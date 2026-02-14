@@ -177,7 +177,7 @@
       if(!input) return;
       activeInput = input;
       const label = input.closest('label');
-      const title = label ? (label.childNodes[0].nodeValue || label.textContent) : input.id;
+      const title = label ? (label.textContent || input.id) : input.id;
       formulaTitle.textContent = title.trim();
       formulaText.textContent = input.dataset.formula || '';
       formulaDetails.textContent = input.dataset.details || '';
@@ -199,7 +199,7 @@
       sliderValue.textContent = String(rounded);
 
       panel.setAttribute('aria-hidden','false');
-      panel.style.display = 'block';
+      panel.classList.add('open');
     }
 
     function closeFormulaPanel(){
@@ -208,7 +208,7 @@
         if(activeInput.dataset.orig) activeInput.value = activeInput.dataset.orig;
       }
       panel.setAttribute('aria-hidden','true');
-      panel.style.display = 'none';
+      panel.classList.remove('open');
       activeInput = null;
     }
 
@@ -218,6 +218,17 @@
       if(t && t.tagName === 'INPUT' && t.readOnly && t.dataset && t.dataset.formula){
         openFormulaPanel(t);
       }
+    });
+
+    // also make the whole label.computed clickable (clicking label text opens panel)
+    document.querySelectorAll('.computed').forEach(function(lbl){
+      lbl.style.cursor = 'pointer';
+      lbl.addEventListener('click', function(ev){
+        // avoid double-handling if clicking the input itself
+        if(ev.target && ev.target.tagName === 'INPUT') return;
+        const inp = lbl.querySelector('input[readonly]');
+        if(inp) openFormulaPanel(inp);
+      });
     });
 
     // close button
