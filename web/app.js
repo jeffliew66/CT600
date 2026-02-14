@@ -8,6 +8,7 @@
   function roundPounds(n){ return Math.round((Number(n) || 0)); }
 
   function compute(){
+    try {
     // Collect all form inputs
     const userInputs = {
       apStart: $("apStart").value,
@@ -175,10 +176,25 @@
       : `✓ Standard 12-month period (${apDays} days)`;
     console.log(apDaysMsg);
     console.log('✓ Computed outputs updated (using TaxEngine with HMRC-compliant rules)');
+    } catch(err) {
+      console.error('❌ COMPUTE ERROR:', err.message);
+      console.error('Stack:', err.stack);
+      alert('Error during calculation:\n\n' + err.message);
+    }
   }
 
   document.addEventListener('DOMContentLoaded', function(){
-    $("computeBtn").addEventListener('click', compute);
+    console.log('✓ Page loaded. TaxEngine:', typeof TaxEngine, 'TaxModel:', typeof TaxModel);
+    if (typeof TaxEngine === 'undefined') {
+      console.error('❌ TaxEngine not loaded!');
+      alert('ERROR: TaxEngine library failed to load. Check browser console.');
+      return;
+    }
+    
+    $("computeBtn").addEventListener('click', function(){
+      console.log('→ Compute button clicked');
+      compute();
+    });
     $("resetBtn").addEventListener('click', function(){ 
       document.getElementById('dataForm').reset();
     });
