@@ -91,40 +91,37 @@
     // Effective tax rate
     const effectiveTaxRate = taxableTotalProfits > 0 ? (corporationTaxCharge / taxableTotalProfits) : 0;
 
-    // Outputs
-    $("section2Out").textContent = ''+
-      'Total Income [C]: ' + roundPounds(totalIncome) + '\n' +
-      'Total Expenses [C]: ' + roundPounds(totalExpenses) + '\n' +
-      'Profit (Loss) before tax [C]: ' + roundPounds(profitBeforeTax) + '\n' +
-      'Tax on Profit [C]: ' + roundPounds(corporationTaxCharge) + '\n' +
-      'Profit (Loss) for the period [C]: ' + roundPounds(profitForPeriod) + '\n';
+    // Populate readonly fields and attach formula/meta for RHS panel
+    const setOut = (id, value, formula, details) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.value = value;
+      el.dataset.formula = formula || '';
+      el.dataset.details = details || '';
+      el.classList.add('clickable');
+    };
 
-    $("section3Out").textContent = ''+
-      'Trading Profit / loss before tax [C]: ' + roundPounds(tradingProfitBeforeTax) + '\n' +
-      'Add back: Depreciation [C]: ' + roundPounds(depreciation) + '\n' +
-      'Add back: Disallowable expenses: ' + roundPounds(disallowableExpenses) + '\n' +
-      'Other adjustments (add if positive): ' + roundPounds(otherAdjustments) + '\n' +
-      'Less: AIA (Trade): ' + roundPounds(aiaTrade) + '\n' +
-      'Less: AIA (Non-Trade): ' + roundPounds(aiaNonTrade) + '\n' +
-      'Less: Trading losses brought forward: ' + roundPounds(tradingLossBF) + '\n' +
-      'Net trading profits [C]: ' + roundPounds(taxableTradingProfit) + '\n';
+    setOut('totalIncome', roundPounds(totalIncome), 'turnover + govtGrants + rental + interest + dividend', `= ${turnover} + ${govtGrants} + ${rentalIncome} + ${interestIncome} + ${dividendIncome} = ${roundPounds(totalIncome)}`);
+    setOut('totalExpenses', roundPounds(totalExpenses), 'rawMaterials + staff + depreciation + otherCharges', `= ${rawMaterials} + ${staffCosts} + ${depreciation} + ${otherCharges} = ${roundPounds(totalExpenses)}`);
+    setOut('profitBeforeTax', roundPounds(profitBeforeTax), 'totalIncome - totalExpenses', `= ${roundPounds(totalIncome)} - ${roundPounds(totalExpenses)} = ${roundPounds(profitBeforeTax)}`);
+    setOut('taxOnProfit', roundPounds(corporationTaxCharge), 'computed per MR/tiers', `CT = ${Math.round(corporationTaxCharge)} (marginalRelief=${Math.round(marginalRelief)})`);
+    setOut('profitForPeriod', roundPounds(profitForPeriod), 'profitBeforeTax - tax', `= ${roundPounds(profitBeforeTax)} - ${roundPounds(corporationTaxCharge)} = ${roundPounds(profitForPeriod)}`);
 
-    $("section4Out").textContent = ''+
-      'Interest income [C]: ' + roundPounds(interestIncome) + '\n' +
-      'Government grants & subsidies [C]: ' + roundPounds(govtGrants) + '\n' +
-      'Dividend income [C]: ' + roundPounds(dividendIncome) + '\n\n' +
-      'Rental & property income [C]: ' + roundPounds(rentalIncome) + '\n' +
-      'Less: rental & property losses b/fwd: ' + roundPounds(rentalLossBF) + '\n' +
-      'Net rental & property income [C]: ' + roundPounds(netRentalIncome) + '\n';
+    setOut('tradingProfitBeforeTax', roundPounds(tradingProfitBeforeTax), 'turnover - rawMaterials - staff - depreciation - other', `= ${turnover} - ${rawMaterials} - ${staffCosts} - ${depreciation} - ${otherCharges} = ${roundPounds(tradingProfitBeforeTax)}`);
+    setOut('addbackDepreciation', roundPounds(depreciation), 'depreciation', `${depreciation}`);
+    setOut('netTradingProfits', roundPounds(taxableTradingProfit), 'taxableBeforeLoss - tradingLossUsed', `taxableBeforeLoss=${roundPounds(taxableBeforeLoss)}, tradingLossUsed=${roundPounds(tradingLossUsed)}, net=${roundPounds(taxableTradingProfit)}`);
 
-    $("section5Out").textContent = ''+
-      'Profits chargeable to corporation tax (TTP) [C]: ' + roundPounds(taxableTotalProfits) + '\n' +
-      'Augmented profits (for MR) [C]: ' + roundPounds(augmentedProfits) + '\n' +
-      'Applicable smallThreshold: ' + roundPounds(smallThreshold) + '\n' +
-      'Applicable upperThreshold: ' + roundPounds(upperThreshold) + '\n' +
-      'Marginal Relief [C]: ' + roundPounds(marginalRelief) + '\n' +
-      'Corporation tax payable [C]: ' + roundPounds(corporationTaxCharge) + '\n' +
-      'Effective tax rate (decimal): ' + (Math.round(effectiveTaxRate*10000)/100) + '%\n';
+    setOut('outInterestIncome', roundPounds(interestIncome), 'interestIncome', `${interestIncome}`);
+    setOut('outGovtGrants', roundPounds(govtGrants), 'govtGrants', `${govtGrants}`);
+    setOut('outDividendIncome', roundPounds(dividendIncome), 'dividendIncome', `${dividendIncome}`);
+    setOut('outRentalIncome', roundPounds(rentalIncome), 'rentalIncome', `${rentalIncome}`);
+    setOut('netRentalIncome', roundPounds(netRentalIncome), 'max(0, rental - rentalLossBF)', `= max(0, ${rentalIncome} - ${rentalLossBF}) = ${roundPounds(netRentalIncome)}`);
+
+    setOut('ttProfitsChargeable', roundPounds(taxableTotalProfits), 'taxableTradingProfit + interest + property', `= ${roundPounds(taxableTradingProfit)} + ${roundPounds(interestIncome)} + ${roundPounds(propertyProfitAfterLossOffset)} = ${roundPounds(taxableTotalProfits)}`);
+    setOut('corpTaxPayable', roundPounds(corporationTaxCharge), 'per FY tiers', `Corporation tax = ${Math.round(corporationTaxCharge)}, effective rate = ${(Math.round(effectiveTaxRate*10000)/100)}%`);
+
+    // show summary in console
+    console.log('Computed outputs updated');
   }
 
   document.addEventListener('DOMContentLoaded', function(){

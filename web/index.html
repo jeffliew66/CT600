@@ -12,78 +12,136 @@
     <p class="hint">Sections: user inputs and computed fields marked with [C]. Fill inputs and click "Compute".</p>
 
     <form id="dataForm">
-      <section>
-        <h2>Section 1 — Period & Company</h2>
-        <label>Start date of Accounting Period
-          <input type="date" id="apStart" required />
-        </label>
-        <label>End date of Accounting Period
-          <input type="date" id="apEnd" required />
-        </label>
-        <label>Number of associated companies
-          <input type="number" id="assocCompanies" min="0" value="0" />
-        </label>
-      </section>
+      <div class="grid">
+        <section class="card">
+          <h2>Section 1</h2>
+          <label>Start date of Accounting Period
+            <input type="date" id="apStart" required />
+          </label>
+          <label>End date of Accounting Period
+            <input type="date" id="apEnd" required />
+          </label>
+          <label>Number of associated companies
+            <input type="number" id="assocCompanies" min="0" value="0" />
+          </label>
+        </section>
 
-      <section>
-        <h2>Section 2 — Income & Expenses</h2>
-        <label>Turnover
-          <input type="number" id="turnover" step="0.01" value="0" />
-        </label>
-        <label>Government grants & subsidies
-          <input type="number" id="govtGrants" step="0.01" value="0" />
-        </label>
-        <label>Rental & property income
-          <input type="number" id="rentalIncome" step="0.01" value="0" />
-        </label>
-        <label>Interest income
-          <input type="number" id="interestIncome" step="0.01" value="0" />
-        </label>
-        <label>Dividend income
-          <input type="number" id="dividendIncome" step="0.01" value="0" />
-        </label>
+        <section class="card">
+          <h2>Section 2</h2>
+          <label>Turnover
+            <input type="number" id="turnover" step="0.01" value="0" />
+          </label>
+          <label>Government grants & subsidies
+            <input type="number" id="govtGrants" step="0.01" value="0" />
+          </label>
+          <label>Rental & property income
+            <input type="number" id="rentalIncome" step="0.01" value="0" />
+          </label>
+          <label>Interest Income
+            <input type="number" id="interestIncome" step="0.01" value="0" />
+          </label>
+          <label>Dividend income
+            <input type="number" id="dividendIncome" step="0.01" value="0" />
+          </label>
 
-        <hr />
+          <label class="computed">Total Income [C]
+            <input type="text" id="totalIncome" readonly data-key="totalIncome" />
+          </label>
 
-        <label>Raw Materials & Consumables
-          <input type="number" id="rawMaterials" step="0.01" value="0" />
-        </label>
-        <label>Staff Costs
-          <input type="number" id="staffCosts" step="0.01" value="0" />
-        </label>
-        <label>Depreciation
-          <input type="number" id="depreciation" step="0.01" value="0" />
-        </label>
-        <label>Other Charges
-          <input type="number" id="otherCharges" step="0.01" value="0" />
-        </label>
-      </section>
+          <hr />
 
-      <section>
-        <h2>Section 3 — Trading Adjustments</h2>
-        <label>Disallowable expenses
-          <input type="number" id="disallowableExpenses" step="0.01" value="0" />
-        </label>
-        <label>Other adjustments (positive add, negative deduct)
-          <input type="number" id="otherAdjustments" step="0.01" value="0" />
-        </label>
-        <label>AIA (Trade)
-          <input type="number" id="aiaTrade" step="0.01" value="0" />
-        </label>
-        <label>AIA (Non-Trade)
-          <input type="number" id="aiaNonTrade" step="0.01" value="0" />
-        </label>
-        <label>Trading losses brought forward
-          <input type="number" id="tradingLossBF" step="0.01" value="0" />
-        </label>
-      </section>
+          <label>Raw Materials & Consumables
+            <input type="number" id="rawMaterials" step="0.01" value="0" />
+          </label>
+          <label>Staff Costs
+            <input type="number" id="staffCosts" step="0.01" value="0" />
+          </label>
+          <label>Depreciation
+            <input type="number" id="depreciation" step="0.01" value="0" />
+          </label>
+          <label>Other Charges
+            <input type="number" id="otherCharges" step="0.01" value="0" />
+          </label>
 
-      <section>
-        <h2>Section 4 — Other Income Details</h2>
-        <label>Rental & property losses brought forward
-          <input type="number" id="rentalLossBF" step="0.01" value="0" />
-        </label>
-      </section>
+          <label class="computed">Total Expenses [C]
+            <input type="text" id="totalExpenses" readonly data-key="totalExpenses" />
+          </label>
+
+          <label class="computed">Profit (Loss) before tax [C]
+            <input type="text" id="profitBeforeTax" readonly data-key="profitBeforeTax" />
+          </label>
+
+          <label class="computed">Tax on Profit [C]
+            <input type="text" id="taxOnProfit" readonly data-key="taxOnProfit" />
+          </label>
+
+          <label class="computed">Profit (Loss) for the period [C]
+            <input type="text" id="profitForPeriod" readonly data-key="profitForPeriod" />
+          </label>
+        </section>
+
+        <section class="card">
+          <h2>Section 3</h2>
+          <label class="computed">Trading Profit / loss before tax [C]
+            <input type="text" id="tradingProfitBeforeTax" readonly data-key="tradingProfitBeforeTax" />
+          </label>
+          <label class="computed">Add back: Depreciation [C]
+            <input type="text" id="addbackDepreciation" readonly data-key="addbackDepreciation" />
+          </label>
+          <label>Add back: Disallowable expenses
+            <input type="number" id="disallowableExpenses" step="0.01" value="0" />
+          </label>
+          <label>Other adjustments (add if positive, deduct if negative)
+            <input type="number" id="otherAdjustments" step="0.01" value="0" />
+          </label>
+          <label>Less: AIA (Trade)
+            <input type="number" id="aiaTrade" step="0.01" value="0" />
+          </label>
+          <label>Less: AIA (Non-Trade)
+            <input type="number" id="aiaNonTrade" step="0.01" value="0" />
+          </label>
+          <label>Less: Trading losses brought forward
+            <input type="number" id="tradingLossBF" step="0.01" value="0" />
+          </label>
+
+          <label class="computed">Net trading profits [C]
+            <input type="text" id="netTradingProfits" readonly data-key="netTradingProfits" />
+          </label>
+        </section>
+
+        <section class="card">
+          <h2>Section 4</h2>
+          <label class="computed">Interest income [C]
+            <input type="text" id="outInterestIncome" readonly data-key="outInterestIncome" />
+          </label>
+          <label class="computed">Government grants & subsidies [C]
+            <input type="text" id="outGovtGrants" readonly data-key="outGovtGrants" />
+          </label>
+          <label class="computed">Dividend income [C]
+            <input type="text" id="outDividendIncome" readonly data-key="outDividendIncome" />
+          </label>
+
+          <label class="computed">Rental & property income [C]
+            <input type="text" id="outRentalIncome" readonly data-key="outRentalIncome" />
+          </label>
+          <label>Less: rental & property losses brought forward
+            <input type="number" id="rentalLossBF" step="0.01" value="0" />
+          </label>
+          <label class="computed">Net rental & property income [C]
+            <input type="text" id="netRentalIncome" readonly data-key="netRentalIncome" />
+          </label>
+        </section>
+
+        <section class="card wide">
+          <h2>Section 5</h2>
+          <label class="computed">Profits chargeable to corporation tax [C]
+            <input type="text" id="ttProfitsChargeable" readonly data-key="ttProfitsChargeable" />
+          </label>
+          <label class="computed">Corporation tax payable [C]
+            <input type="text" id="corpTaxPayable" readonly data-key="corpTaxPayable" />
+          </label>
+        </section>
+      </div>
 
       <div class="actions">
         <button type="button" id="computeBtn">Compute</button>
@@ -92,30 +150,16 @@
 
     </form>
 
-    <section id="results">
-      <h2>Results (computed fields marked [C])</h2>
-
-      <div class="result-block">
-        <h3>Section 2 Outputs</h3>
-        <pre id="section2Out"></pre>
+    <!-- RHS sliding panel for formula / details -->
+    <aside id="formulaPanel" aria-hidden="true">
+      <button id="closePanel" aria-label="Close">×</button>
+      <div id="formulaContent">
+        <h3 id="formulaTitle">Formula</h3>
+        <pre id="formulaText"></pre>
+        <h4>Detailed Calculation</h4>
+        <pre id="formulaDetails"></pre>
       </div>
-
-      <div class="result-block">
-        <h3>Section 3 Outputs</h3>
-        <pre id="section3Out"></pre>
-      </div>
-
-      <div class="result-block">
-        <h3>Section 4 Outputs</h3>
-        <pre id="section4Out"></pre>
-      </div>
-
-      <div class="result-block">
-        <h3>Section 5 Outputs</h3>
-        <pre id="section5Out"></pre>
-      </div>
-
-    </section>
+    </aside>
 
     <footer>
       <p>Ready to deploy to Vercel: drop the <code>web</code> folder into a repo and link to Vercel.</p>
