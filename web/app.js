@@ -36,8 +36,30 @@
 
     // Call TaxEngine (HMRC-compliant with AP splitting, thresholds, MR)
     const { inputs, result } = TaxEngine.run(userInputs, {});
-
-    // Extract key values for display
+    
+    // DEBUG: Full calculation output
+    console.log('═══════════════════════════════════════════════════════════════');
+    console.log('TAX CALCULATION DEBUG OUTPUT');
+    console.log('═══════════════════════════════════════════════════════════════');
+    console.log('AP:', userInputs.apStart, 'to', userInputs.apEnd);
+    console.log('AP Days:', inputs.apDays, '| Associates:', userInputs.assocCompanies, '| Divisor:', (userInputs.assocCompanies || 0) + 1);
+    console.log('Turnover:', userInputs.turnover, '| Expenses:', userInputs.costOfSales + userInputs.staffCosts + userInputs.depreciation + userInputs.otherCharges);
+    console.log('');
+    console.log('PERIODS:');
+    result.metadata.periods.forEach((p, i) => {
+      console.log(`  Prd${i+1}: ${p.days}d | TxPrf=£${p.taxable_profit.toLocaleString()} | CT=£${p.ct_charge.toLocaleString()}`);
+    });
+    console.log('');
+    console.log('BY FY:');
+    result.byFY.forEach(fy => {
+      const thresholds = result.metadata.thresholds?.[fy.fy_year] || {};
+      console.log(`  FY${fy.fy_year}: Thresholds[Lower/Upper]=£${(thresholds.small || '?').toLocaleString?.()}/£${(thresholds.upper || '?').toLocaleString?.()}`);
+      console.log(`    TaxPrf=£${Math.round(fy.taxableProfit).toLocaleString()} | AugPrf=£${Math.round(fy.augmentedProfit).toLocaleString()} | CT=£${Math.round(fy.ctCharge).toLocaleString()} | MR=£${Math.round(fy.marginalRelief).toLocaleString()}`);
+    });
+    console.log('');
+    console.log('TOTAL CT: £' + result.tax.corporationTaxCharge.toLocaleString());
+    console.log('═══════════════════════════════════════════════════════════════');
+    
     const totalIncome = result.accounts.totalIncome;
     const totalExpenses = result.accounts.totalExpenses;
     const profitBeforeTax = result.accounts.profitBeforeTax;

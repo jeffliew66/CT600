@@ -212,9 +212,11 @@
       const small = getTier(fy.tiers, 2).threshold;
       const upper = getTier(fy.tiers, 3).threshold;
 
-      // Apportion by AP days in that FY / FY total days (HMRC style), then divide by associates divisor
-      const smallForAP = (small * (fy.ap_days_in_fy / fy.fy_total_days)) / divisor;
-      const upperForAP = (upper * (fy.ap_days_in_fy / fy.fy_total_days)) / divisor;
+      // HMRC RULE: Thresholds are NOT pro-rated by days; they apply in full to the profit
+      // allocated to that FY. Only the profit is pro-rated, not the thresholds.
+      // Associates divisor applies to thresholds (50k/divisor, 250k/divisor).
+      const smallForAP = small / divisor;
+      const upperForAP = upper / divisor;
 
       return {
         fy_year: fy.fy_year,
@@ -328,6 +330,8 @@
       // Allocate inputs to this period
       const periodProfitBeforeTax = result.accounts.profitBeforeTax * (period.days / inputs.apDays);
       const periodPropertyProfit = result.property.propertyProfitAfterLossOffset * (period.days / inputs.apDays);
+      const periodInterestIncome = pnl.interestIncome * (period.days / inputs.apDays);
+      const periodDividendIncome = pnl.dividendIncome * (period.days / inputs.apDays);
 
       // Add-backs
       const periodAddBacks = TaxModel.roundPounds(
@@ -348,7 +352,8 @@
 
       const periodTaxableAfterLoss = TaxModel.roundPounds(periodTaxableBeforeLoss - periodLossUsed);
       const periodTaxableTotal = Math.max(0, periodTaxableAfterLoss);
-      const periodAugmentedProfit = TaxModel.roundPounds(periodTaxableTotal + pnl.dividendIncome * (period.days / inputs.apDays));
+      // Augmented profit includes taxable profit + dividend income (for rate banding)
+      const periodAugmentedProfit = TaxModel.roundPounds(periodTaxableTotal + periodDividendIncome);
 
       // Calculate CT per FY within this period
       const periodByFY = fyOverlaps.map((fy) => {
@@ -400,8 +405,16 @@
     result.computation.deductions = result.computation.capitalAllowances;
     result.computation.tradingLossUsed = TaxModel.roundPounds(periodResults[0].lossUsed);
     result.computation.taxableTradingProfit = TaxModel.roundPounds(periodResults.reduce((s, p) => s + p.taxableProfit, 0));
-    result.computation.taxableNonTradingProfits = TaxModel.roundPounds(pnl.interestIncome + result.property.propertyProfitAfterLossOffset);
-    result.computation.taxableTotalProfits = Math.max(0, result.computation.taxableTradingProfit);
+    
+    // CRITICAL FIX: Include ALL income types in taxable total profits
+    // Taxable Total = Trading Profit + Interest Income + Property Profit (after loss offset)
+    const totalInterestIncome = TaxModel.roundPounds(pnl.interestIncome);
+    const totalPropertyProfit = TaxModel.roundPounds(result.property.propertyProfitAfterLossOffset);
+    
+    result.computation.taxableNonTradingProfits = TaxModel.roundPounds(totalInterestIncome + totalPropertyProfit);
+    result.computation.taxableTotalProfits = Math.max(0, result.computation.taxableTradingProfit + totalInterestIncome + totalPropertyProfit);
+    
+    // Augmented profit (for rate banding) = Taxable Total + Dividend Income
     result.computation.augmentedProfits = TaxModel.roundPounds(result.computation.taxableTotalProfits + pnl.dividendIncome);
 
     result.tax.corporationTaxCharge = TaxModel.roundPounds(periodResults.reduce((s, p) => s + p.ctCharge, 0));

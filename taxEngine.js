@@ -59,6 +59,39 @@
   //
   // ==============================================================================
   const defaultCorpTaxYears = [
+    // FY 2020: 19% small profits rate + 25% main rate + marginal relief
+    // Rates unchanged from FY 2019 (pre-April 2023 increase)
+    {
+      fy_year: 2020,
+      start_date: '2020-04-01',
+      end_date: '2021-03-31',
+      tiers: [
+        { index: 1, threshold: 0, rate: 0.19, relief_fraction: 0, aia_limit: 1000000 },
+        { index: 2, threshold: 50000, rate: 0.25, relief_fraction: 0.015, aia_limit: 1000000 },
+        { index: 3, threshold: 250000, rate: 0.25, relief_fraction: 0, aia_limit: 1000000 }
+      ]
+    },
+    {
+      fy_year: 2021,
+      start_date: '2021-04-01',
+      end_date: '2022-03-31',
+      tiers: [
+        { index: 1, threshold: 0, rate: 0.19, relief_fraction: 0, aia_limit: 1000000 },
+        { index: 2, threshold: 50000, rate: 0.25, relief_fraction: 0.015, aia_limit: 1000000 },
+        { index: 3, threshold: 250000, rate: 0.25, relief_fraction: 0, aia_limit: 1000000 }
+      ]
+    },
+    {
+      fy_year: 2022,
+      start_date: '2022-04-01',
+      end_date: '2023-03-31',
+      tiers: [
+        { index: 1, threshold: 0, rate: 0.19, relief_fraction: 0, aia_limit: 1000000 },
+        { index: 2, threshold: 50000, rate: 0.25, relief_fraction: 0.015, aia_limit: 1000000 },
+        { index: 3, threshold: 250000, rate: 0.25, relief_fraction: 0, aia_limit: 1000000 }
+      ]
+    },
+    // FY 2023: 19% small profits rate (unchanged), 25% main rate (unchanged)
     {
       fy_year: 2023,
       start_date: '2023-04-01',
@@ -69,6 +102,7 @@
         { index: 3, threshold: 250000, rate: 0.25, relief_fraction: 0, aia_limit: 1000000 }
       ]
     },
+    // FY 2024: Same rates continue (19% small, 25% main)
     {
       fy_year: 2024,
       start_date: '2024-04-01',
@@ -79,18 +113,67 @@
         { index: 3, threshold: 250000, rate: 0.25, relief_fraction: 0, aia_limit: 1000000 }
       ]
     },
-    // SAMPLE FUTURE YEAR (replace with actual rates when announced by HMRC)
-    // Uncomment and update when FY 2025/26 rates are confirmed
-    // {
-    //   fy_year: 2025,
-    //   start_date: '2025-04-01',
-    //   end_date: '2026-03-31',
-    //   tiers: [
-    //     { index: 1, threshold: 0, rate: 0.19, relief_fraction: 0, aia_limit: 1000000 },
-    //     { index: 2, threshold: 50000, rate: 0.25, relief_fraction: 0.015, aia_limit: 1000000 },
-    //     { index: 3, threshold: 250000, rate: 0.25, relief_fraction: 0, aia_limit: 1000000 }
-    //   ]
-    // }
+    // FY 2025 onwards: Assuming rates unchanged (19% small, 25% main) until HMRC announces change
+    {
+      fy_year: 2025,
+      start_date: '2025-04-01',
+      end_date: '2026-03-31',
+      tiers: [
+        { index: 1, threshold: 0, rate: 0.19, relief_fraction: 0, aia_limit: 1000000 },
+        { index: 2, threshold: 50000, rate: 0.25, relief_fraction: 0.015, aia_limit: 1000000 },
+        { index: 3, threshold: 250000, rate: 0.25, relief_fraction: 0, aia_limit: 1000000 }
+      ]
+    },
+    {
+      fy_year: 2026,
+      start_date: '2026-04-01',
+      end_date: '2027-03-31',
+      tiers: [
+        { index: 1, threshold: 0, rate: 0.19, relief_fraction: 0, aia_limit: 1000000 },
+        { index: 2, threshold: 50000, rate: 0.25, relief_fraction: 0.015, aia_limit: 1000000 },
+        { index: 3, threshold: 250000, rate: 0.25, relief_fraction: 0, aia_limit: 1000000 }
+      ]
+    },
+    {
+      fy_year: 2027,
+      start_date: '2027-04-01',
+      end_date: '2028-03-31',
+      tiers: [
+        { index: 1, threshold: 0, rate: 0.19, relief_fraction: 0, aia_limit: 1000000 },
+        { index: 2, threshold: 50000, rate: 0.25, relief_fraction: 0.015, aia_limit: 1000000 },
+        { index: 3, threshold: 250000, rate: 0.25, relief_fraction: 0, aia_limit: 1000000 }
+      ]
+    },
+    {
+      fy_year: 2028,
+      start_date: '2028-04-01',
+      end_date: '2029-03-31',
+      tiers: [
+        { index: 1, threshold: 0, rate: 0.19, relief_fraction: 0, aia_limit: 1000000 },
+        { index: 2, threshold: 50000, rate: 0.25, relief_fraction: 0.015, aia_limit: 1000000 },
+        { index: 3, threshold: 250000, rate: 0.25, relief_fraction: 0, aia_limit: 1000000 }
+      ]
+    },
+    {
+      fy_year: 2029,
+      start_date: '2029-04-01',
+      end_date: '2030-03-31',
+      tiers: [
+        { index: 1, threshold: 0, rate: 0.19, relief_fraction: 0, aia_limit: 1000000 },
+        { index: 2, threshold: 50000, rate: 0.25, relief_fraction: 0.015, aia_limit: 1000000 },
+        { index: 3, threshold: 250000, rate: 0.25, relief_fraction: 0, aia_limit: 1000000 }
+      ]
+    },
+    {
+      fy_year: 2030,
+      start_date: '2030-04-01',
+      end_date: '2031-03-31',
+      tiers: [
+        { index: 1, threshold: 0, rate: 0.19, relief_fraction: 0, aia_limit: 1000000 },
+        { index: 2, threshold: 50000, rate: 0.25, relief_fraction: 0.015, aia_limit: 1000000 },
+        { index: 3, threshold: 250000, rate: 0.25, relief_fraction: 0, aia_limit: 1000000 }
+      ]
+    }
   ];
 
   function getTier(tiers, idx) {
@@ -212,9 +295,11 @@
       const small = getTier(fy.tiers, 2).threshold;
       const upper = getTier(fy.tiers, 3).threshold;
 
-      // Apportion by AP days in that FY / FY total days (HMRC style), then divide by associates divisor
-      const smallForAP = (small * (fy.ap_days_in_fy / fy.fy_total_days)) / divisor;
-      const upperForAP = (upper * (fy.ap_days_in_fy / fy.fy_total_days)) / divisor;
+      // HMRC RULE: Thresholds are NOT pro-rated by days; they apply in full to the profit
+      // allocated to that FY. Only the profit is pro-rated, not the thresholds.
+      // Associates divisor applies to thresholds (50k/divisor, 250k/divisor).
+      const smallForAP = small / divisor;
+      const upperForAP = upper / divisor;
 
       return {
         fy_year: fy.fy_year,
@@ -328,6 +413,8 @@
       // Allocate inputs to this period
       const periodProfitBeforeTax = result.accounts.profitBeforeTax * (period.days / inputs.apDays);
       const periodPropertyProfit = result.property.propertyProfitAfterLossOffset * (period.days / inputs.apDays);
+      const periodInterestIncome = pnl.interestIncome * (period.days / inputs.apDays);
+      const periodDividendIncome = pnl.dividendIncome * (period.days / inputs.apDays);
 
       // Add-backs
       const periodAddBacks = TaxModel.roundPounds(
@@ -348,7 +435,8 @@
 
       const periodTaxableAfterLoss = TaxModel.roundPounds(periodTaxableBeforeLoss - periodLossUsed);
       const periodTaxableTotal = Math.max(0, periodTaxableAfterLoss);
-      const periodAugmentedProfit = TaxModel.roundPounds(periodTaxableTotal + pnl.dividendIncome * (period.days / inputs.apDays));
+      // Augmented profit includes taxable profit + dividend income (for rate banding)
+      const periodAugmentedProfit = TaxModel.roundPounds(periodTaxableTotal + periodDividendIncome);
 
       // Calculate CT per FY within this period
       const periodByFY = fyOverlaps.map((fy) => {
@@ -400,8 +488,16 @@
     result.computation.deductions = result.computation.capitalAllowances;
     result.computation.tradingLossUsed = TaxModel.roundPounds(periodResults[0].lossUsed);
     result.computation.taxableTradingProfit = TaxModel.roundPounds(periodResults.reduce((s, p) => s + p.taxableProfit, 0));
-    result.computation.taxableNonTradingProfits = TaxModel.roundPounds(pnl.interestIncome + result.property.propertyProfitAfterLossOffset);
-    result.computation.taxableTotalProfits = Math.max(0, result.computation.taxableTradingProfit);
+    
+    // CRITICAL FIX: Include ALL income types in taxable total profits
+    // Taxable Total = Trading Profit + Interest Income + Property Profit (after loss offset)
+    const totalInterestIncome = TaxModel.roundPounds(pnl.interestIncome);
+    const totalPropertyProfit = TaxModel.roundPounds(result.property.propertyProfitAfterLossOffset);
+    
+    result.computation.taxableNonTradingProfits = TaxModel.roundPounds(totalInterestIncome + totalPropertyProfit);
+    result.computation.taxableTotalProfits = Math.max(0, result.computation.taxableTradingProfit + totalInterestIncome + totalPropertyProfit);
+    
+    // Augmented profit (for rate banding) = Taxable Total + Dividend Income
     result.computation.augmentedProfits = TaxModel.roundPounds(result.computation.taxableTotalProfits + pnl.dividendIncome);
 
     result.tax.corporationTaxCharge = TaxModel.roundPounds(periodResults.reduce((s, p) => s + p.ctCharge, 0));
