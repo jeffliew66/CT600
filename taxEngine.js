@@ -148,26 +148,30 @@
     // if augmented <= lower => small profits rate (19%)
     // if augmented >= upper => main rate (25%)
     // else MR = relief_fraction*(upper-augmented)*(taxable/augmented)
+    // 
+    // HMRC COMPLIANCE FIX: Keep full decimal precision during computation,
+    // round only the final CT charge to the nearest £1.
     const smallRate = getTier(tiers, 1).rate;
     const mainRate = getTier(tiers, 3).rate;
     const reliefFraction = getTier(tiers, 2).relief_fraction;
 
-    const tp = Math.max(0, TaxModel.roundPounds(taxableProfit));
-    const ap = Math.max(0, TaxModel.roundPounds(augmentedProfit));
+    const tp = Math.max(0, taxableProfit);  // Keep as-is, no rounding
+    const ap = Math.max(0, augmentedProfit);  // Keep as-is, no rounding
+    const lower = Math.max(0, lowerLimit);
+    const upper = Math.max(0, upperLimit);
 
     let ctCharge = 0;
     let marginalRelief = 0;
 
-    if (ap <= TaxModel.roundPounds(lowerLimit)) {
+    if (ap <= lower) {
       ctCharge = tp * smallRate;
-    } else if (ap >= TaxModel.roundPounds(upperLimit)) {
+    } else if (ap >= upper) {
       ctCharge = tp * mainRate;
     } else {
-      // Start at main rate then deduct marginal relief
+      // Start at main rate then deduct marginal relief (all in decimal precision)
       const main = tp * mainRate;
-      // Guard: if ap == 0, ratio is 0 (shouldn't happen in-band, but safe)
       const ratio = ap > 0 ? (tp / ap) : 0;
-      marginalRelief = reliefFraction * (upperLimit - ap) * ratio;
+      marginalRelief = reliefFraction * (upper - ap) * ratio;
       ctCharge = main - marginalRelief;
     }
 
@@ -175,8 +179,8 @@
       fy_year,
       taxableProfit: tp,
       augmentedProfit: ap,
-      ctCharge: TaxModel.roundPounds(ctCharge),
-      marginalRelief: TaxModel.roundPounds(marginalRelief)
+      ctCharge: TaxModel.roundPounds(ctCharge),  // Round only the final charge
+      marginalRelief: TaxModel.roundPounds(marginalRelief)  // Round for reporting
     };
   }
 

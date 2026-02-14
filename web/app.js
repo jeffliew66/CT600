@@ -107,10 +107,61 @@
     setOut('totalExpenses', roundPounds(totalExpenses), 'rawMaterials + staff + depreciation + otherCharges', `= ${rawMaterials} + ${staffCosts} + ${depreciation} + ${otherCharges} = ${roundPounds(totalExpenses)}`);
     document.getElementById('totalExpenses').dataset.raw = String(totalExpenses);
     document.getElementById('totalExpenses').dataset.orig = String(roundPounds(totalExpenses));
-    setOut('profitBeforeTax', roundPounds(profitBeforeTax), 'totalIncome - totalExpenses', `= ${roundPounds(totalIncome)} - ${roundPounds(totalExpenses)} = ${roundPounds(profitBeforeTax)}`);
+    const pbtDetail = `STEP-BY-STEP CALCULATION:
+
+Total Income
+  = Turnover + Govt Grants + Interest + Rental + Dividend
+  = £${roundPounds(turnover).toLocaleString()} + £${roundPounds(govtGrants).toLocaleString()} + £${roundPounds(rentalIncome).toLocaleString()} + £${roundPounds(interestIncome).toLocaleString()} + £${roundPounds(dividendIncome).toLocaleString()}
+  = £${roundPounds(totalIncome).toLocaleString()}
+
+Total Expenses
+  = Raw Materials + Staff + Depreciation + Other
+  = £${roundPounds(rawMaterials).toLocaleString()} + £${roundPounds(staffCosts).toLocaleString()} + £${roundPounds(depreciation).toLocaleString()} + £${roundPounds(otherCharges).toLocaleString()}
+  = £${roundPounds(totalExpenses).toLocaleString()}
+
+Profit Before Tax
+  = Total Income - Total Expenses
+  = £${roundPounds(totalIncome).toLocaleString()} - £${roundPounds(totalExpenses).toLocaleString()}
+  = £${roundPounds(profitBeforeTax).toLocaleString()}`;
+    setOut('profitBeforeTax', roundPounds(profitBeforeTax), 'Total Income - Total Expenses', pbtDetail);
     document.getElementById('profitBeforeTax').dataset.raw = String(profitBeforeTax);
     document.getElementById('profitBeforeTax').dataset.orig = String(roundPounds(profitBeforeTax));
-    setOut('taxOnProfit', roundPounds(corporationTaxCharge), 'computed per MR/tiers', `CT = ${Math.round(corporationTaxCharge)} (marginalRelief=${Math.round(marginalRelief)})`);
+    const taxFormulaDetail = (() => {
+      let detail = `Taxable Profit (TP): £${roundPounds(taxableTotalProfits).toLocaleString()}\n`;
+      detail += `Dividend Income: £${roundPounds(dividendIncome).toLocaleString()}\n`;
+      detail += `Augmented Profit (AP): TP + Dividends = £${roundPounds(taxableTotalProfits).toLocaleString()} + £${roundPounds(dividendIncome).toLocaleString()} = £${roundPounds(augmentedProfits).toLocaleString()}\n\n`;
+      detail += `THRESHOLDS (with associates divisor ${assocCompanies + 1}):\n`;
+      detail += `  Small profit threshold: £50,000 ÷ ${assocCompanies + 1} = £${roundPounds(smallThreshold).toLocaleString()}\n`;
+      detail += `  Main rate threshold: £250,000 ÷ ${assocCompanies + 1} = £${roundPounds(upperThreshold).toLocaleString()}\n\n`;
+      detail += `TAX RATE DETERMINATION:\n`;
+      if (augmentedProfits <= smallThreshold) {
+        detail += `  AP (£${roundPounds(augmentedProfits).toLocaleString()}) ≤ Small threshold (£${roundPounds(smallThreshold).toLocaleString()})\n`;
+        detail += `  → Apply SMALL PROFITS RATE (19%)\n\n`;
+        detail += `CALCULATION:\n`;
+        detail += `  CT = TP × 19% = £${roundPounds(taxableTotalProfits).toLocaleString()} × 0.19 = £${Math.round(corporationTaxCharge).toLocaleString()}`;
+      } else if (augmentedProfits >= upperThreshold) {
+        detail += `  AP (£${roundPounds(augmentedProfits).toLocaleString()}) ≥ Main rate threshold (£${roundPounds(upperThreshold).toLocaleString()})\n`;
+        detail += `  → Apply MAIN RATE (25%)\n\n`;
+        detail += `CALCULATION:\n`;
+        detail += `  CT = TP × 25% = £${roundPounds(taxableTotalProfits).toLocaleString()} × 0.25 = £${Math.round(corporationTaxCharge).toLocaleString()}`;
+      } else {
+        const main = taxableTotalProfits * 0.25;
+        const ratio = augmentedProfits > 0 ? (taxableTotalProfits / augmentedProfits) : 0;
+        detail += `  AP (£${roundPounds(augmentedProfits).toLocaleString()}) is between thresholds\n`;
+        detail += `  → Apply MARGINAL RELIEF\n\n`;
+        detail += `CALCULATION:\n`;
+        detail += `  Step 1: CT at main rate = TP × 25% = £${roundPounds(taxableTotalProfits).toLocaleString()} × 0.25 = £${Math.round(main).toLocaleString()}\n`;
+        detail += `  Step 2: Ratio = TP ÷ AP = £${roundPounds(taxableTotalProfits).toLocaleString()} ÷ £${roundPounds(augmentedProfits).toLocaleString()} = ${ratio.toFixed(4)}\n`;
+        detail += `  Step 3: Marginal Relief = 1.5% × (Upper threshold - AP) × Ratio\n`;
+        detail += `                           = 0.015 × (£${roundPounds(upperThreshold).toLocaleString()} - £${roundPounds(augmentedProfits).toLocaleString()}) × ${ratio.toFixed(4)}\n`;
+        detail += `                           = 0.015 × £${roundPounds(upperThreshold - augmentedProfits).toLocaleString()} × ${ratio.toFixed(4)}\n`;
+        detail += `                           = £${Math.round(marginalRelief).toLocaleString()}\n`;
+        detail += `  Step 4: Final CT = Main rate CT - Marginal Relief\n`;
+        detail += `                   = £${Math.round(main).toLocaleString()} - £${Math.round(marginalRelief).toLocaleString()} = £${Math.round(corporationTaxCharge).toLocaleString()}`;
+      }
+      return detail;
+    })();
+    setOut('taxOnProfit', roundPounds(corporationTaxCharge), 'CT = TP × rate(s), adjusted by marginal relief if applicable', taxFormulaDetail);
     document.getElementById('taxOnProfit').dataset.raw = String(corporationTaxCharge);
     document.getElementById('taxOnProfit').dataset.orig = String(Math.round(corporationTaxCharge));
     setOut('profitForPeriod', roundPounds(profitForPeriod), 'profitBeforeTax - tax', `= ${roundPounds(profitBeforeTax)} - ${roundPounds(corporationTaxCharge)} = ${roundPounds(profitForPeriod)}`);
@@ -123,7 +174,35 @@
     setOut('addbackDepreciation', roundPounds(depreciation), 'depreciation', `${depreciation}`);
     document.getElementById('addbackDepreciation').dataset.raw = String(depreciation);
     document.getElementById('addbackDepreciation').dataset.orig = String(roundPounds(depreciation));
-    setOut('netTradingProfits', roundPounds(taxableTradingProfit), 'taxableBeforeLoss - tradingLossUsed', `taxableBeforeLoss=${roundPounds(taxableBeforeLoss)}, tradingLossUsed=${roundPounds(tradingLossUsed)}, net=${roundPounds(taxableTradingProfit)}`);
+    const ntpDetail = `STEP-BY-STEP CALCULATION:
+
+Trading Profit Before Tax
+  = Turnover - Cost of Sales - Staff - Depreciation - Other Charges
+  = £${roundPounds(turnover).toLocaleString()} - £${roundPounds(rawMaterials).toLocaleString()} - £${roundPounds(staffCosts).toLocaleString()} - £${roundPounds(depreciation).toLocaleString()} - £${roundPounds(otherCharges).toLocaleString()}
+  = £${roundPounds(tradingProfitBeforeTax).toLocaleString()}
+
+Add-backs (non-deductible for tax)
+  = Depreciation + Disallowables + Adjustments
+  = £${roundPounds(depreciation).toLocaleString()} + £${roundPounds(disallowableExpenses).toLocaleString()} + £${roundPounds(otherAdjustments > 0 ? otherAdjustments : 0).toLocaleString()}
+  = £${roundPounds(addBacks).toLocaleString()}
+
+Deductions (capital allowances, AIA)
+  = AIA Claimed (up to limit)
+  = £${roundPounds(deductions).toLocaleString()}
+
+Taxable Before Loss Offset
+  = Trading Profit + Add-backs - Deductions
+  = £${roundPounds(tradingProfitBeforeTax).toLocaleString()} + £${roundPounds(addBacks).toLocaleString()} - £${roundPounds(deductions).toLocaleString()}
+  = £${roundPounds(taxableBeforeLoss).toLocaleString()}
+
+Trading Loss Brought Forward: £${roundPounds(tradingLossBF).toLocaleString()}
+Loss Used (min of BF loss & taxable): £${roundPounds(tradingLossUsed).toLocaleString()}
+
+Net Trading Profit (after loss offset)
+  = Taxable Before Loss - Loss Used
+  = £${roundPounds(taxableBeforeLoss).toLocaleString()} - £${roundPounds(tradingLossUsed).toLocaleString()}
+  = £${roundPounds(taxableTradingProfit).toLocaleString()}`;
+    setOut('netTradingProfits', roundPounds(taxableTradingProfit), 'Trading profit + add-backs - deductions - loss carry-forward', ntpDetail);
     document.getElementById('netTradingProfits').dataset.raw = String(taxableTradingProfit);
     document.getElementById('netTradingProfits').dataset.orig = String(roundPounds(taxableTradingProfit));
 
@@ -143,7 +222,29 @@
     document.getElementById('netRentalIncome').dataset.raw = String(netRentalIncome);
     document.getElementById('netRentalIncome').dataset.orig = String(roundPounds(netRentalIncome));
 
-    setOut('ttProfitsChargeable', roundPounds(taxableTotalProfits), 'taxableTradingProfit + interest + property', `= ${roundPounds(taxableTradingProfit)} + ${roundPounds(interestIncome)} + ${roundPounds(propertyProfitAfterLossOffset)} = ${roundPounds(taxableTotalProfits)}`);
+    const ttpDetail = `STEP-BY-STEP CALCULATION:
+
+Note: Trading and Property income are treated SEPARATELY for tax purposes.
+
+1. TRADING PROFIT (from Section 3)
+   Net Trading: £${roundPounds(taxableTradingProfit).toLocaleString()}
+
+2. RENTAL & PROPERTY INCOME (from Section 4)
+   Rental Income: £${roundPounds(rentalIncome).toLocaleString()}
+   Less: Rental Losses B/F: £${roundPounds(rentalLossBF).toLocaleString()}
+   Net Rental Income: £${roundPounds(propertyProfitAfterLossOffset).toLocaleString()}
+
+3. OTHER INCOME
+   Interest Income: £${roundPounds(interestIncome).toLocaleString()}
+   Government Grants: £${roundPounds(govtGrants).toLocaleString()}
+
+4. TAXABLE TOTAL PROFIT (TTP)
+   = Trading + Interest + Property (after losses) + Grants
+   = £${roundPounds(taxableTradingProfit).toLocaleString()} + £${roundPounds(interestIncome).toLocaleString()} + £${roundPounds(propertyProfitAfterLossOffset).toLocaleString()}
+   = £${roundPounds(taxableTotalProfits).toLocaleString()}
+
+This is the profit on which corporation tax is calculated.`;
+    setOut('ttProfitsChargeable', roundPounds(taxableTotalProfits), 'Sum of all taxable income sources (trading, property, interest, grants)', ttpDetail);
     document.getElementById('ttProfitsChargeable').dataset.raw = String(taxableTotalProfits);
     document.getElementById('ttProfitsChargeable').dataset.orig = String(roundPounds(taxableTotalProfits));
     setOut('corpTaxPayable', roundPounds(corporationTaxCharge), 'per FY tiers', `Corporation tax = ${Math.round(corporationTaxCharge)}, effective rate = ${(Math.round(effectiveTaxRate*10000)/100)}%`);
@@ -247,13 +348,15 @@
       }
     });
 
-    // slider movement updates the active input
+    // slider movement updates the active input and re-runs compute
     formulaSlider.addEventListener('input', function(){
       const val = Number(formulaSlider.value);
       sliderValue.textContent = String(val);
       if(activeInput){
         activeInput.value = String(Math.round(val));
         activeInput.dataset.adjusted = '1';
+        // Re-run compute to propagate slider changes to dependent fields
+        compute();
       }
     });
   });
