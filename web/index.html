@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>HMRC v2 — Quick Calculator</title>
+  <link rel="stylesheet" href="/web/style.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>HMRC v2 — Input & Validation Page</h1>
+    <p class="hint">Sections: user inputs and computed fields marked with [C]. Fill inputs and click "Compute".</p>
+
+    <form id="dataForm">
+      <section>
+        <h2>Section 1 — Period & Company</h2>
+        <label>Start date of Accounting Period
+          <input type="date" id="apStart" required />
+        </label>
+        <label>End date of Accounting Period
+          <input type="date" id="apEnd" required />
+        </label>
+        <label>Number of associated companies
+          <input type="number" id="assocCompanies" min="0" value="0" />
+        </label>
+      </section>
+
+      <section>
+        <h2>Section 2 — Income & Expenses</h2>
+        <label>Turnover
+          <input type="number" id="turnover" step="0.01" value="0" />
+        </label>
+        <label>Government grants & subsidies
+          <input type="number" id="govtGrants" step="0.01" value="0" />
+        </label>
+        <label>Rental & property income
+          <input type="number" id="rentalIncome" step="0.01" value="0" />
+        </label>
+        <label>Interest income
+          <input type="number" id="interestIncome" step="0.01" value="0" />
+        </label>
+        <label>Dividend income
+          <input type="number" id="dividendIncome" step="0.01" value="0" />
+        </label>
+
+        <hr />
+
+        <label>Raw Materials & Consumables
+          <input type="number" id="rawMaterials" step="0.01" value="0" />
+        </label>
+        <label>Staff Costs
+          <input type="number" id="staffCosts" step="0.01" value="0" />
+        </label>
+        <label>Depreciation
+          <input type="number" id="depreciation" step="0.01" value="0" />
+        </label>
+        <label>Other Charges
+          <input type="number" id="otherCharges" step="0.01" value="0" />
+        </label>
+      </section>
+
+      <section>
+        <h2>Section 3 — Trading Adjustments</h2>
+        <label>Disallowable expenses
+          <input type="number" id="disallowableExpenses" step="0.01" value="0" />
+        </label>
+        <label>Other adjustments (positive add, negative deduct)
+          <input type="number" id="otherAdjustments" step="0.01" value="0" />
+        </label>
+        <label>AIA (Trade)
+          <input type="number" id="aiaTrade" step="0.01" value="0" />
+        </label>
+        <label>AIA (Non-Trade)
+          <input type="number" id="aiaNonTrade" step="0.01" value="0" />
+        </label>
+        <label>Trading losses brought forward
+          <input type="number" id="tradingLossBF" step="0.01" value="0" />
+        </label>
+      </section>
+
+      <section>
+        <h2>Section 4 — Other Income Details</h2>
+        <label>Rental & property losses brought forward
+          <input type="number" id="rentalLossBF" step="0.01" value="0" />
+        </label>
+      </section>
+
+      <div class="actions">
+        <button type="button" id="computeBtn">Compute</button>
+        <button type="button" id="resetBtn">Reset</button>
+      </div>
+
+    </form>
+
+    <section id="results">
+      <h2>Results (computed fields marked [C])</h2>
+
+      <div class="result-block">
+        <h3>Section 2 Outputs</h3>
+        <pre id="section2Out"></pre>
+      </div>
+
+      <div class="result-block">
+        <h3>Section 3 Outputs</h3>
+        <pre id="section3Out"></pre>
+      </div>
+
+      <div class="result-block">
+        <h3>Section 4 Outputs</h3>
+        <pre id="section4Out"></pre>
+      </div>
+
+      <div class="result-block">
+        <h3>Section 5 Outputs</h3>
+        <pre id="section5Out"></pre>
+      </div>
+
+    </section>
+
+    <footer>
+      <p>Ready to deploy to Vercel: drop the <code>web</code> folder into a repo and link to Vercel.</p>
+    </footer>
+  </div>
+
+  <script src="/web/app.js"></script>
+</body>
+</html>

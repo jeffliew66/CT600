@@ -1,0 +1,76 @@
+/**
+ * ct600Mapper.js
+ * Maps canonical tax model -> CT600 box values.
+ *
+ * IMPORTANT:
+ * - CT600 boxes are outputs, not your truth.
+ * - Keep this mapper thin and deterministic.
+ */
+(function (root) {
+  'use strict';
+
+  const TaxModel = root.TaxModel;
+  if (!TaxModel) throw new Error('TaxModel not loaded. Load taxModel.js first.');
+
+  function round(n) { return TaxModel.roundPounds(n); }
+
+  function map(inputs, result) {
+    // Minimal set based on your existing box mapping usage.
+    // Add more as you implement more CT600 pages/boxes.
+    const boxes = {};
+
+    // Period + associates
+    boxes.box_30_period_start = inputs.apStart;
+    boxes.box_35_period_end = inputs.apEnd;
+    boxes.box_326_assoc_companies = inputs.assocCompanies;
+    boxes.box_327_assoc_companies = inputs.assocCompanies;
+    boxes.box_328_assoc_companies = inputs.assocCompanies;
+
+    // P&L-related CT600 boxes you used
+    boxes.box_145_trade_turnover = round(inputs.pnl.turnover);
+    boxes.box_170_interest_income = round(inputs.pnl.interestIncome);
+    boxes.box_190_rental_income = round(inputs.pnl.rentalIncome);
+    boxes.box_620_dividend_income = round(inputs.pnl.dividendIncome);
+
+    // Trading profit
+    boxes.box_155_trading_profit = round(result.accounts.profitBeforeTax);
+    boxes.box_160_trading_losses_bfwd = round(inputs.losses.tradingLossBF);
+    boxes.box_165_net_trading_profits = round(result.computation.taxableTradingProfit);
+
+    // Property losses
+    boxes.box_250_prop_losses_bfwd = round(inputs.pnl.propertyLossBF);
+    boxes.box_250_prop_losses_cfwd = round(result.property.propertyLossCF);
+
+    // Profit subtotal (simplified): taxable trading profit + interest + property profit
+    // NOTE: Does NOT include govtGrants (they affect PBT but not the tax-base Box 235)
+    boxes.box_235_profits_subtotal = round(
+      result.computation.taxableTradingProfit + inputs.pnl.interestIncome + result.property.propertyProfitAfterLossOffset
+    );
+    boxes.box_300_profits_before_deductions = boxes.box_235_profits_subtotal;  // Simplified: no capital gains
+    boxes.box_305_donations = 0;  // Not modeled in v1
+    boxes.box_310_group_relief = 0;  // Not modeled in v1
+    boxes.box_312_other_deductions = 0;  // Not modeled in v1
+
+    // Taxable profit / TTP
+    boxes.box_315_taxable_profit = round(result.computation.taxableTotalProfits);
+
+    // Augmented profits
+    boxes.box_330_augmented_profit = round(result.computation.augmentedProfits);
+
+    // CT charge / payable
+    // CORRECTION: Box 325 is "NI profits included" (NOT CT charge)
+    // CT charge maps to Box 455 (total CT calculated)
+    // Tax payable maps to Box 475 (net CT liability)
+    // NOTE: Box 475 = Box 480 (Tax Payable) - Box 595 (Tax Already Paid)
+    //       For v1, we assume no prior tax payments, so Box 475 ≈ Box 480
+    boxes.box_455_total_ct_calculated = round(result.tax.corporationTaxCharge);
+    boxes.box_475_net_ct_liability = round(result.tax.taxPayable);
+
+    // Helpful transparency (not official CT600 boxes, but good for UI/debug)
+    boxes._marginal_relief_total = round(result.tax.marginalRelief);
+
+    return boxes;
+  }
+
+  root.CT600Mapper = { map };
+})(typeof window !== 'undefined' ? window : globalThis);
