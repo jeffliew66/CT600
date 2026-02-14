@@ -251,8 +251,13 @@ This is the profit on which corporation tax is calculated.`;
     document.getElementById('corpTaxPayable').dataset.raw = String(corporationTaxCharge);
     document.getElementById('corpTaxPayable').dataset.orig = String(Math.round(corporationTaxCharge));
 
-    // show summary in console
+    // show summary in console and check AP split
+    const apDays = Math.ceil((new Date($("apEnd").value) - new Date($("apStart").value)) / (1000 * 60 * 60 * 24));
     console.log('Computed outputs updated');
+    if (apDays > 365) {
+      console.log('⚠️  AP SPLIT: Accounting period is ' + apDays + ' days (> 365). Period has been split per HMRC rules.');
+      console.log('   Thresholds, AIA, and tax are calculated per split period.');
+    }
   }
 
   document.addEventListener('DOMContentLoaded', function(){

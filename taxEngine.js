@@ -23,7 +23,41 @@
     return Math.round((endUTC - startUTC) / msPerDay) + 1;
   }
 
-  // Default CT configuration (from your initial.js). Keep updated.
+  // ==============================================================================
+  // CORPORATION TAX RATE CONFIGURATION
+  // ==============================================================================
+  // 
+  // This array defines CT rates, marginal relief thresholds, AIA limits, and
+  // other tax parameters per financial year (6 Apr to 5 Apr).
+  //
+  // Structure:
+  //   fy_year: The financial year (e.g., 2024 = FY ending 5 Apr 2024)
+  //   start_date: FY start date (YYYY-MM-DD, typically 6 Apr or 1 Apr for Companies House filing)
+  //   end_date: FY end date (YYYY-MM-DD)
+  //   tiers: Array of 3 tax tiers (ordered by threshold)
+  //
+  // Each tier has:
+  //   index: 1, 2, or 3 (tier sequence; do not change)
+  //   threshold: Augmented profit threshold (£) for this tier
+  //   rate: Corporation tax rate (decimal; 0.19 = 19%, 0.25 = 25%)
+  //   relief_fraction: Marginal relief factor (0.015 = 1.5% per £ above lower threshold)
+  //   aia_limit: Annual Investment Allowance cap (£)
+  //
+  // Tier definitions (current 2024 onwards):
+  //   Tier 1: Small profits rate (AP ≤ £50k) → 19% CT, no MR
+  //   Tier 2: Marginal relief band (£50k < AP < £250k) → 25% CT minus MR
+  //   Tier 3: Main rate (AP ≥ £250k) → 25% CT, no MR
+  //
+  // FUTURE RATES: To add a new FY with different rates, copy a tier set and update:
+  //   - fy_year, start_date, end_date
+  //   - threshold (if lower/upper limits change)
+  //   - rate (if CT% changes)
+  //   - relief_fraction (if MR % changes)
+  //   - aia_limit (if AIA cap changes)
+  //
+  // IMPORTANT: Thresholds are further divided by (associated_companies + 1).
+  //
+  // ==============================================================================
   const defaultCorpTaxYears = [
     {
       fy_year: 2023,
@@ -44,7 +78,19 @@
         { index: 2, threshold: 50000, rate: 0.25, relief_fraction: 0.015, aia_limit: 1000000 },
         { index: 3, threshold: 250000, rate: 0.25, relief_fraction: 0, aia_limit: 1000000 }
       ]
-    }
+    },
+    // SAMPLE FUTURE YEAR (replace with actual rates when announced by HMRC)
+    // Uncomment and update when FY 2025/26 rates are confirmed
+    // {
+    //   fy_year: 2025,
+    //   start_date: '2025-04-01',
+    //   end_date: '2026-03-31',
+    //   tiers: [
+    //     { index: 1, threshold: 0, rate: 0.19, relief_fraction: 0, aia_limit: 1000000 },
+    //     { index: 2, threshold: 50000, rate: 0.25, relief_fraction: 0.015, aia_limit: 1000000 },
+    //     { index: 3, threshold: 250000, rate: 0.25, relief_fraction: 0, aia_limit: 1000000 }
+    //   ]
+    // }
   ];
 
   function getTier(tiers, idx) {
@@ -53,16 +99,61 @@
     return t;
   }
 
+  function buildAccountingPeriodSplits(inputs, corpTaxYears) {
+    // HMRC RULE: Accounting periods > 12 months must be split at 12-month mark
+    const apDays = inputs.apDays;
+    const apStart = inputs.apStartUTC;
+    const apEnd = inputs.apEndUTC;
+
+    // If AP is 12 months or less, no split needed
+    if (apDays <= 365) {
+      return [{
+        periodName: 'Full Period',
+        startUTC: apStart,
+        endUTC: apEnd,
+        days: apDays,
+        isShortPeriod: false
+      }];
+    }
+
+    // AP > 12 months: split at 12-month mark
+    // Period 1: apStart to apStart + 365 days
+    // Period 2: apStart + 365 days + 1 day to apEnd
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const period1End = new Date(apStart.getTime() + (365 * msPerDay));
+    
+    const period1Days = daysInclusive(apStart, period1End);
+    const period2Start = new Date(period1End.getTime() + msPerDay);
+    const period2Days = daysInclusive(period2Start, apEnd);
+
+    return [
+      {
+        periodName: 'Period 1 (12 months)',
+        startUTC: apStart,
+        endUTC: period1End,
+        days: period1Days,
+        isShortPeriod: false
+      },
+      {
+        periodName: 'Period 2 (short period)',
+        startUTC: period2Start,
+        endUTC: apEnd,
+        days: period2Days,
+        isShortPeriod: true
+      }
+    ];
+  }
+
   function buildFYOverlaps(inputs, corpTaxYears) {
-    const apStartUTC = inputs.apStartUTC;
-    const apEndUTC = inputs.apEndUTC;
+    const apStart = inputs.apStartUTC;
+    const apEnd = inputs.apEndUTC;
 
     const overlaps = (corpTaxYears || []).map((fy) => {
       const fyStart = parseDate(fy.start_date);
       const fyEnd = parseDate(fy.end_date);
 
-      const overlapStart = apStartUTC > fyStart ? apStartUTC : fyStart;
-      const overlapEnd = apEndUTC < fyEnd ? apEndUTC : fyEnd;
+      const overlapStart = apStart > fyStart ? apStart : fyStart;
+      const overlapEnd = apEnd < fyEnd ? apEnd : fyEnd;
 
       let apDaysInFY = 0;
       if (overlapStart <= overlapEnd) apDaysInFY = daysInclusive(overlapStart, overlapEnd);
@@ -191,7 +282,21 @@
     const inputs = TaxModel.createInputs(userInputs);
     const result = TaxModel.createEmptyResult();
 
-    // 1) Accounts P&L -> PBT
+    // HMRC RULE: Split AP if > 12 months
+    const apSplits = buildAccountingPeriodSplits(inputs, corpTaxYears);
+    const hasMultiplePeriods = apSplits.length > 1;
+
+    // Allocate profit and income proportionally across periods
+    const allocateToPeriods = (value) => {
+      return apSplits.map((period) => ({
+        periodName: period.periodName,
+        days: period.days,
+        isShortPeriod: period.isShortPeriod,
+        amount: value * (period.days / inputs.apDays)
+      }));
+    };
+
+    // 1) Accounts P&L -> PBT (allocate to periods)
     const pnl = inputs.pnl;
     result.accounts.totalIncome = TaxModel.roundPounds(
       pnl.turnover + pnl.govtGrants + pnl.rentalIncome + pnl.interestIncome + pnl.dividendIncome
@@ -201,101 +306,120 @@
     );
     result.accounts.profitBeforeTax = TaxModel.roundPounds(result.accounts.totalIncome - result.accounts.totalExpenses);
 
-    // 2) Property loss offset (same as your pnl.js)
+    // 2) Property loss offset
     result.property.rentalIncome = pnl.rentalIncome;
     result.property.propertyLossBF = pnl.propertyLossBF;
     result.property.propertyProfitAfterLossOffset = Math.max(0, pnl.rentalIncome - pnl.propertyLossBF);
     result.property.propertyLossCF = Math.max(0, pnl.propertyLossBF - pnl.rentalIncome);
 
-    // 3) FY overlaps, thresholds, AIA caps
-    const fyOverlaps = buildFYOverlaps(inputs, corpTaxYears);
-    const thresholdParts = buildThresholdParts(inputs, fyOverlaps);
-    const aiaAlloc = buildAIAAllocation(inputs, fyOverlaps, corpTaxYears);
+    // 3) Allocate profit to each AP split period and calculate tax per period
+    const periodResults = apSplits.map((period) => {
+      // Build FY overlaps FOR THIS PERIOD ONLY
+      const tmpInputs = {
+        apStartUTC: period.startUTC,
+        apEndUTC: period.endUTC,
+        apDays: period.days,
+        assocCompanies: inputs.assocCompanies
+      };
+      const fyOverlaps = buildFYOverlaps(tmpInputs, corpTaxYears);
+      const thresholdParts = buildThresholdParts(tmpInputs, fyOverlaps);
+      const aiaAlloc = buildAIAAllocation(tmpInputs, fyOverlaps, corpTaxYears);
 
-    // 4) Core tax computation (v1)
-    // 
-    // SIMPLIFIED APPROACH FOR V1:
-    // This engine calculates profit using a "combine all income, then
-    // tax-adjust" approach. All income types (trading, rental, interest,
-    // dividends, grants) are combined in the accounts P&L, then tax-specific
-    // adjustments (add-backs, deductions, loss offsets) applied.
-    //
-    // RESULT: Final TTP is mathematically correct ✓
-    // LIMITATION: Not FRS 105 structured (not separated by income type)
-    // ACCEPTABLE FOR: Small trading companies ± rental income (v1 scope)
-    // PLAN: v2.1 should restructure to separate income types from start
-    //
-    // See CODE_REVIEW_FINDINGS.js "Issue #1" for full explanation.
-    
-    // Add-backs: depreciation + disallowables + other adjustments
-    const addBacks = TaxModel.roundPounds(pnl.depreciation + inputs.adjustments.disallowableExpenses + inputs.adjustments.otherAdjustments);
-    result.computation.addBacks = addBacks;
+      // Allocate inputs to this period
+      const periodProfitBeforeTax = result.accounts.profitBeforeTax * (period.days / inputs.apDays);
+      const periodPropertyProfit = result.property.propertyProfitAfterLossOffset * (period.days / inputs.apDays);
 
-    // Capital allowances (AIA) - limited by computed cap for whole AP
-    const aiaCapTotal = aiaAlloc.totalCap;
-    const aiaClaim = Math.min(inputs.capitalAllowances.aiaAdditions, TaxModel.roundPounds(aiaCapTotal));
-    result.computation.capitalAllowances = TaxModel.roundPounds(aiaClaim);
+      // Add-backs
+      const periodAddBacks = TaxModel.roundPounds(
+        (pnl.depreciation + inputs.adjustments.disallowableExpenses + inputs.adjustments.otherAdjustments) * (period.days / inputs.apDays)
+      );
 
-    // Deductions: currently just capital allowances
-    result.computation.deductions = result.computation.capitalAllowances;
+      // Capital allowances (AIA) - pro-rated cap
+      const periodAIACapTotal = aiaAlloc.totalCap;
+      const periodAIAClaim = Math.min(inputs.capitalAllowances.aiaAdditions * (period.days / inputs.apDays), TaxModel.roundPounds(periodAIACapTotal));
 
-    // Taxable trading profit before trading loss
-    // Start from accounts PBT, then add backs, then subtract deductions (CA)
-    // Note: This mirrors your box_315 style approach (broadly).
-    const taxableBeforeLoss = TaxModel.roundPounds(result.accounts.profitBeforeTax + addBacks - result.computation.deductions);
+      // Taxable trading profit
+      const periodTaxableBeforeLoss = TaxModel.roundPounds(periodProfitBeforeTax + periodAddBacks - TaxModel.roundPounds(periodAIAClaim));
 
-    // Apply trading loss b/fwd
-    const lossBF = inputs.losses.tradingLossBF;
-    const lossUsed = Math.min(lossBF, Math.max(0, taxableBeforeLoss));
-    result.computation.tradingLossUsed = TaxModel.roundPounds(lossUsed);
+      // Trading loss offset (only applies in first period, then carry to next)
+      const periodLossUsed = period === apSplits[0]
+        ? Math.min(inputs.losses.tradingLossBF, Math.max(0, periodTaxableBeforeLoss))
+        : 0; // No fresh loss offset in short period
 
-    const taxableAfterLoss = TaxModel.roundPounds(taxableBeforeLoss - lossUsed);
-    result.computation.taxableTradingProfit = taxableAfterLoss;
+      const periodTaxableAfterLoss = TaxModel.roundPounds(periodTaxableBeforeLoss - periodLossUsed);
+      const periodTaxableTotal = Math.max(0, periodTaxableAfterLoss);
+      const periodAugmentedProfit = TaxModel.roundPounds(periodTaxableTotal + pnl.dividendIncome * (period.days / inputs.apDays));
 
-    // Non-trading taxable profits: interest + property (after offset) + govt grants (already in accounts, but we keep for transparency)
-    // For v1, we treat these as included in taxableTradingProfit already via PBT.
-    // To keep compatibility with your existing box mapping, we expose them separately and also compute taxableTotalProfits as taxableAfterLoss.
-    result.computation.taxableNonTradingProfits = TaxModel.roundPounds(pnl.interestIncome + result.property.propertyProfitAfterLossOffset);
-    result.computation.taxableTotalProfits = Math.max(0, taxableAfterLoss);
+      // Calculate CT per FY within this period
+      const periodByFY = fyOverlaps.map((fy) => {
+        const th = thresholdParts.find((t) => t.fy_year === fy.fy_year);
+        const tp = periodTaxableTotal * (fy.ap_days_in_fy / period.days);
+        const ap = periodAugmentedProfit * (fy.ap_days_in_fy / period.days);
 
-    // Augmented profits = taxable total profits + dividends
-    result.computation.augmentedProfits = TaxModel.roundPounds(result.computation.taxableTotalProfits + pnl.dividendIncome);
+        const computed = computeTaxPerFY({
+          fy_year: fy.fy_year,
+          taxableProfit: tp,
+          augmentedProfit: ap,
+          lowerLimit: th ? th.small_threshold_for_AP_in_this_FY : 0,
+          upperLimit: th ? th.upper_threshold_for_AP_in_this_FY : 0,
+          tiers: fy.tiers
+        });
 
-    // 5) Split profits by FY days and compute CT per FY
-    const taxableByFY = prorateByFY(result.computation.taxableTotalProfits, inputs, fyOverlaps);
-    const augmentedByFY = prorateByFY(result.computation.augmentedProfits, inputs, fyOverlaps);
-
-    const byFY = fyOverlaps.map((fy) => {
-      const th = thresholdParts.find((t) => t.fy_year === fy.fy_year);
-      const tp = taxableByFY.find((x) => x.fy_year === fy.fy_year)?.amount || 0;
-      const ap = augmentedByFY.find((x) => x.fy_year === fy.fy_year)?.amount || 0;
-
-      const computed = computeTaxPerFY({
-        fy_year: fy.fy_year,
-        taxableProfit: tp,
-        augmentedProfit: ap,
-        lowerLimit: th ? th.small_threshold_for_AP_in_this_FY : 0,
-        upperLimit: th ? th.upper_threshold_for_AP_in_this_FY : 0,
-        tiers: fy.tiers
+        return {
+          fy_year: fy.fy_year,
+          ap_days_in_fy: fy.ap_days_in_fy,
+          thresholds: th || null,
+          aia_cap_for_fy: aiaAlloc.parts.find((p) => p.fy_year === fy.fy_year)?.aia_cap_for_fy || 0,
+          taxableProfit: computed.taxableProfit,
+          augmentedProfit: computed.augmentedProfit,
+          ctCharge: computed.ctCharge,
+          marginalRelief: computed.marginalRelief
+        };
       });
 
       return {
-        fy_year: fy.fy_year,
-        ap_days_in_fy: fy.ap_days_in_fy,
-        thresholds: th || null,
-        aia_cap_for_fy: aiaAlloc.parts.find((p) => p.fy_year === fy.fy_year)?.aia_cap_for_fy || 0,
-        taxableProfit: computed.taxableProfit,
-        augmentedProfit: computed.augmentedProfit,
-        ctCharge: computed.ctCharge,
-        marginalRelief: computed.marginalRelief
+        periodName: period.periodName,
+        days: period.days,
+        isShortPeriod: period.isShortPeriod,
+        profitBeforeTax: TaxModel.roundPounds(periodProfitBeforeTax),
+        taxableProfit: periodTaxableTotal,
+        augmentedProfit: periodAugmentedProfit,
+        lossUsed: TaxModel.roundPounds(periodLossUsed),
+        aiaCapTotal: TaxModel.roundPounds(periodAIACapTotal),
+        aiaClaimed: TaxModel.roundPounds(periodAIAClaim),
+        byFY: periodByFY,
+        ctCharge: TaxModel.roundPounds(periodByFY.reduce((s, x) => s + (x.ctCharge || 0), 0)),
+        marginalRelief: TaxModel.roundPounds(periodByFY.reduce((s, x) => s + (x.marginalRelief || 0), 0))
       };
     });
 
-    result.byFY = byFY;
+    // Aggregate results across all periods
+    result.byFY = periodResults.flatMap((p) => p.byFY);
+    result.computation.addBacks = TaxModel.roundPounds(periodResults.reduce((s, p) => s + (pnl.depreciation + inputs.adjustments.disallowableExpenses + inputs.adjustments.otherAdjustments) * (p.days / inputs.apDays), 0));
+    result.computation.capitalAllowances = TaxModel.roundPounds(periodResults.reduce((s, p) => s + p.aiaClaimed, 0));
+    result.computation.deductions = result.computation.capitalAllowances;
+    result.computation.tradingLossUsed = TaxModel.roundPounds(periodResults[0].lossUsed);
+    result.computation.taxableTradingProfit = TaxModel.roundPounds(periodResults.reduce((s, p) => s + p.taxableProfit, 0));
+    result.computation.taxableNonTradingProfits = TaxModel.roundPounds(pnl.interestIncome + result.property.propertyProfitAfterLossOffset);
+    result.computation.taxableTotalProfits = Math.max(0, result.computation.taxableTradingProfit);
+    result.computation.augmentedProfits = TaxModel.roundPounds(result.computation.taxableTotalProfits + pnl.dividendIncome);
 
-    result.tax.corporationTaxCharge = TaxModel.roundPounds(byFY.reduce((s, x) => s + (x.ctCharge || 0), 0));
-    result.tax.marginalRelief = TaxModel.roundPounds(byFY.reduce((s, x) => s + (x.marginalRelief || 0), 0));
+    result.tax.corporationTaxCharge = TaxModel.roundPounds(periodResults.reduce((s, p) => s + p.ctCharge, 0));
+    result.tax.marginalRelief = TaxModel.roundPounds(periodResults.reduce((s, p) => s + p.marginalRelief, 0));
     result.tax.taxPayable = result.tax.corporationTaxCharge;
+
+    // Metadata: note if AP was split
+    result.metadata = {
+      ap_days: inputs.apDays,
+      ap_split: hasMultiplePeriods,
+      periods: periodResults.map((p) => ({
+        name: p.periodName,
+        days: p.days,
+        taxable_profit: p.taxableProfit,
+        aia_claim: p.aiaClaimed,
+        ct_charge: p.ctCharge
+      }))
+    };
 
     return { inputs, result, corpTaxYears };
   }
