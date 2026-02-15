@@ -33,11 +33,12 @@
     }
 
     // Collect all form inputs
-    const chargeableFileInput = $("chargeableGainsFile");
-    const capitalGainsFileName = (chargeableFileInput && chargeableFileInput.files && chargeableFileInput.files[0])
-      ? chargeableFileInput.files[0].name
+    const capitalGainsFileInput = $("capitalGainsFile") || $("chargeableGainsFile");
+    const capitalGainsFileName = (capitalGainsFileInput && capitalGainsFileInput.files && capitalGainsFileInput.files[0])
+      ? capitalGainsFileInput.files[0].name
       : '';
-    const chargeableGainsInput = toNum($("chargeableGains").value);
+    const legacyChargeableGainsInput = $("chargeableGains") ? toNum($("chargeableGains").value) : 0;
+    const capitalGainsInput = $("capitalGains") ? toNum($("capitalGains").value) : legacyChargeableGainsInput;
     const tradingLossBFInput = toNum($("tradingLossBF").value);
     const propertyLossBFInput = toNum($("rentalLossBF").value);
     const userInputs = {
@@ -49,8 +50,8 @@
       govtGrants: toNum($("govtGrants").value),
       rentalIncome: toNum($("rentalIncome").value),
       interestIncome: toNum($("interestIncome").value),
-      disposalGains: 0,
-      capitalGains: chargeableGainsInput,
+      disposalGains: $("disposalGains") ? toNum($("disposalGains").value) : 0,
+      capitalGains: capitalGainsInput,
       capitalGainsFileName,
       dividendIncome: toNum($("dividendIncome").value),
       // P&L expenses
@@ -131,20 +132,20 @@
     };
 
     // Populate P&L fields
-    const tradeAccountingIncome = userInputs.turnover + userInputs.govtGrants;
-    const nonTradeAccountingIncome =
+    const tradeAccountingIncome = userInputs.turnover + userInputs.govtGrants + userInputs.disposalGains;
+    const otherAccountingIncome =
       userInputs.interestIncome +
       userInputs.rentalIncome +
-      userInputs.disposalGains +
       userInputs.capitalGains;
     setOut(
       "totalIncome",
       roundPounds(totalIncome),
-      "Total accounting income = trade income + non-trade income (dividends excluded)",
-      `Trade income = Turnover + Govt grants = ${pounds(userInputs.turnover)} + ${pounds(userInputs.govtGrants)} = ${pounds(tradeAccountingIncome)}\n` +
-      `Non-trade income = Interest + Rental + Chargeable gains\n` +
-      `= ${pounds(userInputs.interestIncome)} + ${pounds(userInputs.rentalIncome)} + ${pounds(userInputs.disposalGains + userInputs.capitalGains)} = ${pounds(nonTradeAccountingIncome)}\n` +
-      `Total accounting income = ${pounds(tradeAccountingIncome)} + ${pounds(nonTradeAccountingIncome)} = ${pounds(totalIncome)}`
+      "Total accounting income = trade income + other income (dividends excluded)",
+      `Trade income = Turnover + Govt grants + Asset disposal proceeds\n` +
+      `= ${pounds(userInputs.turnover)} + ${pounds(userInputs.govtGrants)} + ${pounds(userInputs.disposalGains)} = ${pounds(tradeAccountingIncome)}\n` +
+      `Other income = Interest + Rental + Capital gains\n` +
+      `= ${pounds(userInputs.interestIncome)} + ${pounds(userInputs.rentalIncome)} + ${pounds(userInputs.capitalGains)} = ${pounds(otherAccountingIncome)}\n` +
+      `Total accounting income = ${pounds(tradeAccountingIncome)} + ${pounds(otherAccountingIncome)} = ${pounds(totalIncome)}`
     );
     setRawMeta('totalIncome', totalIncome, roundPounds(totalIncome));
 
@@ -157,7 +158,7 @@
     setRawMeta('totalExpenses', totalExpenses, roundPounds(totalExpenses));
 
     // Detailed PBT formula
-    const pbtDetail = `STEP-BY-STEP CALCULATION:\n\nTotal Income (accounting, excludes dividends)\n  = Turnover + Govt Grants + Interest + Rental + Disposal gains + Capital gains\n  = GBP ${roundPounds(userInputs.turnover).toLocaleString()} + GBP ${roundPounds(userInputs.govtGrants).toLocaleString()} + GBP ${roundPounds(userInputs.interestIncome).toLocaleString()} + GBP ${roundPounds(userInputs.rentalIncome).toLocaleString()} + GBP ${roundPounds(userInputs.disposalGains).toLocaleString()} + GBP ${roundPounds(userInputs.capitalGains).toLocaleString()}\n  = GBP ${roundPounds(totalIncome).toLocaleString()}\n\nTotal Expenses\n  = Raw Materials + Staff + Depreciation + Other\n  = GBP ${roundPounds(userInputs.costOfSales).toLocaleString()} + GBP ${roundPounds(userInputs.staffCosts).toLocaleString()} + GBP ${roundPounds(userInputs.depreciation).toLocaleString()} + GBP ${roundPounds(userInputs.otherCharges).toLocaleString()}\n  = GBP ${roundPounds(totalExpenses).toLocaleString()}\n\nProfit Before Tax\n  = Total Income - Total Expenses\n  = GBP ${roundPounds(totalIncome).toLocaleString()} - GBP ${roundPounds(totalExpenses).toLocaleString()}\n  = GBP ${roundPounds(profitBeforeTax).toLocaleString()}`;
+    const pbtDetail = `STEP-BY-STEP CALCULATION:\n\nTotal Income (accounting, excludes dividends)\n  = Turnover + Govt Grants + Asset disposal proceeds + Interest + Rental + Capital gains\n  = GBP ${roundPounds(userInputs.turnover).toLocaleString()} + GBP ${roundPounds(userInputs.govtGrants).toLocaleString()} + GBP ${roundPounds(userInputs.disposalGains).toLocaleString()} + GBP ${roundPounds(userInputs.interestIncome).toLocaleString()} + GBP ${roundPounds(userInputs.rentalIncome).toLocaleString()} + GBP ${roundPounds(userInputs.capitalGains).toLocaleString()}\n  = GBP ${roundPounds(totalIncome).toLocaleString()}\n\nTotal Expenses\n  = Raw Materials + Staff + Depreciation + Other\n  = GBP ${roundPounds(userInputs.costOfSales).toLocaleString()} + GBP ${roundPounds(userInputs.staffCosts).toLocaleString()} + GBP ${roundPounds(userInputs.depreciation).toLocaleString()} + GBP ${roundPounds(userInputs.otherCharges).toLocaleString()}\n  = GBP ${roundPounds(totalExpenses).toLocaleString()}\n\nProfit Before Tax\n  = Total Income - Total Expenses\n  = GBP ${roundPounds(totalIncome).toLocaleString()} - GBP ${roundPounds(totalExpenses).toLocaleString()}\n  = GBP ${roundPounds(profitBeforeTax).toLocaleString()}`;
     setOut('profitBeforeTax', roundPounds(profitBeforeTax), 'Total Income - Total Expenses', pbtDetail);
     setRawMeta('profitBeforeTax', profitBeforeTax, roundPounds(profitBeforeTax));
 
@@ -246,16 +247,17 @@
     verificationDetail += `Dividend Income used for augmented profit: ${pounds(userInputs.dividendIncome)}\n`;
     verificationDetail += `Augmented Profits: ${pounds(augmentedProfits)}\n\n`;
     verificationDetail += `FORMULA TEMPLATE (SYMBOLIC):\n`;
-    verificationDetail += `  Total Income = Turnover + Govt Grants + Interest + Rental + Disposal gains + Capital gains\n`;
+    verificationDetail += `  Total Income = Turnover + Govt Grants + Asset disposal proceeds + Interest + Rental + Capital gains\n`;
     verificationDetail += `  Profit Before Tax = Total Income - Total Expenses\n`;
     verificationDetail += `  Taxable Trading Profit = trading component after trade AIA and trading loss relief\n`;
     verificationDetail += `  Taxable Total Profits (TTP) = max(0, Taxable Trading Profit + Taxable Non-Trading Income)\n`;
-    verificationDetail += `  Taxable Non-Trading Income = Interest + Disposal gains + Capital gains + (Rental/Property after property loss BF and rental/property AIA)\n`;
+    verificationDetail += `  Taxable Non-Trading Income = Interest + Capital gains + (Rental/Property after property loss BF and rental/property AIA)\n`;
     verificationDetail += `  Augmented Profits = TTP + Dividends\n`;
-    verificationDetail += `  Period factor = 1.0 for complete 12-month period, else (period days / 365)\n`;
-    verificationDetail += `  Lower Threshold (period) = 50,000 x Period factor / (Associated Companies + 1)\n`;
-    verificationDetail += `  Upper Threshold (period) = 250,000 x Period factor / (Associated Companies + 1)\n`;
-    verificationDetail += `  Threshold (slice) = Threshold(period) x (slice days / period days)\n`;
+    verificationDetail += `  For a complete 12-month period:\n`;
+    verificationDetail += `    Threshold(slice) = (Annual threshold / (Associated Companies + 1)) x (slice days / period days)\n`;
+    verificationDetail += `  For a short period:\n`;
+    verificationDetail += `    Threshold(slice) = (Annual threshold x slice days / FY total days) / (Associated Companies + 1)\n`;
+    verificationDetail += `    FY total days uses the relevant FY (365 or 366)\n`;
     verificationDetail += `  Effective thresholds = sum of slice thresholds within each effective tax-regime slice\n`;
     verificationDetail += `  If Augmented <= Lower: CT = TTP x 19%\n`;
     verificationDetail += `  If Augmented >= Upper: CT = TTP x 25%\n`;
@@ -266,7 +268,7 @@
     verificationDetail += `WITH YOUR FIGURES:\n`;
     verificationDetail += `Profit build-up (independently checkable):\n`;
     verificationDetail += `  Accounting income (excludes dividends): ${pounds(totalIncome)}\n`;
-    verificationDetail += `    Includes disposal gains ${pounds(userInputs.disposalGains)} and capital gains ${pounds(userInputs.capitalGains)}\n`;
+    verificationDetail += `    Includes asset disposal proceeds ${pounds(userInputs.disposalGains)} and capital gains ${pounds(userInputs.capitalGains)}\n`;
     if (userInputs.capitalGains) {
       verificationDetail += `    Capital gains source file: ${userInputs.capitalGainsFileName || 'No file selected'}\n`;
     }
@@ -278,7 +280,7 @@
     verificationDetail += `  Trading losses requested to use: ${userInputs.tradingLossUseRequested == null ? 'Auto (up to available)' : pounds(userInputs.tradingLossUseRequested)}\n`;
     verificationDetail += `  Less trading losses used: ${pounds(result.computation.tradingLossUsed)}\n`;
     verificationDetail += `  Taxable trading profit: ${pounds(taxableTradingProfit)}\n`;
-    verificationDetail += `  Taxable non-trading income (interest + disposal gains + capital gains + rental/property after rental/property AIA): ${pounds(taxableNonTradeIncome)}\n`;
+    verificationDetail += `  Taxable non-trading income (interest + capital gains + rental/property after rental/property AIA): ${pounds(taxableNonTradeIncome)}\n`;
     verificationDetail += `  Taxable Total Profits = max(0, ${pounds(taxableTradingProfit)} + ${pounds(taxableNonTradeIncome)}) = ${pounds(taxableTotalProfits)}\n`;
     verificationDetail += `  Augmented Profits = TTP + dividends = ${pounds(taxableTotalProfits)} + ${pounds(userInputs.dividendIncome)} = ${pounds(augmentedProfits)}\n\n`;
 
@@ -335,16 +337,16 @@
     // Presentation totals for Section 2/3/4 (UI only)
     const periodsMeta = (result.metadata && result.metadata.periods) ? result.metadata.periods : [];
     const nonTradeAIAClaimTotal = periodsMeta.reduce((s, p) => s + Number(p.non_trade_aia_claim || 0), 0);
-    const tradingIncomeTotal = userInputs.turnover + userInputs.govtGrants;
+    const tradingIncomeTotal = userInputs.turnover + userInputs.govtGrants + userInputs.disposalGains;
     const tradingExpenseTotal = totalExpenses;
     const tradingProfits = tradingIncomeTotal - tradingExpenseTotal;
     const tradingProfitsTaxable = taxableTradingProfit;
-    const chargeableGainsTotal = userInputs.disposalGains + userInputs.capitalGains;
+    const capitalGainsTotal = userInputs.capitalGains;
     const rentalAfterLossBeforeAIA = result.property.propertyProfitAfterLossOffset;
     const rentalPropertyTotal = rentalAfterLossBeforeAIA - nonTradeAIAClaimTotal;
     const nonTradingProfits =
       userInputs.interestIncome +
-      chargeableGainsTotal +
+      capitalGainsTotal +
       rentalPropertyTotal +
       userInputs.dividendIncome;
 
@@ -374,8 +376,8 @@
     setOut(
       'outTradingIncomeTotal',
       roundPounds(tradingIncomeTotal),
-      'Trading income = Turnover + Government grants & subsidies',
-      `${pounds(userInputs.turnover)} + ${pounds(userInputs.govtGrants)} = ${pounds(tradingIncomeTotal)}`
+      'Trading income = Turnover + Government grants & subsidies + Asset disposal proceeds',
+      `${pounds(userInputs.turnover)} + ${pounds(userInputs.govtGrants)} + ${pounds(userInputs.disposalGains)} = ${pounds(tradingIncomeTotal)}`
     );
     setRawMeta('outTradingIncomeTotal', tradingIncomeTotal, roundPounds(tradingIncomeTotal));
 
@@ -405,12 +407,12 @@
 
     setOut(
       'outChargeableGainsTotal',
-      roundPounds(chargeableGainsTotal),
-      'Chargeable gains used in computation',
-      `Chargeable gains amount = ${pounds(chargeableGainsTotal)}\n` +
+      roundPounds(capitalGainsTotal),
+      'Capital gains used in computation',
+      `Capital gains amount = ${pounds(capitalGainsTotal)}\n` +
       `Attachment: ${userInputs.capitalGainsFileName || 'No file selected'}`
     );
-    setRawMeta('outChargeableGainsTotal', chargeableGainsTotal, roundPounds(chargeableGainsTotal));
+    setRawMeta('outChargeableGainsTotal', capitalGainsTotal, roundPounds(capitalGainsTotal));
 
     setOut(
       'outRentalPropertyTotal',
@@ -425,8 +427,8 @@
     setOut(
       'outNonTradingProfits',
       roundPounds(nonTradingProfits),
-      'Non-trading profits = Interest + Chargeable gains + Rental/property total + Dividends',
-      `${pounds(userInputs.interestIncome)} + ${pounds(chargeableGainsTotal)} + ${pounds(rentalPropertyTotal)} + ${pounds(userInputs.dividendIncome)} = ${pounds(nonTradingProfits)}`
+      'Non-trading profits = Interest + Capital gains + Rental/property total + Dividends',
+      `${pounds(userInputs.interestIncome)} + ${pounds(capitalGainsTotal)} + ${pounds(rentalPropertyTotal)} + ${pounds(userInputs.dividendIncome)} = ${pounds(nonTradingProfits)}`
     );
     setRawMeta('outNonTradingProfits', nonTradingProfits, roundPounds(nonTradingProfits));
 
@@ -484,7 +486,13 @@
 
     setOut('outDividendIncome', roundPounds(userInputs.dividendIncome), 'Dividend income (affects rate, not taxable)', `GBP ${roundPounds(userInputs.dividendIncome).toLocaleString()}`);
     setRawMeta('outDividendIncome', userInputs.dividendIncome, roundPounds(userInputs.dividendIncome));
-    setOut('outDisposalGains', roundPounds(userInputs.disposalGains), 'Disposal gains are taxable non-trading income', `${pounds(userInputs.disposalGains)}`);
+    setOut(
+      'outDisposalGains',
+      roundPounds(userInputs.disposalGains),
+      'Asset disposal proceeds (AIA disposal context) are treated as taxable trading income',
+      `${pounds(userInputs.disposalGains)}\n` +
+      `These feed taxable trading profits (not taxable non-trading profits).`
+    );
     setRawMeta('outDisposalGains', userInputs.disposalGains, roundPounds(userInputs.disposalGains));
     setOut(
       'outCapitalGains',
@@ -724,7 +732,7 @@
       taxableTotalProfits,
       'Profits chargeable to corporation tax (TTP) = max(0, taxable trading + taxable non-trading)',
       `Taxable trading = ${pounds(result.computation.taxableTradingProfit)}\n` +
-      `Taxable non-trading (interest + disposal gains + capital gains + rental/property after rental/property AIA) = ${pounds(taxableNonTradeIncome)}\n` +
+      `Taxable non-trading (interest + capital gains + rental/property after rental/property AIA) = ${pounds(taxableNonTradeIncome)}\n` +
       `TTP = max(0, ${pounds(result.computation.taxableTradingProfit)} + ${pounds(taxableNonTradeIncome)}) = ${pounds(taxableTotalProfits)}`
     );
 
@@ -733,7 +741,7 @@
       augmentedProfits,
       'Augmented profits = Taxable Total Profits + dividends',
       `STEP 1: Taxable trading profit = ${pounds(result.computation.taxableTradingProfit)}\n` +
-      `STEP 2: Taxable non-trading income (interest + disposal gains + capital gains + rental/property after rental/property AIA) = ${pounds(taxableNonTradeIncome)}\n` +
+      `STEP 2: Taxable non-trading income (interest + capital gains + rental/property after rental/property AIA) = ${pounds(taxableNonTradeIncome)}\n` +
       `STEP 3: Taxable Total Profits = max(0, ${pounds(result.computation.taxableTradingProfit)} + ${pounds(taxableNonTradeIncome)}) = ${pounds(taxableTotalProfits)}\n` +
       `STEP 4: Augmented profits = ${pounds(taxableTotalProfits)} + ${pounds(userInputs.dividendIncome)} = ${pounds(augmentedProfits)}`
     );
@@ -766,8 +774,10 @@
       'outTotalAIAClaimedVar',
       result.computation.capitalAllowances,
       'Total AIA claimed = sum of period AIA claims',
-      `AIA MASTER cap formula per slice: annual AIA limit x period factor x (slice days / period days) / (associated companies + 1)\n` +
-      `Period factor = 1 for complete 12-month period, else period days / 365\n` +
+      `AIA MASTER cap formula per slice:\n` +
+      `  Complete 12-month period: (annual AIA limit / (associated companies + 1)) x (slice days / period days)\n` +
+      `  Short period: (annual AIA limit x slice days / FY total days) / (associated companies + 1)\n` +
+      `  FY total days uses the relevant FY (365 or 366)\n` +
       `Associated companies divisor = ${divisor}\n` +
       `Period 1 master cap: ${pounds(p1AiaCap)}\n` +
       `Period 1 trade additions ${pounds(p1TradeAiaAdditionsShare)} | non-trade additions ${pounds(p1NonTradeAiaAdditionsShare)}\n` +

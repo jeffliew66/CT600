@@ -112,20 +112,13 @@
   /**
    * Builds "Tax Calculation Table" (CT600 Page 4, Boxes 250-415)
    * Shows CT charge broken down by FY
+   * DESIGN NOTE: LOSS-RELIEF TREATMENT
+   * This engine applies trading losses against taxable trading profits only.
    * 
-   * ⚠️  DESIGN DECISION: IMPLICIT SECTION 37 CLAIM
-   * This engine automatically offsets trading losses against other income
-   * (rental, interest, dividends) in the current year.
+   * Non-trading streams are computed separately and are not reduced by
+   * trading loss relief in this model.
    * 
-   * HMRC Rule: This requires an explicit Section 37 Claim (CTA 2010 s37).
-   * This calculation assumes the company has made (or will make) this claim.
-   * 
-   * Impact: If the company prefers to carry forward the loss (to offset
-   * against future trading profits, possibly at a higher rate), they would
-   * NOT make the Section 37 claim, and taxable profit would be HIGHER.
-   * 
-   * For transparency: The output notes "Loss set off against other income"
-   * to indicate Section 37 relief has been applied.
+   * This note is informational only and follows the implemented engine logic.
    */
   function buildTaxCalculationTable(result) {
     const byFY = result.byFY;
@@ -163,8 +156,8 @@
         total_augmented_profit: totalAugmented,
         total_marginal_relief: totalMarginalRelief,
         corporation_tax_charge: totalCTCharge,
-        // Metadata: Document Section 37 assumption
-        section_37_claim_note: 'Trading losses have been set off against other income per Section 37 Claim (CTA 2010 s37).'
+        // Metadata: document implemented loss-relief treatment
+        loss_relief_note: 'Trading losses are applied against taxable trading profits only.'
       }
     };
   }

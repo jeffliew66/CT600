@@ -51,7 +51,16 @@
     const rentalIncome = roundPounds(ui.rentalIncome ?? ui.box_190_rental_income ?? 0);
     const propertyLossBF = roundPounds(ui.propertyLossBF ?? ui.box_250_prop_losses_bfwd ?? 0);
     const interestIncome = roundPounds(ui.interestIncome ?? ui.box_170_interest_income ?? 0);
-    const disposalGains = roundPounds(ui.disposalGains ?? ui.box_205_disposal_gains ?? 0);
+    // Backward compatible aliases:
+    // - disposalGains (legacy UI label)
+    // - balancingChargesTrade / assetDisposalsBalancingCharge (clearer tax meaning)
+    const disposalGains = roundPounds(
+      ui.disposalGains ??
+      ui.balancingChargesTrade ??
+      ui.assetDisposalsBalancingCharge ??
+      ui.box_205_disposal_gains ??
+      0
+    );
     const capitalGains = roundPounds(ui.capitalGains ?? ui.box_210_chargeable_gains ?? 0);
     const capitalGainsFileName = String(ui.capitalGainsFileName ?? ui.capital_gains_source_file ?? '');
     const dividendIncome = roundPounds(ui.dividendIncome ?? ui.box_620_dividend_income ?? 0);

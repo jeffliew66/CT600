@@ -263,6 +263,43 @@ function checkShortPeriodThresholdProration() {
   assert(upperAssocDiff < 1, `Associated-company divisor not applied to pro-rated upper threshold. diff=${upperAssocDiff}`);
 }
 
+function checkShortPeriodThresholdProrationLeapFY() {
+  // FY2023 runs 2023-04-01 to 2024-03-31 and has 366 days.
+  // HMRC-style short period example should use denominator 366, not 365.
+  const out = run(baseInput({
+    apStart: '2023-04-01',
+    apEnd: '2023-12-31', // 275 days in FY2023
+    assocCompanies: 0,
+    turnover: 120000,
+    dividendIncome: 0
+  }));
+
+  assert(out.result.byFY.length === 1, 'Expected one slice for single-FY leap-year short period.');
+  const th = out.result.byFY[0].thresholds || {};
+  const expectedLower366 = 50000 * (275 / 366);
+  const expectedUpper366 = 250000 * (275 / 366);
+  const expectedUpper365 = 250000 * (275 / 365);
+  const lowerDiff = Math.abs((th.small_threshold_for_AP_in_this_FY || 0) - expectedLower366);
+  const upperDiff = Math.abs((th.upper_threshold_for_AP_in_this_FY || 0) - expectedUpper366);
+  const upperDiffFrom365 = Math.abs((th.upper_threshold_for_AP_in_this_FY || 0) - expectedUpper365);
+
+  assert(lowerDiff < 1, `Leap-year short-period lower threshold should use /366. diff=${lowerDiff}`);
+  assert(upperDiff < 1, `Leap-year short-period upper threshold should use /366. diff=${upperDiff}`);
+  assert(upperDiffFrom365 > 100, 'Leap-year threshold appears to still be using /365.');
+
+  const outAssoc = run(baseInput({
+    apStart: '2023-04-01',
+    apEnd: '2023-12-31',
+    assocCompanies: 3,
+    turnover: 120000,
+    dividendIncome: 0
+  }));
+  const thAssoc = outAssoc.result.byFY[0].thresholds || {};
+  const expectedUpperAssoc = expectedUpper366 / 4;
+  const upperAssocDiff = Math.abs((thAssoc.upper_threshold_for_AP_in_this_FY || 0) - expectedUpperAssoc);
+  assert(upperAssocDiff < 1, `Associated-company divisor not applied to leap-year upper threshold. diff=${upperAssocDiff}`);
+}
+
 function checkAiaProrationAndAssociates() {
   const base = baseInput({
     apStart: '2024-04-01',
@@ -285,6 +322,27 @@ function checkAiaProrationAndAssociates() {
   const p3 = (out3.result.metadata.periods || [])[0] || {};
   assert(typeof p0.aia_cap_total === 'number', 'Missing period AIA cap metadata for assoc=0.');
   assert(typeof p3.aia_cap_total === 'number', 'Missing period AIA cap metadata for assoc=3.');
+}
+
+function checkAiaProrationLeapFY() {
+  const base = baseInput({
+    apStart: '2023-04-01',
+    apEnd: '2023-12-31', // 275 days in FY2023 (366-day FY)
+    turnover: 300000,
+    aiaAdditions: 10000000 // force cap to bind
+  });
+
+  const out0 = run({ ...base, assocCompanies: 0 });
+  const expectedCap366 = 1000000 * (275 / 366);
+  const expectedCap365 = 1000000 * (275 / 365);
+  const claim0 = out0.result.computation.capitalAllowances;
+  assert(Math.abs(claim0 - Math.round(expectedCap366)) <= 1, `Leap-year AIA cap/claim should use /366 (assoc=0). got=${claim0}`);
+  assert(Math.abs(claim0 - Math.round(expectedCap365)) > 100, 'Leap-year AIA appears to still be using /365.');
+
+  const out3 = run({ ...base, assocCompanies: 3 });
+  const expectedCap3 = expectedCap366 / 4;
+  const claim3 = out3.result.computation.capitalAllowances;
+  assert(Math.abs(claim3 - Math.round(expectedCap3)) <= 1, `Leap-year AIA cap/claim should use /366 with assoc divisor (assoc=3). got=${claim3}`);
 }
 
 function checkLossBfSequentialAcrossApPeriods() {
@@ -381,6 +439,50 @@ function checkDisposalAndCapitalGainsTaxable() {
 
   assert(out.result.accounts.totalIncome === 100000, 'Disposal/capital gains should be included in accounting income.');
   assert(out.result.computation.taxableTotalProfits === 100000, 'Disposal/capital gains should be taxable.');
+}
+
+function checkDisposalGainsClassifiedAsTradingForLossRelief() {
+  const out = run(baseInput({
+    apStart: '2024-04-01',
+    apEnd: '2025-03-31',
+    assocCompanies: 0,
+    turnover: 0,
+    disposalGains: 10000,
+    capitalGains: 0,
+    tradingLossBF: 10000,
+    tradingLossUseRequested: 10000
+  }));
+
+  assert(
+    out.result.computation.tradingLossUsed === 10000,
+    'Trading loss should be able to offset disposal gains treated as trading balancing charges.'
+  );
+  assert(
+    out.result.computation.taxableTotalProfits === 0,
+    'Taxable profits should be nil when trading loss fully offsets disposal balancing charges.'
+  );
+}
+
+function checkCapitalGainsRemainNonTradingForLossRelief() {
+  const out = run(baseInput({
+    apStart: '2024-04-01',
+    apEnd: '2025-03-31',
+    assocCompanies: 0,
+    turnover: 0,
+    disposalGains: 0,
+    capitalGains: 10000,
+    tradingLossBF: 10000,
+    tradingLossUseRequested: 10000
+  }));
+
+  assert(
+    out.result.computation.tradingLossUsed === 0,
+    'Trading loss should not offset capital gains (non-trading).'
+  );
+  assert(
+    out.result.computation.taxableTotalProfits === 10000,
+    'Capital gains should remain taxable when there is no taxable trading profit.'
+  );
 }
 
 function checkSeparateTradeNonTradeAiaBuckets() {
@@ -512,13 +614,12 @@ function checkIncomeNotDoubleCounted() {
   const recomposedTTP =
     r.computation.taxableTradingProfit +
     input.interestIncome +
-    input.disposalGains +
     input.capitalGains +
     r.property.propertyProfitAfterLossOffset;
 
   assert(
     r.computation.taxableTotalProfits === recomposedTTP,
-    'Taxable Total Profits is not equal to trading + interest + disposal gains + capital gains + net property (possible double counting).'
+    'Taxable Total Profits is not equal to trading + interest + capital gains + net property (possible double counting).'
   );
 
   assert(
@@ -556,11 +657,15 @@ function main() {
   checkIncomeNotDoubleCounted();
   checkNoChangeRegimeCollapsesStraddle();
   checkShortPeriodThresholdProration();
+  checkShortPeriodThresholdProrationLeapFY();
   checkAiaProrationAndAssociates();
+  checkAiaProrationLeapFY();
   checkLossBfSequentialAcrossApPeriods();
   checkPropertyLossBfSequentialAcrossApPeriods();
   checkLossUseRequestedCap();
   checkDisposalAndCapitalGainsTaxable();
+  checkDisposalGainsClassifiedAsTradingForLossRelief();
+  checkCapitalGainsRemainNonTradingForLossRelief();
   checkSeparateTradeNonTradeAiaBuckets();
   checkAiaCanCreateLoss();
   printSummary(rows);

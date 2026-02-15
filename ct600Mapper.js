@@ -44,7 +44,8 @@
     boxes.box_250_prop_losses_cfwd = round(result.property.propertyLossCF);
 
     // Profit subtotal (simplified): taxable trading + taxable non-trading
-    // (includes interest, rental/property net, disposal gains, capital gains as computed by engine)
+    // Engine classifies disposal balancing charges in trading; non-trading covers
+    // interest, rental/property net and capital gains.
     boxes.box_235_profits_subtotal = round(
       result.computation.taxableTradingProfit + result.computation.taxableNonTradingProfits
     );

@@ -275,14 +275,20 @@
     // CRITICAL: Apply associates divisor to AIA cap (same as thresholds)
     const divisor = (inputs.assocCompanies || 0) + 1;
     const periodDays = inputs.apDays || 1;
-    const periodFactor = inputs.isShortPeriod ? (periodDays / 365) : 1;
     // AIA master cap is shared across trade/non-trade.
-    // Slice cap shares sum to the period cap.
+    // Short-period rule: pro-rate by days in the relevant FY slice (365/366 as applicable).
+    // Full 12-month period rule: use strict annual cap then apportion by slice share.
     const parts = fyOverlaps.map((fy) => {
       const annualAiaLimit = getTier(fy.tiers, 1).aia_limit;
-      const periodCapFromThisFY = (annualAiaLimit * periodFactor) / divisor;
-      const sliceShare = periodDays > 0 ? (fy.ap_days_in_fy / periodDays) : 0;
-      const sliceMasterCap = periodCapFromThisFY * sliceShare;
+      let sliceMasterCap = 0;
+      if (inputs.isShortPeriod) {
+        const fyDays = fy.fy_total_days || 365;
+        sliceMasterCap = (annualAiaLimit * (fy.ap_days_in_fy / fyDays)) / divisor;
+      } else {
+        const periodCapFromThisFY = annualAiaLimit / divisor;
+        const sliceShare = periodDays > 0 ? (fy.ap_days_in_fy / periodDays) : 0;
+        sliceMasterCap = periodCapFromThisFY * sliceShare;
+      }
       return {
         fy_year: fy.fy_year,
         ap_days_in_fy: fy.ap_days_in_fy,
@@ -333,20 +339,27 @@
   function buildThresholdParts(inputs, fyOverlaps) {
     const divisor = (inputs.assocCompanies || 0) + 1;
     const periodDays = inputs.apDays || 1;
-    const periodFactor = inputs.isShortPeriod ? (periodDays / 365) : 1;
 
     return fyOverlaps.map((fy) => {
       const small = getTier(fy.tiers, 2).threshold;
       const upper = getTier(fy.tiers, 3).threshold;
       // Threshold rule:
       // - full 12-month period: strict annual thresholds (50k/250k, then associates divisor)
-      // - short period: annual thresholds x (period days / 365), then associates divisor
-      // Slice thresholds are proportional shares of the period-level thresholds.
-      const periodSmall = (small * periodFactor) / divisor;
-      const periodUpper = (upper * periodFactor) / divisor;
-      const sliceShare = periodDays > 0 ? (fy.ap_days_in_fy / periodDays) : 0;
-      const smallForAP = periodSmall * sliceShare;
-      const upperForAP = periodUpper * sliceShare;
+      // - short period: pro-rate by FY slice days / FY total days (365/366 as applicable), then associates divisor
+      // Slice thresholds are then summed across slices.
+      let smallForAP = 0;
+      let upperForAP = 0;
+      if (inputs.isShortPeriod) {
+        const fyDays = fy.fy_total_days || 365;
+        smallForAP = (small * (fy.ap_days_in_fy / fyDays)) / divisor;
+        upperForAP = (upper * (fy.ap_days_in_fy / fyDays)) / divisor;
+      } else {
+        const periodSmall = small / divisor;
+        const periodUpper = upper / divisor;
+        const sliceShare = periodDays > 0 ? (fy.ap_days_in_fy / periodDays) : 0;
+        smallForAP = periodSmall * sliceShare;
+        upperForAP = periodUpper * sliceShare;
+      }
 
       return {
         fy_year: fy.fy_year,
@@ -525,7 +538,8 @@
       const periodRatio = (period.days / (inputs.apDays || 1));
       const periodDividendIncome = pnl.dividendIncome * periodRatio;
       const periodInterestIncome = pnl.interestIncome * periodRatio;
-      const periodDisposalGains = pnl.disposalGains * periodRatio;
+      // disposalGains is treated as trading balancing charges (AIA disposal context),
+      // not non-trading chargeable gains.
       const periodCapitalGains = pnl.capitalGains * periodRatio;
       const periodRentalIncomeGross = TaxModel.roundPounds(pnl.rentalIncome * periodRatio);
       const periodPropertyLossPool = Math.max(0, remainingPropertyLossPool);
@@ -551,8 +565,10 @@
         periodProfitBeforeTax + periodAddBacks + periodPropertyAdjustment
       );
       const periodNonTradingBeforeAIA = TaxModel.roundPounds(
-        periodInterestIncome + periodPropertyProfit + periodDisposalGains + periodCapitalGains
+        periodInterestIncome + periodPropertyProfit + periodCapitalGains
       );
+      // Trading bucket is computed residually from total taxable base, so it includes
+      // disposal balancing charges (pnl.disposalGains) by design.
       const periodTradingBeforeAIA = TaxModel.roundPounds(periodTaxableBeforeAIA - periodNonTradingBeforeAIA);
       // AIA claim is driven by qualifying additions (subject to shared cap),
       // and can create/increase a loss. Do not cap claim by current-period profit.
@@ -566,7 +582,7 @@
       // Rental/property AIA offsets the rental/property stream only (not interest).
       const periodPropertyAfterAIA = TaxModel.roundPounds(periodPropertyProfit - periodNonTradeAIAClaim);
       const periodNonTradingAfterAIA = TaxModel.roundPounds(
-        periodInterestIncome + periodPropertyAfterAIA + periodDisposalGains + periodCapitalGains
+        periodInterestIncome + periodPropertyAfterAIA + periodCapitalGains
       );
       const periodTaxableBeforeLoss = TaxModel.roundPounds(periodTradingAfterAIA + periodNonTradingAfterAIA);
 
