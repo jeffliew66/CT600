@@ -13,7 +13,7 @@
 
     <form id="dataForm">
       <div class="layoutRow rowMain">
-        <div class="layoutCol colOne">
+        <div class="layoutCol">
           <section class="card" id="section1Card">
             <h2>Section 1</h2>
             <label>Start date of Accounting Period
@@ -26,31 +26,14 @@
               <input type="number" id="assocCompanies" min="0" value="0" />
             </label>
           </section>
+        </div>
 
+        <div class="layoutCol">
           <section class="card" id="section2Card">
-            <h2>Section 2</h2>
+            <h2>Section 2: Trade Data</h2>
             <label>Turnover
               <input type="number" id="turnover" step="0.01" value="0" />
             </label>
-            <label>Government grants & subsidies
-              <input type="number" id="govtGrants" step="0.01" value="0" />
-            </label>
-            <label>Rental & property income
-              <input type="number" id="rentalIncome" step="0.01" value="0" />
-            </label>
-            <label>Interest Income
-              <input type="number" id="interestIncome" step="0.01" value="0" />
-            </label>
-            <label>Dividend income
-              <input type="number" id="dividendIncome" step="0.01" value="0" />
-            </label>
-
-            <label class="computed">Total Income [C]
-              <input type="text" id="totalIncome" readonly data-key="totalIncome" />
-            </label>
-
-            <hr />
-
             <label>Raw Materials & Consumables
               <input type="number" id="rawMaterials" step="0.01" value="0" />
             </label>
@@ -63,34 +46,6 @@
             <label>Other Charges
               <input type="number" id="otherCharges" step="0.01" value="0" />
             </label>
-
-            <label class="computed">Total Expenses [C]
-              <input type="text" id="totalExpenses" readonly data-key="totalExpenses" />
-            </label>
-
-            <label class="computed">Profit (Loss) before tax [C]
-              <input type="text" id="profitBeforeTax" readonly data-key="profitBeforeTax" />
-            </label>
-
-            <label class="computed">Tax on Profit [C]
-              <input type="text" id="taxOnProfit" readonly data-key="taxOnProfit" />
-            </label>
-
-            <label class="computed">Profit (Loss) for the period [C]
-              <input type="text" id="profitForPeriod" readonly data-key="profitForPeriod" />
-            </label>
-          </section>
-        </div>
-
-        <div class="layoutCol colTwo">
-          <section class="card" id="section3Card">
-            <h2>Section 3</h2>
-            <label class="computed">Trading Profit / loss before tax [C]
-              <input type="text" id="tradingProfitBeforeTax" readonly data-key="tradingProfitBeforeTax" />
-            </label>
-            <label class="computed">Add back: Depreciation [C]
-              <input type="text" id="addbackDepreciation" readonly data-key="addbackDepreciation" />
-            </label>
             <label>Add back: Disallowable expenses
               <input type="number" id="disallowableExpenses" step="0.01" value="0" />
             </label>
@@ -100,41 +55,78 @@
             <label>Less: AIA (Trade)
               <input type="number" id="aiaTrade" step="0.01" value="0" />
             </label>
-            <label>Less: AIA (Non-Trade)
-              <input type="number" id="aiaNonTrade" step="0.01" value="0" />
-            </label>
             <label>Less: Trading losses brought forward
               <input type="number" id="tradingLossBF" step="0.01" value="0" />
             </label>
-
+            <label class="computed">Total Expenses [C]
+              <input type="text" id="totalExpenses" readonly data-key="totalExpenses" />
+            </label>
+            <label class="computed">Trading Profit / loss before tax [C]
+              <input type="text" id="tradingProfitBeforeTax" readonly data-key="tradingProfitBeforeTax" />
+            </label>
+            <label class="computed">Add back: Depreciation [C]
+              <input type="text" id="addbackDepreciation" readonly data-key="addbackDepreciation" />
+            </label>
             <label class="computed">Net trading profits [C]
               <input type="text" id="netTradingProfits" readonly data-key="netTradingProfits" />
             </label>
           </section>
-          <section class="card" id="section4Card">
-            <h2>Section 4</h2>
-            <label class="computed">Interest income [C]
-              <input type="text" id="outInterestIncome" readonly data-key="outInterestIncome" />
+        </div>
+
+        <div class="layoutCol">
+          <section class="card" id="section3Card">
+            <h2>Section 3: Non-Trade Data</h2>
+            <label>Government grants & subsidies
+              <input type="number" id="govtGrants" step="0.01" value="0" />
+            </label>
+            <label>Interest Income
+              <input type="number" id="interestIncome" step="0.01" value="0" />
+            </label>
+            <label>Dividend income
+              <input type="number" id="dividendIncome" step="0.01" value="0" />
+            </label>
+            <label>Rental & property income
+              <input type="number" id="rentalIncome" step="0.01" value="0" />
+            </label>
+            <label>Less: rental & property losses brought forward
+              <input type="number" id="rentalLossBF" step="0.01" value="0" />
+            </label>
+            <label>Less: AIA (Non-Trade)
+              <input type="number" id="aiaNonTrade" step="0.01" value="0" />
             </label>
             <label class="computed">Government grants & subsidies [C]
               <input type="text" id="outGovtGrants" readonly data-key="outGovtGrants" />
             </label>
+            <label class="computed">Interest income [C]
+              <input type="text" id="outInterestIncome" readonly data-key="outInterestIncome" />
+            </label>
             <label class="computed">Dividend income [C]
               <input type="text" id="outDividendIncome" readonly data-key="outDividendIncome" />
             </label>
-
             <label class="computed">Rental & property income [C]
               <input type="text" id="outRentalIncome" readonly data-key="outRentalIncome" />
-            </label>
-            <label>Less: rental & property losses brought forward
-              <input type="number" id="rentalLossBF" step="0.01" value="0" />
             </label>
             <label class="computed">Net rental & property income [C]
               <input type="text" id="netRentalIncome" readonly data-key="netRentalIncome" />
             </label>
           </section>
-          <section class="card" id="section5Card">
-            <h2>Section 5</h2>
+        </div>
+
+        <div class="layoutCol">
+          <section class="card" id="section4Card">
+            <h2>Section 4: Tax Calculation</h2>
+            <label class="computed">Total Income [C]
+              <input type="text" id="totalIncome" readonly data-key="totalIncome" />
+            </label>
+            <label class="computed">Profit (Loss) before tax [C]
+              <input type="text" id="profitBeforeTax" readonly data-key="profitBeforeTax" />
+            </label>
+            <label class="computed">Tax on Profit [C]
+              <input type="text" id="taxOnProfit" readonly data-key="taxOnProfit" />
+            </label>
+            <label class="computed">Profit (Loss) for the period [C]
+              <input type="text" id="profitForPeriod" readonly data-key="profitForPeriod" />
+            </label>
             <label class="computed">Profits chargeable to corporation tax [C]
               <input type="text" id="ttProfitsChargeable" readonly data-key="ttProfitsChargeable" />
             </label>
@@ -144,9 +136,9 @@
           </section>
         </div>
 
-        <div class="layoutCol colThree">
-          <section class="card" id="section6Card">
-            <h2>Section 6: Tax Variables</h2>
+        <div class="layoutCol">
+          <section class="card" id="section5Card">
+            <h2>Section 5: Tax Variables</h2>
 
             <div class="varsGroup">
               <h3>Core Thresholds And Rates</h3>
@@ -181,6 +173,12 @@
                 <label class="computed">P1 profit before tax [C]
                   <input type="text" id="outP1ProfitBeforeTax" readonly data-key="outP1ProfitBeforeTax" />
                 </label>
+                <label class="computed">P1 lower bracket limit [C]
+                  <input type="text" id="outP1LowerBracket" readonly data-key="outP1LowerBracket" />
+                </label>
+                <label class="computed">P1 upper bracket limit [C]
+                  <input type="text" id="outP1UpperBracket" readonly data-key="outP1UpperBracket" />
+                </label>
                 <label class="computed">P1 taxable profit [C]
                   <input type="text" id="outP1TaxableProfit" readonly data-key="outP1TaxableProfit" />
                 </label>
@@ -201,6 +199,12 @@
                 </label>
                 <label class="computed">P2 profit before tax [C]
                   <input type="text" id="outP2ProfitBeforeTax" readonly data-key="outP2ProfitBeforeTax" />
+                </label>
+                <label class="computed">P2 lower bracket limit [C]
+                  <input type="text" id="outP2LowerBracket" readonly data-key="outP2LowerBracket" />
+                </label>
+                <label class="computed">P2 upper bracket limit [C]
+                  <input type="text" id="outP2UpperBracket" readonly data-key="outP2UpperBracket" />
                 </label>
                 <label class="computed">P2 taxable profit [C]
                   <input type="text" id="outP2TaxableProfit" readonly data-key="outP2TaxableProfit" />

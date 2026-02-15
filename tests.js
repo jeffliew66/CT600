@@ -380,6 +380,23 @@ function checkSeparateTradeNonTradeAiaBuckets() {
   assert(ttpBoth <= Math.min(ttpTradeOnly, ttpNonTradeOnly), 'Both AIA buckets should not increase taxable profits.');
 }
 
+function checkAiaCanCreateLoss() {
+  const out = run(baseInput({
+    apStart: '2024-04-01',
+    apEnd: '2025-03-31',
+    assocCompanies: 0,
+    turnover: 30000,
+    aiaTradeAdditions: 100000,
+    aiaNonTradeAdditions: 0,
+    aiaAdditions: 0
+  }));
+
+  const p1 = ((out.result.metadata || {}).periods || [])[0] || {};
+  assert((p1.trade_aia_claim || 0) > 30000, 'AIA claim should be allowed above current-period trade profit.');
+  assert((p1.taxable_before_loss || 0) < 0, 'AIA should be able to create an overall period loss before loss relief.');
+  assert(out.result.computation.taxableTotalProfits === 0, 'Negative period result should cap taxable total profits at 0.');
+}
+
 function checkTwelveMonthBoundary() {
   // Exact 12-month AP that is 366 days (leap year) must NOT be split.
   const leapYearTwelveMonths = run(baseInput({
@@ -491,6 +508,7 @@ function main() {
   checkLossBfSequentialAcrossApPeriods();
   checkPropertyLossBfSequentialAcrossApPeriods();
   checkSeparateTradeNonTradeAiaBuckets();
+  checkAiaCanCreateLoss();
   printSummary(rows);
   console.log('\nPASS: all matrix checks passed.');
 }

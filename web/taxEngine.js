@@ -474,8 +474,10 @@
       );
       const periodNonTradingBeforeAIA = TaxModel.roundPounds(periodInterestIncome + periodPropertyProfit);
       const periodTradingBeforeAIA = TaxModel.roundPounds(periodTaxableBeforeAIA - periodNonTradingBeforeAIA);
-      const tradePotentialClaim = Math.min(periodTradeAIAAdditionsShare, Math.max(0, periodTradingBeforeAIA));
-      const nonTradePotentialClaim = Math.min(periodNonTradeAIAAdditionsShare, Math.max(0, periodNonTradingBeforeAIA));
+      // AIA claim is driven by qualifying additions (subject to shared cap),
+      // and can create/increase a loss. Do not cap claim by current-period profit.
+      const tradePotentialClaim = Math.max(0, periodTradeAIAAdditionsShare);
+      const nonTradePotentialClaim = Math.max(0, periodNonTradeAIAAdditionsShare);
       const sharedCapClaims = allocateSharedCap(tradePotentialClaim, nonTradePotentialClaim, periodAIACapTotal);
       const periodTradeAIAClaim = TaxModel.roundPounds(sharedCapClaims.tradeClaim);
       const periodNonTradeAIAClaim = TaxModel.roundPounds(sharedCapClaims.nonTradeClaim);

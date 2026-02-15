@@ -400,6 +400,28 @@
     document.getElementById('outUpperRate').dataset.orig = String(roundPounds(upperRate * 100));
     const p1ByFY = (p1.by_fy || ((result.byFY || []).filter((x) => (x.period_index || 1) === 1)));
     const p2ByFY = (p2.by_fy || ((result.byFY || []).filter((x) => (x.period_index || 0) === 2)));
+    const sumPeriodThreshold = (slices, key) => (slices || []).reduce((sum, slice) => {
+      return sum + Number(slice && slice.thresholds ? (slice.thresholds[key] || 0) : 0);
+    }, 0);
+    const buildPeriodThresholdBreakdown = (slices, key, label, periodIndex) => {
+      if (!slices || !slices.length) {
+        return `No Period ${periodIndex} slices. ${label} = ${pounds(0)}`;
+      }
+      const lines = slices.map((slice) => {
+        const fyLabel = (Array.isArray(slice.fy_years) && slice.fy_years.length > 1)
+          ? `FY${slice.fy_years[0]}-FY${slice.fy_years[slice.fy_years.length - 1]}`
+          : `FY${slice.fy_year}`;
+        return `${fyLabel}: ${pounds(slice.thresholds ? (slice.thresholds[key] || 0) : 0)}`;
+      });
+      const total = sumPeriodThreshold(slices, key);
+      return `Period ${periodIndex} ${label} = sum of effective-slice ${label.toLowerCase()} values\n` +
+        `${lines.join(' + ')}\n` +
+        `= ${pounds(total)}`;
+    };
+    const p1LowerBracket = sumPeriodThreshold(p1ByFY, 'small_threshold_for_AP_in_this_FY');
+    const p1UpperBracket = sumPeriodThreshold(p1ByFY, 'upper_threshold_for_AP_in_this_FY');
+    const p2LowerBracket = sumPeriodThreshold(p2ByFY, 'small_threshold_for_AP_in_this_FY');
+    const p2UpperBracket = sumPeriodThreshold(p2ByFY, 'upper_threshold_for_AP_in_this_FY');
 
     function buildPeriodTaxableDetail(period, periodIndex) {
       const days = Number(period.days || 0);
@@ -571,6 +593,18 @@
 
     setOutNumeric('outP1RevenueShare', p1Revenue, 'Period 1 revenue share = total accounting income x (P1 days / AP days)', `${pounds(totalIncome)} x (${p1.days || 0}/${apDays}) = ${pounds(p1Revenue)}`);
     setOutNumeric('outP1ProfitBeforeTax', p1.profit_before_tax || 0, 'Period 1 PBT = AP PBT apportioned to period 1', `${pounds(profitBeforeTax)} x (${p1.days || 0}/${apDays}) ~= ${pounds(p1.profit_before_tax || 0)}`);
+    setOutNumeric(
+      'outP1LowerBracket',
+      p1LowerBracket,
+      'Period 1 lower bracket limit = sum of effective tax-slice lower thresholds in Period 1',
+      buildPeriodThresholdBreakdown(p1ByFY, 'small_threshold_for_AP_in_this_FY', 'Lower bracket limit', 1)
+    );
+    setOutNumeric(
+      'outP1UpperBracket',
+      p1UpperBracket,
+      'Period 1 upper bracket limit = sum of effective tax-slice upper thresholds in Period 1',
+      buildPeriodThresholdBreakdown(p1ByFY, 'upper_threshold_for_AP_in_this_FY', 'Upper bracket limit', 1)
+    );
     const p1TaxableDetail = buildPeriodTaxableDetail(p1, 1);
     setOutNumeric('outP1TaxableProfit', p1.taxable_profit || 0, p1TaxableDetail.formula, p1TaxableDetail.details);
     setOutNumeric(
@@ -578,8 +612,9 @@
       p1.aia_claim || 0,
       'Period 1 AIA: shared master cap allocated across trade and non-trade claims',
       `Master cap (P1) = ${pounds(p1AiaCap)}\n` +
-      `Trade potential claim (P1) = min(trade additions ${pounds(p1TradeAiaAdditionsShare)}, trade profit available) = ${pounds(p1.trade_aia_potential_claim || 0)}\n` +
-      `Non-trade potential claim (P1) = min(non-trade additions ${pounds(p1NonTradeAiaAdditionsShare)}, non-trade profit available) = ${pounds(p1.non_trade_aia_potential_claim || 0)}\n` +
+      `Trade requested claim (P1) = qualifying trade additions share = ${pounds(p1.trade_aia_potential_claim || 0)}\n` +
+      `Non-trade requested claim (P1) = qualifying non-trade additions share = ${pounds(p1.non_trade_aia_potential_claim || 0)}\n` +
+      `Note: AIA claim is not capped by current profit and can create/increase a loss.\n` +
       `Allocated from shared cap -> trade claim ${pounds(p1TradeAiaClaim)} | non-trade claim ${pounds(p1NonTradeAiaClaim)}\n` +
       `Total AIA claim (P1) = ${pounds(p1TradeAiaClaim)} + ${pounds(p1NonTradeAiaClaim)} = ${pounds(p1.aia_claim || 0)}`
     );
@@ -588,6 +623,18 @@
 
     setOutNumeric('outP2RevenueShare', p2Revenue, 'Period 2 revenue share = total accounting income x (P2 days / AP days)', `${pounds(totalIncome)} x (${p2.days || 0}/${apDays}) = ${pounds(p2Revenue)}`);
     setOutNumeric('outP2ProfitBeforeTax', p2.profit_before_tax || 0, 'Period 2 PBT = AP PBT apportioned to period 2', `${pounds(profitBeforeTax)} x (${p2.days || 0}/${apDays}) ~= ${pounds(p2.profit_before_tax || 0)}`);
+    setOutNumeric(
+      'outP2LowerBracket',
+      p2LowerBracket,
+      'Period 2 lower bracket limit = sum of effective tax-slice lower thresholds in Period 2',
+      buildPeriodThresholdBreakdown(p2ByFY, 'small_threshold_for_AP_in_this_FY', 'Lower bracket limit', 2)
+    );
+    setOutNumeric(
+      'outP2UpperBracket',
+      p2UpperBracket,
+      'Period 2 upper bracket limit = sum of effective tax-slice upper thresholds in Period 2',
+      buildPeriodThresholdBreakdown(p2ByFY, 'upper_threshold_for_AP_in_this_FY', 'Upper bracket limit', 2)
+    );
     const p2TaxableDetail = buildPeriodTaxableDetail(p2, 2);
     setOutNumeric('outP2TaxableProfit', p2.taxable_profit || 0, p2TaxableDetail.formula, p2TaxableDetail.details);
     setOutNumeric(
@@ -595,8 +642,9 @@
       p2.aia_claim || 0,
       'Period 2 AIA: shared master cap allocated across trade and non-trade claims',
       `Master cap (P2) = ${pounds(p2AiaCap)}\n` +
-      `Trade potential claim (P2) = min(trade additions ${pounds(p2TradeAiaAdditionsShare)}, trade profit available) = ${pounds(p2.trade_aia_potential_claim || 0)}\n` +
-      `Non-trade potential claim (P2) = min(non-trade additions ${pounds(p2NonTradeAiaAdditionsShare)}, non-trade profit available) = ${pounds(p2.non_trade_aia_potential_claim || 0)}\n` +
+      `Trade requested claim (P2) = qualifying trade additions share = ${pounds(p2.trade_aia_potential_claim || 0)}\n` +
+      `Non-trade requested claim (P2) = qualifying non-trade additions share = ${pounds(p2.non_trade_aia_potential_claim || 0)}\n` +
+      `Note: AIA claim is not capped by current profit and can create/increase a loss.\n` +
       `Allocated from shared cap -> trade claim ${pounds(p2TradeAiaClaim)} | non-trade claim ${pounds(p2NonTradeAiaClaim)}\n` +
       `Total AIA claim (P2) = ${pounds(p2TradeAiaClaim)} + ${pounds(p2NonTradeAiaClaim)} = ${pounds(p2.aia_claim || 0)}`
     );
