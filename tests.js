@@ -347,8 +347,8 @@ function checkSeparateTradeNonTradeAiaBuckets() {
     apEnd: '2025-03-31',
     assocCompanies: 0,
     turnover: 100000,
-    interestIncome: 100000,
-    rentalIncome: 0,
+    interestIncome: 0,
+    rentalIncome: 100000,
     propertyLossBF: 0
   });
 
@@ -376,7 +376,7 @@ function checkSeparateTradeNonTradeAiaBuckets() {
   const ttpBoth = both.result.computation.taxableTotalProfits;
 
   assert(ttpTradeOnly < 200000, 'Trade AIA should reduce total taxable profits.');
-  assert(ttpNonTradeOnly < 200000, 'Non-trade AIA should reduce total taxable profits.');
+  assert(ttpNonTradeOnly < 200000, 'Rental/property AIA should reduce total taxable profits.');
   assert(ttpBoth <= Math.min(ttpTradeOnly, ttpNonTradeOnly), 'Both AIA buckets should not increase taxable profits.');
 }
 

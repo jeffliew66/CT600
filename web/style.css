@@ -80,6 +80,36 @@ h1{
   font-size:16px;
 }
 
+.groupBlock{
+  border:1px solid #dbe8df;
+  border-radius:10px;
+  background:#f8fcf9;
+  padding:7px 8px;
+  margin:6px 0;
+}
+
+.groupHead{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  margin:0 0 6px;
+}
+
+.groupHead h3{
+  margin:0;
+  font-size:11px;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  color:#1a5339;
+}
+
+.groupValue{
+  font-size:12px;
+  font-weight:600;
+  color:#1a5339;
+}
+
 #section5Card{
   display:flex;
   flex-direction:column;
@@ -182,6 +212,10 @@ footer{
   color:#496050;
   font-size:13px;
   margin-top:8px;
+}
+
+.techHidden{
+  display:none;
 }
 
 /* RHS formula panel */

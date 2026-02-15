@@ -84,6 +84,7 @@
     const totalExpenses = result.accounts.totalExpenses;
     const profitBeforeTax = result.accounts.profitBeforeTax;
     const taxableTradingProfit = result.computation.taxableTradingProfit;
+    const taxableNonTradeIncome = result.computation.taxableNonTradingProfits;
     const taxableTotalProfits = result.computation.taxableTotalProfits;
     const augmentedProfits = result.computation.augmentedProfits;
     const corporationTaxCharge = result.tax.corporationTaxCharge;
@@ -106,21 +107,40 @@
       el.dataset.raw = String(value);
       el.dataset.orig = String(roundPounds(value));
     };
+    const setRawMeta = (id, raw, orig) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.dataset.raw = String(raw);
+      el.dataset.orig = String(orig);
+    };
 
     // Populate P&L fields
-    setOut("totalIncome", roundPounds(totalIncome), "Sum of accounting income sources (excludes dividends)", `Turnover + Govt Grants + Interest + Rental = ${pounds(totalIncome)}`);
-    document.getElementById('totalIncome').dataset.raw = String(totalIncome);
-    document.getElementById('totalIncome').dataset.orig = String(roundPounds(totalIncome));
+    const tradeAccountingIncome = userInputs.turnover;
+    const nonTradeAccountingIncome = userInputs.govtGrants + userInputs.interestIncome + userInputs.rentalIncome;
+    setOut(
+      "totalIncome",
+      roundPounds(totalIncome),
+      "Total accounting income = trade income + non-trade income (dividends excluded)",
+      `Trade income = Turnover = ${pounds(tradeAccountingIncome)}\n` +
+      `Non-trade income = Govt grants + Interest + Rental = ${pounds(userInputs.govtGrants)} + ${pounds(userInputs.interestIncome)} + ${pounds(userInputs.rentalIncome)} = ${pounds(nonTradeAccountingIncome)}\n` +
+      `Total accounting income = ${pounds(tradeAccountingIncome)} + ${pounds(nonTradeAccountingIncome)} = ${pounds(totalIncome)}`
+    );
+    setRawMeta('totalIncome', totalIncome, roundPounds(totalIncome));
 
-    setOut('totalExpenses', roundPounds(totalExpenses), 'Sum of all expenses', `Raw Materials + Staff + Depreciation + Other = GBP ${roundPounds(totalExpenses).toLocaleString()}`);
-    document.getElementById('totalExpenses').dataset.raw = String(totalExpenses);
-    document.getElementById('totalExpenses').dataset.orig = String(roundPounds(totalExpenses));
+    setOut(
+      'totalExpenses',
+      roundPounds(totalExpenses),
+      'Total expenses = Raw materials + Staff + Depreciation + Other charges',
+      `Raw materials ${pounds(userInputs.costOfSales)} + Staff ${pounds(userInputs.staffCosts)} + Depreciation ${pounds(userInputs.depreciation)} + Other charges ${pounds(userInputs.otherCharges)} = ${pounds(totalExpenses)}`
+    );
+    setRawMeta('totalExpenses', totalExpenses, roundPounds(totalExpenses));
+    const expensesGroupTotalEl = $('outExpensesGroupTotal');
+    if (expensesGroupTotalEl) expensesGroupTotalEl.textContent = pounds(totalExpenses);
 
     // Detailed PBT formula
     const pbtDetail = `STEP-BY-STEP CALCULATION:\n\nTotal Income (accounting, excludes dividends)\n  = Turnover + Govt Grants + Interest + Rental\n  = GBP ${roundPounds(userInputs.turnover).toLocaleString()} + GBP ${roundPounds(userInputs.govtGrants).toLocaleString()} + GBP ${roundPounds(userInputs.interestIncome).toLocaleString()} + GBP ${roundPounds(userInputs.rentalIncome).toLocaleString()}\n  = GBP ${roundPounds(totalIncome).toLocaleString()}\n\nTotal Expenses\n  = Raw Materials + Staff + Depreciation + Other\n  = GBP ${roundPounds(userInputs.costOfSales).toLocaleString()} + GBP ${roundPounds(userInputs.staffCosts).toLocaleString()} + GBP ${roundPounds(userInputs.depreciation).toLocaleString()} + GBP ${roundPounds(userInputs.otherCharges).toLocaleString()}\n  = GBP ${roundPounds(totalExpenses).toLocaleString()}\n\nProfit Before Tax\n  = Total Income - Total Expenses\n  = GBP ${roundPounds(totalIncome).toLocaleString()} - GBP ${roundPounds(totalExpenses).toLocaleString()}\n  = GBP ${roundPounds(profitBeforeTax).toLocaleString()}`;
     setOut('profitBeforeTax', roundPounds(profitBeforeTax), 'Total Income - Total Expenses', pbtDetail);
-    document.getElementById('profitBeforeTax').dataset.raw = String(profitBeforeTax);
-    document.getElementById('profitBeforeTax').dataset.orig = String(roundPounds(profitBeforeTax));
+    setRawMeta('profitBeforeTax', profitBeforeTax, roundPounds(profitBeforeTax));
 
     // Tax calculation with AP split info
     const apDays = inputs.apDays;
@@ -209,8 +229,9 @@
     verificationDetail += `FORMULA TEMPLATE (SYMBOLIC):\n`;
     verificationDetail += `  Total Income = Turnover + Govt Grants + Interest + Rental\n`;
     verificationDetail += `  Profit Before Tax = Total Income - Total Expenses\n`;
-    verificationDetail += `  Taxable Trading Profit = Profit Before Tax + AddBacks - CapitalAllowances - TradingLossUsed\n`;
-    verificationDetail += `  Taxable Total Profits (TTP) = Taxable Trading Profit + Interest + Net Property\n`;
+    verificationDetail += `  Taxable Trading Profit = trading component after trade AIA and trading loss relief\n`;
+    verificationDetail += `  Taxable Total Profits (TTP) = max(0, Taxable Trading Profit + Taxable Non-Trading Income)\n`;
+    verificationDetail += `  Taxable Non-Trading Income = Interest + (Rental/Property after property loss BF and rental/property AIA)\n`;
     verificationDetail += `  Augmented Profits = TTP + Dividends\n`;
     verificationDetail += `  Period factor = 1.0 for complete 12-month period, else (period days / 365)\n`;
     verificationDetail += `  Lower Threshold (period) = 50,000 x Period factor / (Associated Companies + 1)\n`;
@@ -232,9 +253,8 @@
     verificationDetail += `  Less capital allowances (AIA used): ${pounds(result.computation.capitalAllowances)}\n`;
     verificationDetail += `  Less trading losses used: ${pounds(result.computation.tradingLossUsed)}\n`;
     verificationDetail += `  Taxable trading profit: ${pounds(taxableTradingProfit)}\n`;
-    verificationDetail += `  Add interest income: ${pounds(userInputs.interestIncome)}\n`;
-    verificationDetail += `  Add net property income: ${pounds(result.property.propertyProfitAfterLossOffset)}\n`;
-    verificationDetail += `  Taxable Total Profits: ${pounds(taxableTotalProfits)}\n`;
+    verificationDetail += `  Taxable non-trading income (interest + rental/property after rental/property AIA): ${pounds(taxableNonTradeIncome)}\n`;
+    verificationDetail += `  Taxable Total Profits = max(0, ${pounds(taxableTradingProfit)} + ${pounds(taxableNonTradeIncome)}) = ${pounds(taxableTotalProfits)}\n`;
     verificationDetail += `  Augmented Profits = TTP + dividends = ${pounds(taxableTotalProfits)} + ${pounds(userInputs.dividendIncome)} = ${pounds(augmentedProfits)}\n\n`;
 
     if (isSplit) {
@@ -281,56 +301,56 @@
     verificationDetail += `Final corporation tax payable = ${pounds(corporationTaxCharge)}`;
     
     setOut('taxOnProfit', roundPounds(corporationTaxCharge), 'Corporation Tax (HMRC-compliant with AP split, MR, thresholds)', `${taxDetail}\n\n${verificationDetail}`);
-    document.getElementById('taxOnProfit').dataset.raw = String(corporationTaxCharge);
-    document.getElementById('taxOnProfit').dataset.orig = String(Math.round(corporationTaxCharge));
+    setRawMeta('taxOnProfit', corporationTaxCharge, Math.round(corporationTaxCharge));
 
     // Profit for period
     setOut('profitForPeriod', roundPounds(profitForPeriod), 'Profit After Tax', `GBP ${roundPounds(profitBeforeTax).toLocaleString()} - GBP ${roundPounds(corporationTaxCharge).toLocaleString()} = GBP ${roundPounds(profitForPeriod).toLocaleString()}`);
-    document.getElementById('profitForPeriod').dataset.raw = String(profitForPeriod);
-    document.getElementById('profitForPeriod').dataset.orig = String(roundPounds(profitForPeriod));
+    setRawMeta('profitForPeriod', profitForPeriod, roundPounds(profitForPeriod));
 
     // Section 3 outputs
     setOut('tradingProfitBeforeTax', roundPounds(profitBeforeTax), 'Operating Profit (before tax)', `GBP ${roundPounds(profitBeforeTax).toLocaleString()}`);
-    document.getElementById('tradingProfitBeforeTax').dataset.raw = String(profitBeforeTax);
-    document.getElementById('tradingProfitBeforeTax').dataset.orig = String(roundPounds(profitBeforeTax));
+    setRawMeta('tradingProfitBeforeTax', profitBeforeTax, roundPounds(profitBeforeTax));
 
     setOut('addbackDepreciation', roundPounds(userInputs.depreciation), 'Tax add-back (depreciation is not deductible)', `GBP ${roundPounds(userInputs.depreciation).toLocaleString()}`);
-    document.getElementById('addbackDepreciation').dataset.raw = String(userInputs.depreciation);
-    document.getElementById('addbackDepreciation').dataset.orig = String(roundPounds(userInputs.depreciation));
+    setRawMeta('addbackDepreciation', userInputs.depreciation, roundPounds(userInputs.depreciation));
 
     setOut('netTradingProfits', roundPounds(taxableTradingProfit), 'Trading profit after adjustments & losses', `GBP ${roundPounds(taxableTradingProfit).toLocaleString()}`);
-    document.getElementById('netTradingProfits').dataset.raw = String(taxableTradingProfit);
-    document.getElementById('netTradingProfits').dataset.orig = String(roundPounds(taxableTradingProfit));
+    setRawMeta('netTradingProfits', taxableTradingProfit, roundPounds(taxableTradingProfit));
 
     // Section 4 outputs
     setOut('outInterestIncome', roundPounds(userInputs.interestIncome), 'Interest earned', `GBP ${roundPounds(userInputs.interestIncome).toLocaleString()}`);
-    document.getElementById('outInterestIncome').dataset.raw = String(userInputs.interestIncome);
-    document.getElementById('outInterestIncome').dataset.orig = String(roundPounds(userInputs.interestIncome));
+    setRawMeta('outInterestIncome', userInputs.interestIncome, roundPounds(userInputs.interestIncome));
 
     setOut('outGovtGrants', roundPounds(userInputs.govtGrants), 'Government grants', `GBP ${roundPounds(userInputs.govtGrants).toLocaleString()}`);
-    document.getElementById('outGovtGrants').dataset.raw = String(userInputs.govtGrants);
-    document.getElementById('outGovtGrants').dataset.orig = String(roundPounds(userInputs.govtGrants));
+    setRawMeta('outGovtGrants', userInputs.govtGrants, roundPounds(userInputs.govtGrants));
 
     setOut('outDividendIncome', roundPounds(userInputs.dividendIncome), 'Dividend income (affects rate, not taxable)', `GBP ${roundPounds(userInputs.dividendIncome).toLocaleString()}`);
-    document.getElementById('outDividendIncome').dataset.raw = String(userInputs.dividendIncome);
-    document.getElementById('outDividendIncome').dataset.orig = String(roundPounds(userInputs.dividendIncome));
+    setRawMeta('outDividendIncome', userInputs.dividendIncome, roundPounds(userInputs.dividendIncome));
 
     setOut('outRentalIncome', roundPounds(result.property.rentalIncome), 'Rental income', `GBP ${roundPounds(result.property.rentalIncome).toLocaleString()}`);
-    document.getElementById('outRentalIncome').dataset.raw = String(result.property.rentalIncome);
-    document.getElementById('outRentalIncome').dataset.orig = String(roundPounds(result.property.rentalIncome));
+    setRawMeta('outRentalIncome', result.property.rentalIncome, roundPounds(result.property.rentalIncome));
 
-    setOut('netRentalIncome', roundPounds(result.property.propertyProfitAfterLossOffset), 'Rental income after loss offset', `GBP ${roundPounds(result.property.propertyProfitAfterLossOffset).toLocaleString()}`);
-    document.getElementById('netRentalIncome').dataset.raw = String(result.property.propertyProfitAfterLossOffset);
-    document.getElementById('netRentalIncome').dataset.orig = String(roundPounds(result.property.propertyProfitAfterLossOffset));
+    setOut(
+      'netRentalIncome',
+      roundPounds(result.property.propertyProfitAfterLossOffset),
+      'Rental/property income after property losses brought forward (before rental/property AIA)',
+      `Gross rental/property income ${pounds(result.property.rentalIncome)} - property losses b/f used = ${pounds(result.property.propertyProfitAfterLossOffset)}`
+    );
+    setRawMeta('netRentalIncome', result.property.propertyProfitAfterLossOffset, roundPounds(result.property.propertyProfitAfterLossOffset));
 
     // Section 5 outputs
-    setOut('ttProfitsChargeable', roundPounds(taxableTotalProfits), 'Total taxable profit (on which CT is calculated)', `Trading GBP ${roundPounds(taxableTradingProfit).toLocaleString()} + Interest GBP ${roundPounds(userInputs.interestIncome).toLocaleString()} + Property GBP ${roundPounds(result.property.propertyProfitAfterLossOffset).toLocaleString()} = GBP ${roundPounds(taxableTotalProfits).toLocaleString()}`);
-    document.getElementById('ttProfitsChargeable').dataset.raw = String(taxableTotalProfits);
-    document.getElementById('ttProfitsChargeable').dataset.orig = String(roundPounds(taxableTotalProfits));
+    setOut(
+      'ttProfitsChargeable',
+      roundPounds(taxableTotalProfits),
+      'Total taxable income = max(0, taxable trade income + taxable non-trade income)',
+      `Taxable trade income = ${pounds(taxableTradingProfit)}\n` +
+      `Taxable non-trade income = ${pounds(taxableNonTradeIncome)}\n` +
+      `Total taxable income = max(0, ${pounds(taxableTradingProfit)} + ${pounds(taxableNonTradeIncome)}) = ${pounds(taxableTotalProfits)}`
+    );
+    setRawMeta('ttProfitsChargeable', taxableTotalProfits, roundPounds(taxableTotalProfits));
 
-    setOut('corpTaxPayable', roundPounds(corporationTaxCharge), 'Final Corporation Tax Payable', verificationDetail);
-    document.getElementById('corpTaxPayable').dataset.raw = String(corporationTaxCharge);
-    document.getElementById('corpTaxPayable').dataset.orig = String(Math.round(corporationTaxCharge));
+    setOut('corpTaxPayable', roundPounds(corporationTaxCharge), 'Final Corporation Tax Payable', `${taxDetail}\n\n${verificationDetail}`);
+    setRawMeta('corpTaxPayable', corporationTaxCharge, Math.round(corporationTaxCharge));
 
     // Section 6 outputs (tax variables and period-level breakdown)
     const periods = (result.metadata && result.metadata.periods) ? result.metadata.periods : [];
@@ -533,8 +553,10 @@
     setOutNumeric(
       'outTTPVar',
       taxableTotalProfits,
-      'Profits chargeable to corporation tax (TTP) = taxable trading + interest + net property',
-      `${pounds(result.computation.taxableTradingProfit)} + ${pounds(userInputs.interestIncome)} + ${pounds(result.property.propertyProfitAfterLossOffset)} = ${pounds(taxableTotalProfits)}`
+      'Profits chargeable to corporation tax (TTP) = max(0, taxable trading + taxable non-trading)',
+      `Taxable trading = ${pounds(result.computation.taxableTradingProfit)}\n` +
+      `Taxable non-trading (interest + rental/property after rental/property AIA) = ${pounds(taxableNonTradeIncome)}\n` +
+      `TTP = max(0, ${pounds(result.computation.taxableTradingProfit)} + ${pounds(taxableNonTradeIncome)}) = ${pounds(taxableTotalProfits)}`
     );
 
     setOutNumeric(
@@ -542,10 +564,9 @@
       augmentedProfits,
       'Augmented profits = Taxable Total Profits + dividends',
       `STEP 1: Taxable trading profit = ${pounds(result.computation.taxableTradingProfit)}\n` +
-      `STEP 2: Add interest income (not double-counted) = ${pounds(userInputs.interestIncome)}\n` +
-      `STEP 3: Add net property income after property losses = ${pounds(result.property.propertyProfitAfterLossOffset)}\n` +
-      `STEP 4: Taxable Total Profits = ${pounds(result.computation.taxableTradingProfit)} + ${pounds(userInputs.interestIncome)} + ${pounds(result.property.propertyProfitAfterLossOffset)} = ${pounds(taxableTotalProfits)}\n` +
-      `STEP 5: Augmented profits = ${pounds(taxableTotalProfits)} + ${pounds(userInputs.dividendIncome)} = ${pounds(augmentedProfits)}`
+      `STEP 2: Taxable non-trading income (interest + rental/property after rental/property AIA) = ${pounds(taxableNonTradeIncome)}\n` +
+      `STEP 3: Taxable Total Profits = max(0, ${pounds(result.computation.taxableTradingProfit)} + ${pounds(taxableNonTradeIncome)}) = ${pounds(taxableTotalProfits)}\n` +
+      `STEP 4: Augmented profits = ${pounds(taxableTotalProfits)} + ${pounds(userInputs.dividendIncome)} = ${pounds(augmentedProfits)}`
     );
 
     const totalMRDetails = [
@@ -581,12 +602,13 @@
       `Associated companies divisor = ${divisor}\n` +
       `Period 1 master cap: ${pounds(p1AiaCap)}\n` +
       `Period 1 trade additions ${pounds(p1TradeAiaAdditionsShare)} | non-trade additions ${pounds(p1NonTradeAiaAdditionsShare)}\n` +
-      `Period 1 trade potential ${pounds(p1.trade_aia_potential_claim || 0)} | non-trade potential ${pounds(p1.non_trade_aia_potential_claim || 0)}\n` +
+      `Period 1 trade requested ${pounds(p1.trade_aia_potential_claim || 0)} | rental/property requested ${pounds(p1.non_trade_aia_potential_claim || 0)}\n` +
       `Period 1 allocated trade claim ${pounds(p1TradeAiaClaim)} | non-trade claim ${pounds(p1NonTradeAiaClaim)} | total claim ${pounds(p1.aia_claim || 0)}\n` +
       `Period 2 master cap: ${pounds(p2AiaCap)}\n` +
       `Period 2 trade additions ${pounds(p2TradeAiaAdditionsShare)} | non-trade additions ${pounds(p2NonTradeAiaAdditionsShare)}\n` +
-      `Period 2 trade potential ${pounds(p2.trade_aia_potential_claim || 0)} | non-trade potential ${pounds(p2.non_trade_aia_potential_claim || 0)}\n` +
+      `Period 2 trade requested ${pounds(p2.trade_aia_potential_claim || 0)} | rental/property requested ${pounds(p2.non_trade_aia_potential_claim || 0)}\n` +
       `Period 2 allocated trade claim ${pounds(p2TradeAiaClaim)} | non-trade claim ${pounds(p2NonTradeAiaClaim)} | total claim ${pounds(p2.aia_claim || 0)}\n` +
+      `Note: non-trade AIA claim offsets rental & property stream (not interest income).\n` +
       `Total cap across periods: ${pounds(totalAiaCap)}\n` +
       `Total claim: ${pounds(p1.aia_claim || 0)} + ${pounds(p2.aia_claim || 0)} = ${pounds(result.computation.capitalAllowances)}`
     );
@@ -613,8 +635,9 @@
       'Period 1 AIA: shared master cap allocated across trade and non-trade claims',
       `Master cap (P1) = ${pounds(p1AiaCap)}\n` +
       `Trade requested claim (P1) = qualifying trade additions share = ${pounds(p1.trade_aia_potential_claim || 0)}\n` +
-      `Non-trade requested claim (P1) = qualifying non-trade additions share = ${pounds(p1.non_trade_aia_potential_claim || 0)}\n` +
+      `Rental/property requested claim (P1) = qualifying rental/property AIA additions share = ${pounds(p1.non_trade_aia_potential_claim || 0)}\n` +
       `Note: AIA claim is not capped by current profit and can create/increase a loss.\n` +
+      `Note: rental/property AIA offsets rental & property stream only (not interest income).\n` +
       `Allocated from shared cap -> trade claim ${pounds(p1TradeAiaClaim)} | non-trade claim ${pounds(p1NonTradeAiaClaim)}\n` +
       `Total AIA claim (P1) = ${pounds(p1TradeAiaClaim)} + ${pounds(p1NonTradeAiaClaim)} = ${pounds(p1.aia_claim || 0)}`
     );
@@ -643,8 +666,9 @@
       'Period 2 AIA: shared master cap allocated across trade and non-trade claims',
       `Master cap (P2) = ${pounds(p2AiaCap)}\n` +
       `Trade requested claim (P2) = qualifying trade additions share = ${pounds(p2.trade_aia_potential_claim || 0)}\n` +
-      `Non-trade requested claim (P2) = qualifying non-trade additions share = ${pounds(p2.non_trade_aia_potential_claim || 0)}\n` +
+      `Rental/property requested claim (P2) = qualifying rental/property AIA additions share = ${pounds(p2.non_trade_aia_potential_claim || 0)}\n` +
       `Note: AIA claim is not capped by current profit and can create/increase a loss.\n` +
+      `Note: rental/property AIA offsets rental & property stream only (not interest income).\n` +
       `Allocated from shared cap -> trade claim ${pounds(p2TradeAiaClaim)} | non-trade claim ${pounds(p2NonTradeAiaClaim)}\n` +
       `Total AIA claim (P2) = ${pounds(p2TradeAiaClaim)} + ${pounds(p2NonTradeAiaClaim)} = ${pounds(p2.aia_claim || 0)}`
     );

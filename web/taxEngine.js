@@ -483,7 +483,9 @@
       const periodNonTradeAIAClaim = TaxModel.roundPounds(sharedCapClaims.nonTradeClaim);
       const periodAIAClaim = periodTradeAIAClaim + periodNonTradeAIAClaim;
       const periodTradingAfterAIA = TaxModel.roundPounds(periodTradingBeforeAIA - periodTradeAIAClaim);
-      const periodNonTradingAfterAIA = TaxModel.roundPounds(periodNonTradingBeforeAIA - periodNonTradeAIAClaim);
+      // Rental/property AIA offsets the rental/property stream only (not interest).
+      const periodPropertyAfterAIA = TaxModel.roundPounds(periodPropertyProfit - periodNonTradeAIAClaim);
+      const periodNonTradingAfterAIA = TaxModel.roundPounds(periodInterestIncome + periodPropertyAfterAIA);
       const periodTaxableBeforeLoss = TaxModel.roundPounds(periodTradingAfterAIA + periodNonTradingAfterAIA);
 
       // Trading losses b/fwd reduce trading profits only.
@@ -600,7 +602,7 @@
     
     // taxableTradingProfit is the trading income only (after P&L, before adding interest/property)
     // This is for reporting/transparency only
-    result.computation.taxableTradingProfit = TaxModel.roundPounds(Math.max(0, periodResults.reduce((s, p) => s + (p.tradingProfitAfterLoss || 0), 0)));
+    result.computation.taxableTradingProfit = TaxModel.roundPounds(periodResults.reduce((s, p) => s + (p.tradingProfitAfterLoss || 0), 0));
     
     // Total taxable profit = ALL sources (trading, interest, property after loss)
     // periodResults already includes all of these
@@ -608,7 +610,7 @@
     
     // For reporting: break down the non-trading portion
     result.computation.taxableNonTradingProfits = TaxModel.roundPounds(
-      Math.max(0, periodResults.reduce((s, p) => s + (p.nonTradingProfitAfterAIA || 0), 0))
+      periodResults.reduce((s, p) => s + (p.nonTradingProfitAfterAIA || 0), 0)
     );
     
     // Augmented profit (for rate banding) = Taxable Total + Dividend Income

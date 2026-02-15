@@ -34,42 +34,53 @@
             <label>Turnover
               <input type="number" id="turnover" step="0.01" value="0" />
             </label>
-            <label>Raw Materials & Consumables
-              <input type="number" id="rawMaterials" step="0.01" value="0" />
-            </label>
-            <label>Staff Costs
-              <input type="number" id="staffCosts" step="0.01" value="0" />
-            </label>
-            <label>Depreciation
-              <input type="number" id="depreciation" step="0.01" value="0" />
-            </label>
-            <label>Other Charges
-              <input type="number" id="otherCharges" step="0.01" value="0" />
-            </label>
-            <label>Add back: Disallowable expenses
-              <input type="number" id="disallowableExpenses" step="0.01" value="0" />
-            </label>
-            <label>Other adjustments (add if positive, deduct if negative)
-              <input type="number" id="otherAdjustments" step="0.01" value="0" />
-            </label>
+            <div class="groupBlock">
+              <div class="groupHead">
+                <h3>Expenses</h3>
+                <span class="groupValue" id="outExpensesGroupTotal">GBP 0</span>
+              </div>
+              <label>Raw Materials & Consumables
+                <input type="number" id="rawMaterials" step="0.01" value="0" />
+              </label>
+              <label>Staff Costs
+                <input type="number" id="staffCosts" step="0.01" value="0" />
+              </label>
+              <label>Depreciation
+                <input type="number" id="depreciation" step="0.01" value="0" />
+              </label>
+              <label>Other Charges
+                <input type="number" id="otherCharges" step="0.01" value="0" />
+              </label>
+              <label>Add back: Disallowable expenses
+                <input type="number" id="disallowableExpenses" step="0.01" value="0" />
+              </label>
+              <label>Other adjustments (add if positive, deduct if negative)
+                <input type="number" id="otherAdjustments" step="0.01" value="0" />
+              </label>
+            </div>
             <label>Less: AIA (Trade)
               <input type="number" id="aiaTrade" step="0.01" value="0" />
             </label>
             <label>Less: Trading losses brought forward
               <input type="number" id="tradingLossBF" step="0.01" value="0" />
             </label>
-            <label class="computed">Total Expenses [C]
-              <input type="text" id="totalExpenses" readonly data-key="totalExpenses" />
-            </label>
-            <label class="computed">Trading Profit / loss before tax [C]
-              <input type="text" id="tradingProfitBeforeTax" readonly data-key="tradingProfitBeforeTax" />
-            </label>
-            <label class="computed">Add back: Depreciation [C]
-              <input type="text" id="addbackDepreciation" readonly data-key="addbackDepreciation" />
-            </label>
-            <label class="computed">Net trading profits [C]
-              <input type="text" id="netTradingProfits" readonly data-key="netTradingProfits" />
-            </label>
+            <div class="groupBlock">
+              <div class="groupHead">
+                <h3>Summary</h3>
+              </div>
+              <label class="computed">Total Expenses [C]
+                <input type="text" id="totalExpenses" readonly data-key="totalExpenses" />
+              </label>
+              <label class="computed">Trading Profit / loss before tax [C]
+                <input type="text" id="tradingProfitBeforeTax" readonly data-key="tradingProfitBeforeTax" />
+              </label>
+              <label class="computed">Add back: Depreciation [C]
+                <input type="text" id="addbackDepreciation" readonly data-key="addbackDepreciation" />
+              </label>
+              <label class="computed">Net trading profits [C]
+                <input type="text" id="netTradingProfits" readonly data-key="netTradingProfits" />
+              </label>
+            </div>
           </section>
         </div>
 
@@ -85,15 +96,20 @@
             <label>Dividend income
               <input type="number" id="dividendIncome" step="0.01" value="0" />
             </label>
-            <label>Rental & property income
-              <input type="number" id="rentalIncome" step="0.01" value="0" />
-            </label>
-            <label>Less: rental & property losses brought forward
-              <input type="number" id="rentalLossBF" step="0.01" value="0" />
-            </label>
-            <label>Less: AIA (Non-Trade)
-              <input type="number" id="aiaNonTrade" step="0.01" value="0" />
-            </label>
+            <div class="groupBlock">
+              <div class="groupHead">
+                <h3>Rental & Property</h3>
+              </div>
+              <label>Rental & property income
+                <input type="number" id="rentalIncome" step="0.01" value="0" />
+              </label>
+              <label>Less: AIA (Rental & property)
+                <input type="number" id="aiaNonTrade" step="0.01" value="0" />
+              </label>
+              <label>Less: rental & property losses brought forward
+                <input type="number" id="rentalLossBF" step="0.01" value="0" />
+              </label>
+            </div>
             <label class="computed">Government grants & subsidies [C]
               <input type="text" id="outGovtGrants" readonly data-key="outGovtGrants" />
             </label>
@@ -106,7 +122,7 @@
             <label class="computed">Rental & property income [C]
               <input type="text" id="outRentalIncome" readonly data-key="outRentalIncome" />
             </label>
-            <label class="computed">Net rental & property income [C]
+            <label class="computed">Net rental & property income (after loss BF, before AIA) [C]
               <input type="text" id="netRentalIncome" readonly data-key="netRentalIncome" />
             </label>
           </section>
@@ -115,19 +131,10 @@
         <div class="layoutCol">
           <section class="card" id="section4Card">
             <h2>Section 4: Tax Calculation</h2>
-            <label class="computed">Total Income [C]
+            <label class="computed">Total accounting income [C]
               <input type="text" id="totalIncome" readonly data-key="totalIncome" />
             </label>
-            <label class="computed">Profit (Loss) before tax [C]
-              <input type="text" id="profitBeforeTax" readonly data-key="profitBeforeTax" />
-            </label>
-            <label class="computed">Tax on Profit [C]
-              <input type="text" id="taxOnProfit" readonly data-key="taxOnProfit" />
-            </label>
-            <label class="computed">Profit (Loss) for the period [C]
-              <input type="text" id="profitForPeriod" readonly data-key="profitForPeriod" />
-            </label>
-            <label class="computed">Profits chargeable to corporation tax [C]
+            <label class="computed">Total taxable income [C]
               <input type="text" id="ttProfitsChargeable" readonly data-key="ttProfitsChargeable" />
             </label>
             <label class="computed">Corporation tax payable [C]
@@ -237,6 +244,12 @@
             </div>
           </section>
         </div>
+      </div>
+
+      <div class="techHidden" aria-hidden="true">
+        <input type="hidden" id="profitBeforeTax" data-key="profitBeforeTax" />
+        <input type="hidden" id="taxOnProfit" data-key="taxOnProfit" />
+        <input type="hidden" id="profitForPeriod" data-key="profitForPeriod" />
       </div>
 
       <div class="actions">
