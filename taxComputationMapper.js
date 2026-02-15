@@ -46,9 +46,21 @@
         total_deductions: round(result.computation.deductions)
       },
 
+      // Trading income components (disposal proceeds are treated as balancing charges in trade)
+      trading_income_components: {
+        turnover: round(inputs.pnl.turnover),
+        govt_grants: round(inputs.pnl.govtGrants),
+        asset_disposal_proceeds_balancing_charges: round(inputs.pnl.disposalGains || 0),
+        total_trading_income: round(
+          (inputs.pnl.turnover || 0) +
+          (inputs.pnl.govtGrants || 0) +
+          (inputs.pnl.disposalGains || 0)
+        )
+      },
+
       // Net trading profit before loss offset
       net_trading_profit_before_loss: round(
-        result.accounts.profitBeforeTax + result.computation.addBacks - result.computation.deductions
+        result.computation.taxableTradingProfit + result.computation.tradingLossUsed
       ),
 
       // Less: trading loss b/fwd
@@ -57,22 +69,18 @@
       // Trading profit after loss
       net_trading_profit: round(result.computation.taxableTradingProfit),
 
-      // Add: other income items (property, interest, dividends separate)
+      // Add: non-trading income items (disposal balancing charges excluded from this bucket)
       other_income: {
         rental_income_net: round(result.property.propertyProfitAfterLossOffset),
         interest_income: round(inputs.pnl.interestIncome),
-        disposal_gains: round(inputs.pnl.disposalGains || 0),
         capital_gains: round(inputs.pnl.capitalGains || 0),
         capital_gains_source_file: String(inputs.pnl.capitalGainsFileName || ''),
         dividend_income: round(inputs.pnl.dividendIncome),
-        govt_grants: round(inputs.pnl.govtGrants),
         total_other_income: round(
           result.property.propertyProfitAfterLossOffset +
           inputs.pnl.interestIncome +
-          (inputs.pnl.disposalGains || 0) +
           (inputs.pnl.capitalGains || 0) +
-          inputs.pnl.dividendIncome +
-          inputs.pnl.govtGrants
+          inputs.pnl.dividendIncome
         )
       },
 
@@ -84,26 +92,57 @@
   /**
    * Builds "Capital Allowances Statement" (CT600 Box 670 basis)
    */
-  function buildCapitalAllowancesSchedule(inputs, result, fyOverlaps) {
-    const partsByFY = fyOverlaps.map((fy) => {
-      const byFY = result.byFY.find((x) => x.fy_year === fy.fy_year);
-      const aiaCap = byFY?.aia_cap_for_fy || 0;
+  function buildCapitalAllowancesSchedule(inputs, result) {
+    const slices = Array.isArray(result.byFY) ? result.byFY : [];
+    const sliceRows = slices.map((slice) => ({
+      fy_year: slice.fy_year,
+      fy_years: Array.isArray(slice.fy_years) ? slice.fy_years : [slice.fy_year],
+      period_index: slice.period_index || 1,
+      ap_days_in_fy: slice.ap_days_in_fy || 0,
+      aia_limit_pro_rated: Number(slice.aia_cap_for_fy || 0)
+    }));
 
-      return {
-        fy_year: fy.fy_year,
-        ap_days_in_fy: fy.ap_days_in_fy,
-        aia_limit_pro_rated: round(aiaCap),
-        aia_claim_requested: round(inputs.capitalAllowances.aiaAdditions),
-        aia_allowance_claimed: round(Math.min(inputs.capitalAllowances.aiaAdditions, aiaCap)),
-        aia_unrelieved_bfwd: round(Math.max(0, inputs.capitalAllowances.aiaAdditions - aiaCap))
-      };
-    });
+    const totalCap = sliceRows.reduce((s, row) => s + row.aia_limit_pro_rated, 0);
+    const requested = Math.max(0, Number(inputs.capitalAllowances?.aiaAdditions || 0));
+    const claimed = Math.max(0, Number(result.computation?.capitalAllowances || 0));
+    const unrelieved = Math.max(0, requested - claimed);
+
+    // Allocate requested/claimed totals across slices by cap-share for schedule display.
+    // This is presentational only; engine totals remain authoritative.
+    function allocateByWeight(total, rows, valueKey, outKey) {
+      let remaining = round(total);
+      const out = rows.map((row, idx) => {
+        const isLast = idx === rows.length - 1;
+        const weight = totalCap > 0 ? (row[valueKey] / totalCap) : 0;
+        const allocated = isLast ? remaining : round(total * weight);
+        remaining -= allocated;
+        return allocated;
+      });
+      return rows.map((row, idx) => ({ ...row, [outKey]: out[idx] }));
+    }
+
+    let parts = allocateByWeight(requested, sliceRows, 'aia_limit_pro_rated', 'aia_claim_requested');
+    parts = allocateByWeight(claimed, parts, 'aia_limit_pro_rated', 'aia_allowance_claimed');
+    parts = allocateByWeight(unrelieved, parts, 'aia_limit_pro_rated', 'aia_unrelieved_bfwd');
+
+    const partsByFY = parts.map((row) => ({
+      fy_year: row.fy_year,
+      fy_years: row.fy_years,
+      period_index: row.period_index,
+      ap_days_in_fy: row.ap_days_in_fy,
+      aia_limit_pro_rated: round(row.aia_limit_pro_rated),
+      aia_claim_requested: round(row.aia_claim_requested),
+      aia_allowance_claimed: round(row.aia_allowance_claimed),
+      aia_unrelieved_bfwd: round(row.aia_unrelieved_bfwd)
+    }));
 
     return {
       total_plant_additions: round(inputs.capitalAllowances.aiaAdditions),
       annual_investment_allowance: {
         parts_by_fy: partsByFY,
-        total_aia_claimed: round(result.computation.capitalAllowances)
+        total_aia_cap: round(totalCap),
+        total_aia_claimed: round(result.computation.capitalAllowances),
+        allocation_note: 'Per-slice requested/claimed/unrelieved figures are allocated by AIA cap-share for reporting.'
       },
       total_capital_allowances: round(result.computation.capitalAllowances)
     };
@@ -111,13 +150,13 @@
 
   /**
    * Builds "Tax Calculation Table" (CT600 Page 4, Boxes 250-415)
-   * Shows CT charge broken down by FY
+   * Shows CT charge broken down by FY.
    * DESIGN NOTE: LOSS-RELIEF TREATMENT
    * This engine applies trading losses against taxable trading profits only.
-   * 
+   *
    * Non-trading streams are computed separately and are not reduced by
    * trading loss relief in this model.
-   * 
+   *
    * This note is informational only and follows the implemented engine logic.
    */
   function buildTaxCalculationTable(result) {
@@ -128,6 +167,7 @@
       const ap = round(fy.augmentedProfit || 0);
       const ct = round(fy.ctCharge || 0);
       const mr = round(fy.marginalRelief || 0);
+      const mainRate = Number(fy.main_rate ?? 0.25);
 
       // Compute actual effective tax rate (CT charge / taxable profit)
       // NOTE: Store as decimal (0.19, 0.25, etc.), NOT rounded to pounds
@@ -135,10 +175,13 @@
 
       return {
         fy_year: fy.fy_year,
+        fy_years: Array.isArray(fy.fy_years) ? fy.fy_years : [fy.fy_year],
+        period_index: fy.period_index || 1,
         taxable_profit: tp,
         augmented_profit: ap,
+        main_rate: mainRate,
         effective_tax_rate: effectiveRate,
-        corporation_tax_at_main_rate: round(tp * 0.25),
+        corporation_tax_at_main_rate: round(tp * mainRate),
         marginal_relief_reduction: mr,
         corporation_tax_charged: ct
       };
@@ -190,7 +233,7 @@
     computation.profit_adjustment_schedule = buildProfitAdjustmentSchedule(inputs, result);
 
     // 2) Capital allowances (AIA claim detail)
-    computation.capital_allowances_schedule = buildCapitalAllowancesSchedule(inputs, result, fyOverlaps);
+    computation.capital_allowances_schedule = buildCapitalAllowancesSchedule(inputs, result);
 
     // 3) Trading loss carry-forward
     computation.trading_loss_schedule = buildTradingLossSchedule(inputs, result);

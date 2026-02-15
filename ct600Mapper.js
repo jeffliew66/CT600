@@ -30,7 +30,9 @@
     boxes.box_145_trade_turnover = round(inputs.pnl.turnover);
     boxes.box_170_interest_income = round(inputs.pnl.interestIncome);
     boxes.box_190_rental_income = round(inputs.pnl.rentalIncome);
-    boxes.box_205_disposal_gains = round(inputs.pnl.disposalGains || 0);
+    // Engine input `disposalGains` is used as trading balancing charges
+    // (AIA asset disposal context), not as non-trading chargeable gains.
+    boxes.box_205_disposal_gains = 0;
     boxes.box_210_chargeable_gains = round(inputs.pnl.capitalGains || 0);
     boxes.box_620_dividend_income = round(inputs.pnl.dividendIncome);
 
@@ -71,6 +73,7 @@
 
     // Helpful transparency (not official CT600 boxes, but good for UI/debug)
     boxes._marginal_relief_total = round(result.tax.marginalRelief);
+    boxes._trading_balancing_charges = round(inputs.pnl.disposalGains || 0);
 
     return boxes;
   }
