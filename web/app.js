@@ -6,6 +6,7 @@
   function $(id){ return document.getElementById(id); }
   function toNum(v){ return Number(v) || 0; }
   function roundPounds(n){ return Math.round((Number(n) || 0)); }
+  function pounds(n){ return `£${roundPounds(n).toLocaleString()}`; }
 
   function compute(){
     try {
@@ -97,24 +98,38 @@
 
     // Tax calculation with AP split info
     const apDays = inputs.apDays;
-    const isSplit = apDays > 365;
+    const isSplit = !!(result.metadata && result.metadata.ap_split);
+    const divisor = (userInputs.assocCompanies || 0) + 1;
+    const smallThreshold = 50000 / divisor;
+    const upperThreshold = 250000 / divisor;
+    const fySlices = (result.byFY || []).map((fy, idx) => ({
+      idx: idx + 1,
+      fyYear: fy.fy_year,
+      days: fy.ap_days_in_fy || 0,
+      taxableProfit: fy.taxableProfit || 0,
+      augmentedProfit: fy.augmentedProfit || 0,
+      ctCharge: fy.ctCharge || 0,
+      marginalRelief: fy.marginalRelief || 0,
+      lower: fy.thresholds ? fy.thresholds.small_threshold_for_AP_in_this_FY : 0,
+      upper: fy.thresholds ? fy.thresholds.upper_threshold_for_AP_in_this_FY : 0
+    }));
+    const hasStraddling = fySlices.length > 1;
+    const hasMarginalRelief = fySlices.some((s) => s.marginalRelief > 0);
     let taxDetail = ``;
     if (isSplit) {
       taxDetail += `⚠️  ACCOUNTING PERIOD SPLIT (HMRC Rule)\n\n`;
-      taxDetail += `AP Length: ${apDays} days (> 365)\n`;
-      taxDetail += `  Period 1: 12 months (${365} days)\n`;
-      taxDetail += `  Period 2: Short period (${apDays - 365} days)\n\n`;
-      taxDetail += `Each period is taxed separately with pro-rated thresholds and AIA.\n\n`;
+      const p1 = (result.metadata && result.metadata.periods && result.metadata.periods[0]) || null;
+      const p2 = (result.metadata && result.metadata.periods && result.metadata.periods[1]) || null;
+      taxDetail += `AP Length: ${apDays} days (> 12 months)\n`;
+      taxDetail += `  Period 1: 12 months (${p1 ? p1.days : '?'} days)\n`;
+      taxDetail += `  Period 2: Short period (${p2 ? p2.days : '?'} days)\n\n`;
+      taxDetail += `Each period is taxed separately with its own thresholds and AIA cap calculation.\n\n`;
     }
     
     taxDetail += `TAXABLE PROFIT & AUGMENTED PROFIT:\n`;
     taxDetail += `  Taxable Total Profits: £${roundPounds(taxableTotalProfits).toLocaleString()}\n`;
     taxDetail += `  Dividend Income (NOT in TTP): £${roundPounds(userInputs.dividendIncome).toLocaleString()}\n`;
     taxDetail += `  Augmented Profit (for rate banding): £${roundPounds(augmentedProfits).toLocaleString()}\n\n`;
-    
-    const divisor = (userInputs.assocCompanies || 0) + 1;
-    const smallThreshold = 50000 / divisor;
-    const upperThreshold = 250000 / divisor;
     
     taxDetail += `THRESHOLDS (with associates divisor ${divisor}):\n`;
     taxDetail += `  Small profit threshold: £50,000 ÷ ${divisor} = £${roundPounds(smallThreshold).toLocaleString()}\n`;
@@ -139,8 +154,69 @@
       taxDetail += `       = 0.015 × £${roundPounds(upperThreshold - augmentedProfits).toLocaleString()} × ${ratio.toFixed(4)} = £${Math.round(marginalRelief).toLocaleString()}\n`;
       taxDetail += `Step 4: Final CT = £${Math.round(mainCT).toLocaleString()} - £${Math.round(marginalRelief).toLocaleString()} = £${Math.round(corporationTaxCharge).toLocaleString()}`;
     }
+    let verificationDetail = `FULL VERIFIABLE TAX BREAKDOWN\n\n`;
+    verificationDetail += `Accounting period: ${userInputs.apStart} to ${userInputs.apEnd} (${apDays} days)\n`;
+    verificationDetail += `Associated companies: ${userInputs.assocCompanies} (divisor ${divisor})\n`;
+    verificationDetail += `Taxable Total Profits: ${pounds(taxableTotalProfits)}\n`;
+    verificationDetail += `Dividend Income used for augmented profit: ${pounds(userInputs.dividendIncome)}\n`;
+    verificationDetail += `Augmented Profits: ${pounds(augmentedProfits)}\n\n`;
+    verificationDetail += `Profit build-up (independently checkable):\n`;
+    verificationDetail += `  Accounting income (excludes dividends): ${pounds(totalIncome)}\n`;
+    verificationDetail += `  Less accounting expenses: ${pounds(totalExpenses)}\n`;
+    verificationDetail += `  Profit before tax: ${pounds(profitBeforeTax)}\n`;
+    verificationDetail += `  Add-backs (depreciation + disallowables + adjustments): ${pounds(result.computation.addBacks)}\n`;
+    verificationDetail += `  Less capital allowances (AIA used): ${pounds(result.computation.capitalAllowances)}\n`;
+    verificationDetail += `  Less trading losses used: ${pounds(result.computation.tradingLossUsed)}\n`;
+    verificationDetail += `  Taxable trading profit: ${pounds(taxableTradingProfit)}\n`;
+    verificationDetail += `  Add interest income: ${pounds(userInputs.interestIncome)}\n`;
+    verificationDetail += `  Add net property income: ${pounds(result.property.propertyProfitAfterLossOffset)}\n`;
+    verificationDetail += `  Taxable Total Profits: ${pounds(taxableTotalProfits)}\n`;
+    verificationDetail += `  Augmented Profits = TTP + dividends = ${pounds(taxableTotalProfits)} + ${pounds(userInputs.dividendIncome)} = ${pounds(augmentedProfits)}\n\n`;
+
+    if (isSplit) {
+      verificationDetail += `AP > 12 months split:\n`;
+      (result.metadata?.periods || []).forEach((p, i) => {
+        verificationDetail += `  Period ${i + 1}: ${p.days} days | Taxable Profit ${pounds(p.taxable_profit)} | CT ${pounds(p.ct_charge)}\n`;
+      });
+      verificationDetail += `\n`;
+    }
+
+    if (hasStraddling) {
+      verificationDetail += `Straddling periods (taxed separately by FY slice):\n`;
+      fySlices.forEach((slice) => {
+        verificationDetail += `  Slice ${slice.idx}: FY${slice.fyYear}, ${slice.days} days\n`;
+        verificationDetail += `    Thresholds: lower ${pounds(slice.lower)} | upper ${pounds(slice.upper)}\n`;
+        verificationDetail += `    Taxable profit: ${pounds(slice.taxableProfit)}\n`;
+        verificationDetail += `    Augmented profit: ${pounds(slice.augmentedProfit)}\n`;
+        if (slice.augmentedProfit <= slice.lower) {
+          verificationDetail += `    CT = ${pounds(slice.taxableProfit)} x 0.19 = ${pounds(slice.ctCharge)}\n`;
+        } else if (slice.augmentedProfit >= slice.upper) {
+          verificationDetail += `    CT = ${pounds(slice.taxableProfit)} x 0.25 = ${pounds(slice.ctCharge)}\n`;
+        } else {
+          const mainCTSlice = slice.taxableProfit * 0.25;
+          const ratioSlice = slice.augmentedProfit > 0 ? (slice.taxableProfit / slice.augmentedProfit) : 0;
+          verificationDetail += `    Marginal Relief applies\n`;
+          verificationDetail += `    Main CT = ${pounds(slice.taxableProfit)} x 0.25 = ${pounds(mainCTSlice)}\n`;
+          verificationDetail += `    Ratio = ${pounds(slice.taxableProfit)} / ${pounds(slice.augmentedProfit)} = ${ratioSlice.toFixed(6)}\n`;
+          verificationDetail += `    MR = 0.015 x (${pounds(slice.upper)} - ${pounds(slice.augmentedProfit)}) x ${ratioSlice.toFixed(6)} = ${pounds(slice.marginalRelief)}\n`;
+          verificationDetail += `    CT = ${pounds(mainCTSlice)} - ${pounds(slice.marginalRelief)} = ${pounds(slice.ctCharge)}\n`;
+        }
+      });
+      verificationDetail += `\n`;
+    } else if (hasMarginalRelief && fySlices.length) {
+      const mrSlice = fySlices[0];
+      const mainCTSlice = mrSlice.taxableProfit * 0.25;
+      const ratioSlice = mrSlice.augmentedProfit > 0 ? (mrSlice.taxableProfit / mrSlice.augmentedProfit) : 0;
+      verificationDetail += `Marginal Relief details:\n`;
+      verificationDetail += `  Thresholds: lower ${pounds(mrSlice.lower)} | upper ${pounds(mrSlice.upper)}\n`;
+      verificationDetail += `  Main CT = ${pounds(mrSlice.taxableProfit)} x 0.25 = ${pounds(mainCTSlice)}\n`;
+      verificationDetail += `  MR = 0.015 x (${pounds(mrSlice.upper)} - ${pounds(mrSlice.augmentedProfit)}) x ${ratioSlice.toFixed(6)} = ${pounds(mrSlice.marginalRelief)}\n`;
+      verificationDetail += `  CT = ${pounds(mainCTSlice)} - ${pounds(mrSlice.marginalRelief)} = ${pounds(mrSlice.ctCharge)}\n\n`;
+    }
+
+    verificationDetail += `Final corporation tax payable = ${pounds(corporationTaxCharge)}`;
     
-    setOut('taxOnProfit', roundPounds(corporationTaxCharge), 'Corporation Tax (HMRC-compliant with AP split, MR, thresholds)', taxDetail);
+    setOut('taxOnProfit', roundPounds(corporationTaxCharge), 'Corporation Tax (HMRC-compliant with AP split, MR, thresholds)', `${taxDetail}\n\n${verificationDetail}`);
     document.getElementById('taxOnProfit').dataset.raw = String(corporationTaxCharge);
     document.getElementById('taxOnProfit').dataset.orig = String(Math.round(corporationTaxCharge));
 
@@ -188,14 +264,14 @@
     document.getElementById('ttProfitsChargeable').dataset.raw = String(taxableTotalProfits);
     document.getElementById('ttProfitsChargeable').dataset.orig = String(roundPounds(taxableTotalProfits));
 
-    setOut('corpTaxPayable', roundPounds(corporationTaxCharge), 'Final Corporation Tax Payable', `£${Math.round(corporationTaxCharge).toLocaleString()}${isSplit ? ' (based on AP split)' : ''}`);
+    setOut('corpTaxPayable', roundPounds(corporationTaxCharge), 'Final Corporation Tax Payable', verificationDetail);
     document.getElementById('corpTaxPayable').dataset.raw = String(corporationTaxCharge);
     document.getElementById('corpTaxPayable').dataset.orig = String(Math.round(corporationTaxCharge));
 
     // Log AP split if applicable
-    const apDaysMsg = apDays > 365 
-      ? `⚠️  AP SPLIT ACTIVE: ${apDays} days split into Period 1 (365 days) + Period 2 (${apDays - 365} days). Each period has own thresholds, AIA, and tax calculation.`
-      : `✓ Standard 12-month period (${apDays} days)`;
+    const apDaysMsg = isSplit
+      ? `AP SPLIT ACTIVE: ${apDays} days split into Period 1 (${result.metadata.periods[0].days} days) + Period 2 (${result.metadata.periods[1].days} days). Each period has own thresholds, AIA, and tax calculation.`
+      : `Standard period (12 months or less): ${apDays} days`;
     console.log(apDaysMsg);
     console.log('✓ Computed outputs updated (using TaxEngine with HMRC-compliant rules)');
     } catch(err) {
@@ -219,7 +295,33 @@
     });
     $("resetBtn").addEventListener('click', function(){ 
       document.getElementById('dataForm').reset();
+      setTimeout(() => compute(), 100); // Auto-calculate after reset (with small delay)
     });
+
+    // AUTO-CALCULATE ON INPUT CHANGE (real-time updates)
+    // Add listeners to all form inputs to trigger compute() whenever any value changes
+    const formInputs = document.querySelectorAll('#dataForm input[type="text"], #dataForm input[type="number"], #dataForm input[type="date"]');
+    formInputs.forEach(input => {
+      // Debounce: wait 300ms after typing stops before computing
+      let debounceTimer;
+      input.addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          console.log('→ Auto-compute triggered by input change to', this.id);
+          compute();
+        }, 300);
+      });
+      
+      // Also compute on blur (when user leaves the field)
+      input.addEventListener('change', function() {
+        console.log('→ Auto-compute triggered by input change to', this.id);
+        compute();
+      });
+    });
+
+    // Run initial calculation on page load
+    console.log('→ Running initial calculation on page load');
+    compute();
 
     // Formula panel elements
     const panel = $('formulaPanel');
@@ -318,3 +420,4 @@
   });
 
 })();
+

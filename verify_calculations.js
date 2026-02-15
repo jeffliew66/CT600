@@ -100,3 +100,32 @@ console.log(`365-day: £${result1.result.tax.corporationTaxCharge.toLocaleString
 console.log(`548-day: £${result2.result.tax.corporationTaxCharge.toLocaleString()}`);
 console.log(`Difference: £${(result1.result.tax.corporationTaxCharge - result2.result.tax.corporationTaxCharge).toLocaleString()} (should be POSITIVE - 548-day should be LESS)`);
 console.log('='.repeat(80));
+
+// Test Case 3: Leap-year exact 12 months should NOT split
+console.log('\n\nTEST 3: Leap-year exact 12 months (1 Jan 2024 - 31 Dec 2024)');
+console.log('-'.repeat(80));
+const test3Inputs = {
+  apStart: '2024-01-01',
+  apEnd: '2024-12-31',
+  assocCompanies: 0,
+  turnover: 100000,
+  govtGrants: 0,
+  rentalIncome: 0,
+  interestIncome: 0,
+  dividendIncome: 0,
+  costOfSales: 0,
+  staffCosts: 0,
+  depreciation: 0,
+  otherCharges: 0,
+  disallowableExpenses: 0,
+  otherAdjustments: 0,
+  aiaAdditions: 0,
+  tradingLossBF: 0,
+  propertyLossBF: 0
+};
+
+const result3 = TaxEngine.run(test3Inputs, {});
+console.log(`Days in AP: ${result3.inputs.apDays}`);
+console.log(`AP split active: ${result3.result.metadata.ap_split ? 'YES' : 'NO'}`);
+console.log(`Number of AP periods: ${(result3.result.metadata.periods || []).length}`);
+console.log('Expected: 366 days, NO split, 1 period');

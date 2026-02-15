@@ -1,314 +1,245 @@
-/**
- * tests.js
- * Unit tests for UK Corporation Tax engine
- * 
- * Compare engine outputs against known HMRC worked examples and edge cases.
- * 
- * Run in Node.js:
- *   node tests.js
- */
+#!/usr/bin/env node
+'use strict';
 
-// Load modules (Node.js or browser globals)
-if (typeof window === 'undefined') {
-  // Node.js mode: manually inject each module
-  global.window = global;
-  global.self = global;
+const fs = require('fs');
+const vm = require('vm');
+
+function loadEngine() {
+  global.window = undefined;
+  global.globalThis = global;
+  vm.runInThisContext(fs.readFileSync('./taxModel.js', 'utf8'));
+  vm.runInThisContext(fs.readFileSync('./taxEngine.js', 'utf8'));
+  if (!global.TaxEngine) throw new Error('TaxEngine failed to load.');
 }
 
-// Load modules in order
-require('./taxModel.js');
-require('./taxEngine.js');
+function run(input) {
+  return TaxEngine.run(input, {});
+}
 
-const TaxModel = global.TaxModel;
-const TaxEngine = global.TaxEngine;
+function assert(condition, message) {
+  if (!condition) throw new Error(message);
+}
 
-// Test helper
-function assert(actual, expected, message) {
-  if (actual !== expected) {
-    console.error(`FAIL: ${message}`);
-    console.error(`  Expected: ${expected}`);
-    console.error(`  Actual: ${actual}`);
-    process.exit(1);
-  } else {
-    console.log(`PASS: ${message}`);
+function baseInput(overrides) {
+  return {
+    apStart: '2024-04-01',
+    apEnd: '2025-03-31',
+    assocCompanies: 0,
+    turnover: 0,
+    govtGrants: 0,
+    rentalIncome: 0,
+    interestIncome: 0,
+    dividendIncome: 0,
+    costOfSales: 0,
+    staffCosts: 0,
+    depreciation: 0,
+    otherCharges: 0,
+    disallowableExpenses: 0,
+    otherAdjustments: 0,
+    aiaAdditions: 0,
+    tradingLossBF: 0,
+    propertyLossBF: 0,
+    ...overrides
+  };
+}
+
+function keyOf(input) {
+  return [
+    input.apStart,
+    input.apEnd,
+    `assoc=${input.assocCompanies}`,
+    `turnover=${input.turnover}`,
+    `div=${input.dividendIncome}`
+  ].join('|');
+}
+
+function runMatrix() {
+  const profiles = {
+    single_fy_no_straddle: { apStart: '2024-04-01', apEnd: '2025-03-31', expectSplit: false, expectStraddle: false },
+    straddle_no_split: { apStart: '2023-07-01', apEnd: '2024-06-29', expectSplit: false, expectStraddle: true },
+    split_and_straddle: { apStart: '2024-01-01', apEnd: '2025-06-30', expectSplit: true, expectStraddle: true }
+  };
+  const assocOptions = [0, 3];
+  const turnoverOptions = [45000, 120000];
+  const dividendOptions = [0, 15000];
+
+  const rows = [];
+  for (const [profileName, profile] of Object.entries(profiles)) {
+    for (const assocCompanies of assocOptions) {
+      for (const turnover of turnoverOptions) {
+        for (const dividendIncome of dividendOptions) {
+          const input = baseInput({ ...profile, assocCompanies, turnover, dividendIncome });
+          const out = run(input);
+          rows.push({ profileName, input, out });
+        }
+      }
+    }
+  }
+  return rows;
+}
+
+function checkCoreRules(rows) {
+  for (const row of rows) {
+    const { profileName, input, out } = row;
+    const result = out.result;
+
+    assert(
+      result.computation.augmentedProfits === result.computation.taxableTotalProfits + input.dividendIncome,
+      `Augmented profit mismatch: ${keyOf(input)}`
+    );
+    assert(
+      result.accounts.totalIncome === input.turnover + input.govtGrants + input.rentalIncome + input.interestIncome,
+      `Dividend leaked into taxable income: ${keyOf(input)}`
+    );
+
+    if (profileName === 'single_fy_no_straddle') {
+      assert(result.metadata.ap_split === false, `Unexpected AP split for single FY: ${keyOf(input)}`);
+      assert(result.byFY.length === 1, `Unexpected FY straddle for single FY: ${keyOf(input)}`);
+    }
+    if (profileName === 'straddle_no_split') {
+      assert(result.metadata.ap_split === false, `Unexpected AP split for straddle-no-split: ${keyOf(input)}`);
+      assert(result.byFY.length >= 2, `Expected FY straddle but got one slice: ${keyOf(input)}`);
+    }
+    if (profileName === 'split_and_straddle') {
+      assert(result.metadata.ap_split === true, `Expected AP split for >12 months: ${keyOf(input)}`);
+      assert((result.metadata.periods || []).length === 2, `Expected 2 AP periods: ${keyOf(input)}`);
+      assert(result.byFY.length >= 2, `Expected multiple FY slices: ${keyOf(input)}`);
+    }
   }
 }
 
-function assertRange(actual, min, max, message) {
-  if (actual < min || actual > max) {
-    console.error(`FAIL: ${message}`);
-    console.error(`  Expected range: [${min}, ${max}]`);
-    console.error(`  Actual: ${actual}`);
-    process.exit(1);
-  } else {
-    console.log(`PASS: ${message}`);
+function checkCombinations(rows) {
+  const byKey = new Map(rows.map((r) => [keyOf(r.input), r]));
+
+  for (const row of rows) {
+    const noDivKey = keyOf({ ...row.input, dividendIncome: 0 });
+    const withDivKey = keyOf({ ...row.input, dividendIncome: 15000 });
+    const noDiv = byKey.get(noDivKey);
+    const withDiv = byKey.get(withDivKey);
+    if (!noDiv || !withDiv) continue;
+
+    assert(
+      noDiv.out.result.computation.taxableTotalProfits === withDiv.out.result.computation.taxableTotalProfits,
+      `Taxable profits changed when only dividend changed: ${keyOf(row.input)}`
+    );
+  }
+
+  for (const profileName of ['single_fy_no_straddle', 'straddle_no_split', 'split_and_straddle']) {
+    for (const turnover of [45000, 120000]) {
+      for (const dividendIncome of [0, 15000]) {
+        const assoc0 = byKey.get(keyOf(baseInput({
+          ...({ single_fy_no_straddle: { apStart: '2024-04-01', apEnd: '2025-03-31' }, straddle_no_split: { apStart: '2023-07-01', apEnd: '2024-06-29' }, split_and_straddle: { apStart: '2024-01-01', apEnd: '2025-06-30' } }[profileName]),
+          assocCompanies: 0,
+          turnover,
+          dividendIncome
+        })));
+        const assoc3 = byKey.get(keyOf(baseInput({
+          ...({ single_fy_no_straddle: { apStart: '2024-04-01', apEnd: '2025-03-31' }, straddle_no_split: { apStart: '2023-07-01', apEnd: '2024-06-29' }, split_and_straddle: { apStart: '2024-01-01', apEnd: '2025-06-30' } }[profileName]),
+          assocCompanies: 3,
+          turnover,
+          dividendIncome
+        })));
+        if (!assoc0 || !assoc3) continue;
+
+        const minLower0 = Math.min(...assoc0.out.result.byFY.map((x) => x.thresholds.small_threshold_for_AP_in_this_FY));
+        const minLower3 = Math.min(...assoc3.out.result.byFY.map((x) => x.thresholds.small_threshold_for_AP_in_this_FY));
+        assert(minLower3 < minLower0, `Associated companies did not reduce thresholds: ${profileName}|turnover=${turnover}|div=${dividendIncome}`);
+      }
+    }
+  }
+
+  const mrOnly = rows.find((r) =>
+    r.profileName === 'single_fy_no_straddle' &&
+    r.input.assocCompanies === 0 &&
+    r.input.turnover === 120000 &&
+    r.input.dividendIncome === 0
+  );
+  assert(mrOnly && mrOnly.out.result.tax.marginalRelief > 0, 'Expected MR case not found (single FY).');
+
+  const fullCombo = rows.find((r) =>
+    r.profileName === 'split_and_straddle' &&
+    r.input.assocCompanies === 3 &&
+    r.input.turnover === 45000 &&
+    r.input.dividendIncome === 15000
+  );
+  assert(fullCombo, 'Full combination case missing.');
+  assert(fullCombo.out.result.metadata.ap_split === true, 'Full combination should split AP.');
+  assert(fullCombo.out.result.byFY.length >= 2, 'Full combination should straddle FYs.');
+  assert(fullCombo.out.result.tax.marginalRelief > 0, 'Full combination should trigger marginal relief.');
+
+  const fullComboNoDiv = run(baseInput({
+    apStart: '2024-01-01',
+    apEnd: '2025-06-30',
+    assocCompanies: 3,
+    turnover: 45000,
+    dividendIncome: 0
+  }));
+  assert(
+    fullComboNoDiv.result.computation.taxableTotalProfits === fullCombo.out.result.computation.taxableTotalProfits,
+    'Dividend changed taxable profits in full combination case.'
+  );
+  assert(
+    fullComboNoDiv.result.tax.corporationTaxCharge !== fullCombo.out.result.tax.corporationTaxCharge,
+    'Dividend did not affect CT rate/charge in full combination case.'
+  );
+}
+
+function checkTwelveMonthBoundary() {
+  // Exact 12-month AP that is 366 days (leap year) must NOT be split.
+  const leapYearTwelveMonths = run(baseInput({
+    apStart: '2024-01-01',
+    apEnd: '2024-12-31',
+    assocCompanies: 0,
+    turnover: 100000,
+    dividendIncome: 0
+  }));
+
+  assert(
+    leapYearTwelveMonths.inputs.apDays === 366,
+    'Expected 366 days for 2024-01-01 to 2024-12-31.'
+  );
+  assert(
+    leapYearTwelveMonths.result.metadata.ap_split === false,
+    'Exact 12-month leap-year AP should not split.'
+  );
+  assert(
+    (leapYearTwelveMonths.result.metadata.periods || []).length === 1,
+    'Exact 12-month leap-year AP should have one period.'
+  );
+}
+
+function printSummary(rows) {
+  console.log('HMRC v2 test matrix summary');
+  console.log('profile | assoc | turnover | dividend | days | split | fy_slices | MR | CT');
+  for (const row of rows) {
+    const r = row.out.result;
+    console.log([
+      row.profileName,
+      row.input.assocCompanies,
+      row.input.turnover,
+      row.input.dividendIncome,
+      row.out.inputs.apDays,
+      r.metadata.ap_split ? 'Y' : 'N',
+      r.byFY.length,
+      r.tax.marginalRelief,
+      r.tax.corporationTaxCharge
+    ].join(' | '));
   }
 }
 
-// Test cases
-console.log('\n=== UK Corporation Tax Engine Unit Tests ===\n');
-
-// TEST 1: Small profits rate (augmented profit <= £50k)
-console.log('Test 1: Small profits rate (augmented profit <= £50k)');
-const test1Input = {
-  apStart: '2024-04-01',
-  apEnd: '2025-03-31',
-  turnover: 100000,
-  costOfSales: 40000,
-  staffCosts: 20000,
-  depreciation: 5000,
-  otherCharges: 10000,
-  govtGrants: 0,
-  rentalIncome: 0,
-  interestIncome: 5000,
-  dividendIncome: 0,
-  disallowableExpenses: 0,
-  otherAdjustments: 0,
-  aiaAdditions: 0,
-  tradingLossBF: 0,
-  propertyLossBF: 0,
-  assocCompanies: 0
-};
-const test1Result = TaxEngine.run(test1Input, {});
-// taxable profit = (100k - 40k - 20k - 5k - 10k) + 0 - 0 = 25k
-// augmented = 25k + 0 = 25k (< 50k threshold)
-// CT = 25k * 0.19 = 4,750
-assert(test1Result.result.computation.taxableTotalProfits, 25000, 'Test1: TTP should be 25,000');
-assert(test1Result.result.tax.corporationTaxCharge, 4750, 'Test1: CT at small rate (19%) should be 4,750');
-console.log('');
-
-// TEST 2: Main rate (augmented profit >= £250k)
-console.log('Test 2: Main rate (augmented profit >= £250k)');
-const test2Input = {
-  apStart: '2024-04-01',
-  apEnd: '2025-03-31',
-  turnover: 500000,
-  costOfSales: 150000,
-  staffCosts: 80000,
-  depreciation: 10000,
-  otherCharges: 20000,
-  govtGrants: 0,
-  rentalIncome: 0,
-  interestIncome: 0,
-  dividendIncome: 0,
-  disallowableExpenses: 0,
-  otherAdjustments: 0,
-  aiaAdditions: 0,
-  tradingLossBF: 0,
-  propertyLossBF: 0,
-  assocCompanies: 0
-};
-const test2Result = TaxEngine.run(test2Input, {});
-// taxable = (500k - 150k - 80k - 10k - 20k) = 240k
-// augmented = 240k (>= 250k? no, borderline)
-// Actually, let me recalculate: 500 - 150 - 80 - 10 - 20 = 240k (below threshold)
-// Let me adjust to push over 250k
-const test2InputAdj = {
-  apStart: '2024-04-01',
-  apEnd: '2025-03-31',
-  turnover: 550000,
-  costOfSales: 150000,
-  staffCosts: 80000,
-  depreciation: 10000,
-  otherCharges: 20000,
-  govtGrants: 0,
-  rentalIncome: 0,
-  interestIncome: 0,
-  dividendIncome: 0,
-  disallowableExpenses: 0,
-  otherAdjustments: 0,
-  aiaAdditions: 0,
-  tradingLossBF: 0,
-  propertyLossBF: 0,
-  assocCompanies: 0
-};
-const test2ResultAdj = TaxEngine.run(test2InputAdj, {});
-// taxable = (550k - 150k - 80k - 10k - 20k) = 290k
-// augmented = 290k (>= 250k)
-// CT = 290k * 0.25 = 72,500
-assert(test2ResultAdj.result.computation.taxableTotalProfits, 290000, 'Test2: TTP should be 290,000');
-assert(test2ResultAdj.result.tax.corporationTaxCharge, 72500, 'Test2: CT at main rate (25%) should be 72,500');
-console.log('');
-
-// TEST 3: Marginal relief zone (£50k < augmented < £250k)
-console.log('Test 3: Marginal relief zone (£50k < augmented < £250k)');
-const test3Input = {
-  apStart: '2024-04-01',
-  apEnd: '2025-03-31',
-  turnover: 250000,
-  costOfSales: 80000,
-  staffCosts: 50000,
-  depreciation: 5000,
-  otherCharges: 15000,
-  govtGrants: 0,
-  rentalIncome: 0,
-  interestIncome: 0,
-  dividendIncome: 0,
-  disallowableExpenses: 0,
-  otherAdjustments: 0,
-  aiaAdditions: 0,
-  tradingLossBF: 0,
-  propertyLossBF: 0,
-  assocCompanies: 0
-};
-const test3Result = TaxEngine.run(test3Input, {});
-// taxable = 250k - 80k - 50k - 5k - 15k = 100k
-// augmented = 100k (in MR band)
-// main rate CT = 100k * 0.25 = 25,000
-// MR = 0.015 * (250k - 100k) * (100k / 100k) = 0.015 * 150k * 1 = 2,250
-// final CT = 25,000 - 2,250 = 22,750
-assert(test3Result.result.computation.taxableTotalProfits, 100000, 'Test3: TTP should be 100,000');
-assert(test3Result.result.tax.corporationTaxCharge, 22750, 'Test3: CT with MR should be 22,750');
-assert(test3Result.result.tax.marginalRelief, 2250, 'Test3: MR relief should be 2,250');
-console.log('');
-
-// TEST 4: Trading loss offset
-console.log('Test 4: Trading loss offset reduces taxable profit');
-const test4Input = {
-  apStart: '2024-04-01',
-  apEnd: '2025-03-31',
-  turnover: 150000,
-  costOfSales: 50000,
-  staffCosts: 30000,
-  depreciation: 5000,
-  otherCharges: 10000,
-  govtGrants: 0,
-  rentalIncome: 0,
-  interestIncome: 0,
-  dividendIncome: 0,
-  disallowableExpenses: 0,
-  otherAdjustments: 0,
-  aiaAdditions: 0,
-  tradingLossBF: 30000,  // Brought forward loss
-  propertyLossBF: 0,
-  assocCompanies: 0
-};
-const test4Result = TaxEngine.run(test4Input, {});
-// taxable = 150k - 50k - 30k - 5k - 10k = 55k
-// loss used = min(30k, 55k) = 30k
-// TTP after loss = 55k - 30k = 25k
-// augmented = 25k < 50k, so CT = 25k * 0.19 = 4,750
-assert(test4Result.result.computation.tradingLossUsed, 30000, 'Test4: Should use 30k of loss');
-assert(test4Result.result.computation.taxableTotalProfits, 25000, 'Test4: TTP after loss should be 25,000');
-assert(test4Result.result.tax.corporationTaxCharge, 4750, 'Test4: CT should be 4,750');
-console.log('');
-
-// TEST 5: Associated companies divisor (thresholds reduced by 2 associated cos)
-console.log('Test 5: Associated companies divisor reduces thresholds');
-const test5Input = {
-  apStart: '2024-04-01',
-  apEnd: '2025-03-31',
-  turnover: 200000,
-  costOfSales: 60000,
-  staffCosts: 40000,
-  depreciation: 5000,
-  otherCharges: 10000,
-  govtGrants: 0,
-  rentalIncome: 0,
-  interestIncome: 0,
-  dividendIncome: 0,
-  disallowableExpenses: 0,
-  otherAdjustments: 0,
-  aiaAdditions: 0,
-  tradingLossBF: 0,
-  propertyLossBF: 0,
-  assocCompanies: 2  // 3 companies in group (divisor = 3)
-};
-const test5Result = TaxEngine.run(test5Input, {});
-// taxable = 200k - 60k - 40k - 5k - 10k = 85k
-// augmented = 85k
-// With 2 assoc companies: small threshold = 50k/3 ≈ 16.67k, upper = 250k/3 ≈ 83.33k
-// 85k > 83.33k approx, so likely in MR or main rate
-// Verify that thresholds were applied with divisor
-const fy = test5Result.result.byFY[0];
-if (fy && fy.thresholds) {
-  assertRange(fy.thresholds.small_threshold_for_AP_in_this_FY, 16000, 17000, 'Test5: Small threshold should be ~16.67k with divisor 3');
-  assertRange(fy.thresholds.upper_threshold_for_AP_in_this_FY, 83000, 84000, 'Test5: Upper threshold should be ~83.33k with divisor 3');
+function main() {
+  loadEngine();
+  const rows = runMatrix();
+  checkCoreRules(rows);
+  checkCombinations(rows);
+  checkTwelveMonthBoundary();
+  printSummary(rows);
+  console.log('\nPASS: all matrix checks passed.');
 }
-console.log('');
 
-// TEST 6: Rounding precision (ensure decimal arithmetic, not premature rounding)
-console.log('Test 6: Rounding precision test (marginal relief computed in decimal)');
-const test6Input = {
-  apStart: '2024-04-01',
-  apEnd: '2025-03-31',
-  turnover: 123456.78,
-  costOfSales: 40000,
-  staffCosts: 30000,
-  depreciation: 2500.50,
-  otherCharges: 5000,
-  govtGrants: 0,
-  rentalIncome: 0,
-  interestIncome: 0,
-  dividendIncome: 0,
-  disallowableExpenses: 0,
-  otherAdjustments: 0,
-  aiaAdditions: 0,
-  tradingLossBF: 0,
-  propertyLossBF: 0,
-  assocCompanies: 0
-};
-const test6Result = TaxEngine.run(test6Input, {});
-// Final CT charge should be rounded to nearest £1, but intermediate steps preserve decimals
-// taxable ≈ 123456.78 - 40000 - 30000 - 2500.50 - 5000 = 45956.28
-// Let's just verify CT is calculated and falls in expected range
-const ct6 = test6Result.result.tax.corporationTaxCharge;
-assertRange(ct6, 8700, 8800, 'Test6: CT should be in expected range with decimal precision');
-console.log('');
-
-// TEST 7: Zero profit edge case
-console.log('Test 7: Zero/negative profit edge case');
-const test7Input = {
-  apStart: '2024-04-01',
-  apEnd: '2025-03-31',
-  turnover: 50000,
-  costOfSales: 50000,
-  staffCosts: 0,
-  depreciation: 0,
-  otherCharges: 0,
-  govtGrants: 0,
-  rentalIncome: 0,
-  interestIncome: 0,
-  dividendIncome: 0,
-  disallowableExpenses: 0,
-  otherAdjustments: 0,
-  aiaAdditions: 0,
-  tradingLossBF: 0,
-  propertyLossBF: 0,
-  assocCompanies: 0
-};
-const test7Result = TaxEngine.run(test7Input, {});
-// taxable = 0
-// CT = 0
-assert(test7Result.result.computation.taxableTotalProfits, 0, 'Test7: TTP should be 0');
-assert(test7Result.result.tax.corporationTaxCharge, 0, 'Test7: CT should be 0');
-console.log('');
-
-// TEST 8: AIA capital allowance limit
-console.log('Test 8: AIA capital allowance limit');
-const test8Input = {
-  apStart: '2024-04-01',
-  apEnd: '2025-03-31',
-  turnover: 500000,
-  costOfSales: 200000,
-  staffCosts: 80000,
-  depreciation: 0,
-  otherCharges: 20000,
-  govtGrants: 0,
-  rentalIncome: 0,
-  interestIncome: 0,
-  dividendIncome: 0,
-  disallowableExpenses: 0,
-  otherAdjustments: 0,
-  aiaAdditions: 1500000,  // Claim more than £1m limit
-  tradingLossBF: 0,
-  propertyLossBF: 0,
-  assocCompanies: 0
-};
-const test8Result = TaxEngine.run(test8Input, {});
-// AIA claim should be capped at £1m (or £1m / divisor for associates)
-const aiaClaimed = test8Result.result.computation.capitalAllowances;
-assert(aiaClaimed, 1000000, 'Test8: AIA should be capped at 1,000,000');
-console.log('');
-
-console.log('\n=== All Tests Passed ✓ ===\n');
+try {
+  main();
+} catch (err) {
+  console.error('FAIL:', err.message);
+  process.exitCode = 1;
+}

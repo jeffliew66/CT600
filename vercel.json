@@ -6,6 +6,8 @@
     { "src": "taxEngine.js", "use": "@vercel/static" }
   ],
   "routes": [
+    { "src": "^/$", "dest": "/web/index.html" },
+    { "src": "^/web/?$", "dest": "/web/index.html" },
     { "src": "^/web/(.*)$", "dest": "/web/$1" },
     { "src": "^/(taxModel|taxEngine)\\.js$", "dest": "/$1.js" },
     { "src": "^/(.*)$", "dest": "/web/$1" }

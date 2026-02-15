@@ -18,6 +18,17 @@
     const [y, m, d] = String(isoStr).split('-').map(Number);
     return new Date(Date.UTC(y, m - 1, d));
   }
+  function addMonthsUTC(dateUTC, months) {
+    const year = dateUTC.getUTCFullYear();
+    const month = dateUTC.getUTCMonth();
+    const day = dateUTC.getUTCDate();
+    const targetMonthIndex = month + months;
+    const targetYear = year + Math.floor(targetMonthIndex / 12);
+    const targetMonth = ((targetMonthIndex % 12) + 12) % 12;
+    const daysInTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+    const safeDay = Math.min(day, daysInTargetMonth);
+    return new Date(Date.UTC(targetYear, targetMonth, safeDay));
+  }
   function daysInclusive(startUTC, endUTC) {
     const msPerDay = 24 * 60 * 60 * 1000;
     return Math.round((endUTC - startUTC) / msPerDay) + 1;
@@ -100,13 +111,17 @@
   }
 
   function buildAccountingPeriodSplits(inputs, corpTaxYears) {
-    // HMRC RULE: Accounting periods > 12 months must be split at 12-month mark
+    // HMRC RULE: Accounting periods longer than 12 months must be split at 12-month mark.
+    // Do not use a fixed 365-day cutoff because exact 12-month periods can be 366 days.
     const apDays = inputs.apDays;
     const apStart = inputs.apStartUTC;
     const apEnd = inputs.apEndUTC;
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const twelveMonthsLater = addMonthsUTC(apStart, 12);
+    const period1End = new Date(twelveMonthsLater.getTime() - msPerDay);
 
-    // If AP is 12 months or less, no split needed
-    if (apDays <= 365) {
+    // AP up to 12 months: no split
+    if (apEnd <= period1End) {
       return [{
         periodName: 'Full Period',
         startUTC: apStart,
@@ -116,12 +131,9 @@
       }];
     }
 
-    // AP > 12 months: split at 12-month mark
-    // Period 1: apStart to apStart + 365 days
-    // Period 2: apStart + 365 days + 1 day to apEnd
-    const msPerDay = 24 * 60 * 60 * 1000;
-    const period1End = new Date(apStart.getTime() + (365 * msPerDay));
-    
+    // AP > 12 months: split at 12-month boundary
+    // Period 1: apStart to day before same date next year
+    // Period 2: next day to apEnd
     const period1Days = daysInclusive(apStart, period1End);
     const period2Start = new Date(period1End.getTime() + msPerDay);
     const period2Days = daysInclusive(period2Start, apEnd);
@@ -299,9 +311,11 @@
     };
 
     // 1) Accounts P&L -> PBT (allocate to periods)
+    // CRITICAL: Do NOT include dividend in totalIncome - dividend affects rate, not taxable profit
     const pnl = inputs.pnl;
     result.accounts.totalIncome = TaxModel.roundPounds(
-      pnl.turnover + pnl.govtGrants + pnl.rentalIncome + pnl.interestIncome + pnl.dividendIncome
+      pnl.turnover + pnl.govtGrants + pnl.rentalIncome + pnl.interestIncome
+      // NOTE: pnl.dividendIncome is NOT included here - handled separately for augmented profit
     );
     result.accounts.totalExpenses = TaxModel.roundPounds(
       pnl.costOfSales + pnl.staffCosts + pnl.depreciation + pnl.otherCharges
