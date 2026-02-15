@@ -449,8 +449,11 @@
       periods: periodResults.map((p) => ({
         name: p.periodName,
         days: p.days,
+        profit_before_tax: p.profitBeforeTax,
         taxable_profit: p.taxableProfit,
+        augmented_profit: p.augmentedProfit,
         aia_claim: p.aiaClaimed,
+        marginal_relief: p.marginalRelief,
         ct_charge: p.ctCharge
       }))
     };

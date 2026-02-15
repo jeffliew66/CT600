@@ -6,6 +6,7 @@
   function $(id){ return document.getElementById(id); }
   function toNum(v){ return Number(v) || 0; }
   function roundPounds(n){ return Math.round((Number(n) || 0)); }
+  function pct(n){ return (Number(n) * 100).toFixed(2); }
   function pounds(n){ return `GBP ${roundPounds(n).toLocaleString()}`; }
   function isCompleteISODate(v){ return /^\d{4}-\d{2}-\d{2}$/.test(String(v || '')); }
   function setStatus(msg, type){
@@ -52,7 +53,7 @@
     };
 
     // Call TaxEngine (HMRC-compliant with AP splitting, thresholds, MR)
-    const { inputs, result } = TaxEngine.run(userInputs, {});
+    const { inputs, result, corpTaxYears } = TaxEngine.run(userInputs, {});
     
     // DEBUG: Full calculation output
     console.log('═══════════════════════════════════════════════════════════════');
@@ -95,6 +96,13 @@
       el.dataset.formula = formula || '';
       el.dataset.details = details || '';
       el.classList.add('clickable');
+    };
+    const setOutNumeric = (id, value, formula, details) => {
+      setOut(id, roundPounds(value), formula, details);
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.dataset.raw = String(value);
+      el.dataset.orig = String(roundPounds(value));
     };
 
     // Populate P&L fields
@@ -298,6 +306,59 @@
     setOut('corpTaxPayable', roundPounds(corporationTaxCharge), 'Final Corporation Tax Payable', verificationDetail);
     document.getElementById('corpTaxPayable').dataset.raw = String(corporationTaxCharge);
     document.getElementById('corpTaxPayable').dataset.orig = String(Math.round(corporationTaxCharge));
+
+    // Section 6 outputs (tax variables and period-level breakdown)
+    const periods = (result.metadata && result.metadata.periods) ? result.metadata.periods : [];
+    const p1 = periods[0] || {
+      days: apDays,
+      profit_before_tax: profitBeforeTax,
+      taxable_profit: taxableTotalProfits,
+      augmented_profit: augmentedProfits,
+      aia_claim: result.computation.capitalAllowances,
+      marginal_relief: marginalRelief
+    };
+    const p2 = periods[1] || {
+      days: 0,
+      profit_before_tax: 0,
+      taxable_profit: 0,
+      augmented_profit: 0,
+      aia_claim: 0,
+      marginal_relief: 0
+    };
+
+    const p1Revenue = totalIncome * ((p1.days || 0) / (apDays || 1));
+    const p2Revenue = totalIncome * ((p2.days || 0) / (apDays || 1));
+
+    const fyYear = result.byFY && result.byFY.length ? result.byFY[0].fy_year : null;
+    const fyConfig = (corpTaxYears || []).find((fy) => fy.fy_year === fyYear);
+    const lowerRate = fyConfig ? ((fyConfig.tiers.find((t) => t.index === 1) || {}).rate || 0.19) : 0.19;
+    const upperRate = fyConfig ? ((fyConfig.tiers.find((t) => t.index === 3) || {}).rate || 0.25) : 0.25;
+
+    setOutNumeric('outApDays', apDays, 'AP days = (End date - Start date) + 1', `${userInputs.apStart} to ${userInputs.apEnd} = ${apDays} days`);
+    setOutNumeric('outAssocDivisor', divisor, 'Associates divisor = associated companies + 1', `${userInputs.assocCompanies} + 1 = ${divisor}`);
+    setOutNumeric('outLowerBracket', smallThreshold, 'Lower bracket = 50,000 / divisor', `50,000 / ${divisor} = ${pounds(smallThreshold)}`);
+    setOut('outLowerRate', `${pct(lowerRate)}%`, 'Lower rate from FY tier 1', `FY ${fyYear || 'n/a'} lower rate = ${pct(lowerRate)}%`);
+    document.getElementById('outLowerRate').dataset.raw = String(lowerRate * 100);
+    document.getElementById('outLowerRate').dataset.orig = String(roundPounds(lowerRate * 100));
+    setOutNumeric('outUpperBracket', upperThreshold, 'Upper bracket = 250,000 / divisor', `250,000 / ${divisor} = ${pounds(upperThreshold)}`);
+    setOut('outUpperRate', `${pct(upperRate)}%`, 'Upper rate from FY tier 3', `FY ${fyYear || 'n/a'} upper rate = ${pct(upperRate)}%`);
+    document.getElementById('outUpperRate').dataset.raw = String(upperRate * 100);
+    document.getElementById('outUpperRate').dataset.orig = String(roundPounds(upperRate * 100));
+    setOutNumeric('outAugmentedProfitsVar', augmentedProfits, 'Augmented profits = TTP + dividends', `${pounds(taxableTotalProfits)} + ${pounds(userInputs.dividendIncome)} = ${pounds(augmentedProfits)}`);
+    setOutNumeric('outTotalMarginalReliefVar', marginalRelief, 'Total MR = sum of MR across all FY slices/periods', `${(result.byFY || []).map((x) => pounds(x.marginalRelief || 0)).join(' + ') || '0'} = ${pounds(marginalRelief)}`);
+    setOutNumeric('outTotalAIAClaimedVar', result.computation.capitalAllowances, 'Total AIA claimed = sum of period AIA claims', `${pounds(p1.aia_claim || 0)} + ${pounds(p2.aia_claim || 0)} = ${pounds(result.computation.capitalAllowances)}`);
+
+    setOutNumeric('outP1RevenueShare', p1Revenue, 'Period 1 revenue share = total accounting income × (P1 days / AP days)', `${pounds(totalIncome)} × (${p1.days || 0}/${apDays}) = ${pounds(p1Revenue)}`);
+    setOutNumeric('outP1ProfitBeforeTax', p1.profit_before_tax || 0, 'Period 1 PBT = AP PBT apportioned to period 1', `${pounds(profitBeforeTax)} × (${p1.days || 0}/${apDays}) ≈ ${pounds(p1.profit_before_tax || 0)}`);
+    setOutNumeric('outP1TaxableProfit', p1.taxable_profit || 0, 'Period 1 taxable profit from engine period computation', `${pounds(p1.taxable_profit || 0)}`);
+    setOutNumeric('outP1AIAClaimed', p1.aia_claim || 0, 'Period 1 AIA claimed from engine period cap/claim logic', `${pounds(p1.aia_claim || 0)}`);
+    setOutNumeric('outP1MarginalRelief', p1.marginal_relief || 0, 'Period 1 MR = sum of FY-slice MR inside period 1', `${pounds(p1.marginal_relief || 0)}`);
+
+    setOutNumeric('outP2RevenueShare', p2Revenue, 'Period 2 revenue share = total accounting income × (P2 days / AP days)', `${pounds(totalIncome)} × (${p2.days || 0}/${apDays}) = ${pounds(p2Revenue)}`);
+    setOutNumeric('outP2ProfitBeforeTax', p2.profit_before_tax || 0, 'Period 2 PBT = AP PBT apportioned to period 2', `${pounds(profitBeforeTax)} × (${p2.days || 0}/${apDays}) ≈ ${pounds(p2.profit_before_tax || 0)}`);
+    setOutNumeric('outP2TaxableProfit', p2.taxable_profit || 0, 'Period 2 taxable profit from engine period computation', `${pounds(p2.taxable_profit || 0)}`);
+    setOutNumeric('outP2AIAClaimed', p2.aia_claim || 0, 'Period 2 AIA claimed from engine period cap/claim logic', `${pounds(p2.aia_claim || 0)}`);
+    setOutNumeric('outP2MarginalRelief', p2.marginal_relief || 0, 'Period 2 MR = sum of FY-slice MR inside period 2', `${pounds(p2.marginal_relief || 0)}`);
 
     // Log AP split if applicable
     const apDaysMsg = isSplit
