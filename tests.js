@@ -36,11 +36,33 @@ function baseInput(overrides) {
     otherCharges: 0,
     disallowableExpenses: 0,
     otherAdjustments: 0,
+    aiaTradeAdditions: 0,
+    aiaNonTradeAdditions: 0,
     aiaAdditions: 0,
     tradingLossBF: 0,
     propertyLossBF: 0,
     ...overrides
   };
+}
+
+function checkFy2022Flat19Rate() {
+  const out = run(baseInput({
+    apStart: '2023-01-01',
+    apEnd: '2023-12-31',
+    assocCompanies: 0,
+    turnover: 300000,
+    dividendIncome: 0
+  }));
+
+  const fy2022Slice = (out.result.byFY || []).find((x) => {
+    const years = Array.isArray(x.fy_years) ? x.fy_years : [x.fy_year];
+    return years.includes(2022);
+  });
+  assert(!!fy2022Slice, 'Expected FY2022 slice/group for 2023-01-01 to 2023-12-31.');
+  assert(
+    Math.abs((fy2022Slice.main_rate || 0) - 0.19) < 1e-9,
+    `FY2022 main rate should be 19%, got ${fy2022Slice.main_rate}`
+  );
 }
 
 function keyOf(input) {
@@ -256,6 +278,62 @@ function checkAiaProrationAndAssociates() {
   assert(typeof p3.aia_cap_total === 'number', 'Missing period AIA cap metadata for assoc=3.');
 }
 
+function checkLossBfSplitAcrossApPeriods() {
+  const out = run(baseInput({
+    apStart: '2024-01-01',
+    apEnd: '2025-06-30', // >12 months, AP split expected
+    assocCompanies: 0,
+    turnover: 240000,
+    tradingLossBF: 120000
+  }));
+
+  const periods = out.result.metadata.periods || [];
+  assert(periods.length === 2, 'Expected two AP periods for loss split check.');
+  const p1 = periods[0] || {};
+  const p2 = periods[1] || {};
+  assert((p1.loss_pool || 0) > 0, 'Period 1 should have loss pool allocated.');
+  assert((p2.loss_pool || 0) > 0, 'Period 2 should have loss pool allocated.');
+}
+
+function checkSeparateTradeNonTradeAiaBuckets() {
+  const common = baseInput({
+    apStart: '2024-04-01',
+    apEnd: '2025-03-31',
+    assocCompanies: 0,
+    turnover: 100000,
+    interestIncome: 100000,
+    rentalIncome: 0,
+    propertyLossBF: 0
+  });
+
+  const tradeOnly = run({
+    ...common,
+    aiaTradeAdditions: 100000,
+    aiaNonTradeAdditions: 0,
+    aiaAdditions: 0
+  });
+  const nonTradeOnly = run({
+    ...common,
+    aiaTradeAdditions: 0,
+    aiaNonTradeAdditions: 100000,
+    aiaAdditions: 0
+  });
+  const both = run({
+    ...common,
+    aiaTradeAdditions: 100000,
+    aiaNonTradeAdditions: 100000,
+    aiaAdditions: 0
+  });
+
+  const ttpTradeOnly = tradeOnly.result.computation.taxableTotalProfits;
+  const ttpNonTradeOnly = nonTradeOnly.result.computation.taxableTotalProfits;
+  const ttpBoth = both.result.computation.taxableTotalProfits;
+
+  assert(ttpTradeOnly < 200000, 'Trade AIA should reduce total taxable profits.');
+  assert(ttpNonTradeOnly < 200000, 'Non-trade AIA should reduce total taxable profits.');
+  assert(ttpBoth <= Math.min(ttpTradeOnly, ttpNonTradeOnly), 'Both AIA buckets should not increase taxable profits.');
+}
+
 function checkTwelveMonthBoundary() {
   // Exact 12-month AP that is 366 days (leap year) must NOT be split.
   const leapYearTwelveMonths = run(baseInput({
@@ -358,11 +436,14 @@ function main() {
   const rows = runMatrix();
   checkCoreRules(rows);
   checkCombinations(rows);
+  checkFy2022Flat19Rate();
   checkTwelveMonthBoundary();
   checkIncomeNotDoubleCounted();
   checkNoChangeRegimeCollapsesStraddle();
   checkShortPeriodThresholdProration();
   checkAiaProrationAndAssociates();
+  checkLossBfSplitAcrossApPeriods();
+  checkSeparateTradeNonTradeAiaBuckets();
   printSummary(rows);
   console.log('\nPASS: all matrix checks passed.');
 }

@@ -63,10 +63,17 @@
     const disallowableExpenses = roundPounds(ui.disallowableExpenses ?? ui.val_disallowable_expenses ?? 0);
     const otherAdjustments = roundPounds(ui.otherAdjustments ?? ui.val_other_adjustments ?? 0);
 
-    // Capital allowances: for v1 we keep "AIA additions" as a single amount.
-    // You already prorate the AIA cap by AP days across FYs in initial.js;
-    // we keep the cap logic inside taxEngine.
-    const aiaAdditions = roundPounds(ui.aiaAdditions ?? ui.box_670_aia_additions ?? 0);
+    // Capital allowances (AIA): keep separate trade/non-trade buckets.
+    const aiaTradeAdditions = roundPounds(
+      ui.aiaTradeAdditions ?? ui.aiaTrade ?? ui.box_670_aia_trade_additions ?? ui.box_670_aia_additions ?? 0
+    );
+    const aiaNonTradeAdditions = roundPounds(
+      ui.aiaNonTradeAdditions ?? ui.aiaNonTrade ?? ui.box_671_aia_non_trade_additions ?? 0
+    );
+    const fallbackAiaTotal = roundPounds(ui.aiaAdditions ?? ui.box_670_aia_additions ?? 0);
+    // Backward compatibility: if only total provided, treat as trade AIA.
+    const resolvedAiaTrade = aiaTradeAdditions || fallbackAiaTotal;
+    const resolvedAiaNonTrade = aiaNonTradeAdditions;
 
     // Trading losses
     const tradingLossBF = roundPounds(ui.tradingLossBF ?? ui.box_160_trading_losses_bfwd ?? 0);
@@ -99,7 +106,9 @@
       },
 
       capitalAllowances: {
-        aiaAdditions
+        aiaTradeAdditions: resolvedAiaTrade,
+        aiaNonTradeAdditions: resolvedAiaNonTrade,
+        aiaAdditions: resolvedAiaTrade + resolvedAiaNonTrade
       },
 
       losses: {

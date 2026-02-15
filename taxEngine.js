@@ -70,16 +70,15 @@
   //
   // ==============================================================================
   const defaultCorpTaxYears = [
-    // FY 2020: 19% small profits rate + 25% main rate + marginal relief
-    // Rates unchanged from FY 2019 (pre-April 2023 increase)
+    // FY 2020-2022: flat 19% CT rate (no marginal relief regime)
     {
       fy_year: 2020,
       start_date: '2020-04-01',
       end_date: '2021-03-31',
       tiers: [
         { index: 1, threshold: 0, rate: 0.19, relief_fraction: 0, aia_limit: 1000000 },
-        { index: 2, threshold: 50000, rate: 0.25, relief_fraction: 0.015, aia_limit: 1000000 },
-        { index: 3, threshold: 250000, rate: 0.25, relief_fraction: 0, aia_limit: 1000000 }
+        { index: 2, threshold: 50000, rate: 0.19, relief_fraction: 0, aia_limit: 1000000 },
+        { index: 3, threshold: 250000, rate: 0.19, relief_fraction: 0, aia_limit: 1000000 }
       ]
     },
     {
@@ -88,8 +87,8 @@
       end_date: '2022-03-31',
       tiers: [
         { index: 1, threshold: 0, rate: 0.19, relief_fraction: 0, aia_limit: 1000000 },
-        { index: 2, threshold: 50000, rate: 0.25, relief_fraction: 0.015, aia_limit: 1000000 },
-        { index: 3, threshold: 250000, rate: 0.25, relief_fraction: 0, aia_limit: 1000000 }
+        { index: 2, threshold: 50000, rate: 0.19, relief_fraction: 0, aia_limit: 1000000 },
+        { index: 3, threshold: 250000, rate: 0.19, relief_fraction: 0, aia_limit: 1000000 }
       ]
     },
     {
@@ -98,8 +97,8 @@
       end_date: '2023-03-31',
       tiers: [
         { index: 1, threshold: 0, rate: 0.19, relief_fraction: 0, aia_limit: 1000000 },
-        { index: 2, threshold: 50000, rate: 0.25, relief_fraction: 0.015, aia_limit: 1000000 },
-        { index: 3, threshold: 250000, rate: 0.25, relief_fraction: 0, aia_limit: 1000000 }
+        { index: 2, threshold: 50000, rate: 0.19, relief_fraction: 0, aia_limit: 1000000 },
+        { index: 3, threshold: 250000, rate: 0.19, relief_fraction: 0, aia_limit: 1000000 }
       ]
     },
     // FY 2023: 19% small profits rate (unchanged), 25% main rate (unchanged)
@@ -275,21 +274,60 @@
   function buildAIAAllocation(inputs, fyOverlaps, corpTaxYears) {
     // CRITICAL: Apply associates divisor to AIA cap (same as thresholds)
     const divisor = (inputs.assocCompanies || 0) + 1;
-    // AIA short-period proration rule requested:
-    // cap = annual AIA limit x (days in slice / 365) / divisor
+    const periodDays = inputs.apDays || 1;
+    const periodFactor = inputs.isShortPeriod ? (periodDays / 365) : 1;
+    // AIA master cap is shared across trade/non-trade.
+    // Slice cap shares sum to the period cap.
     const parts = fyOverlaps.map((fy) => {
       const annualAiaLimit = getTier(fy.tiers, 1).aia_limit;
-      const sliceCap = (annualAiaLimit * (fy.ap_days_in_fy / 365)) / divisor;
+      const periodCapFromThisFY = (annualAiaLimit * periodFactor) / divisor;
+      const sliceShare = periodDays > 0 ? (fy.ap_days_in_fy / periodDays) : 0;
+      const sliceMasterCap = periodCapFromThisFY * sliceShare;
       return {
         fy_year: fy.fy_year,
         ap_days_in_fy: fy.ap_days_in_fy,
         aia_annual_limit: annualAiaLimit,
-        aia_cap_for_fy: sliceCap
+        aia_cap_for_fy: sliceMasterCap
       };
     });
     const totalCap = parts.reduce((s, p) => s + (p.aia_cap_for_fy || 0), 0);
 
     return { totalCap, parts };
+  }
+
+  function allocateSharedCap(tradePotential, nonTradePotential, masterCap) {
+    const cap = Math.max(0, masterCap || 0);
+    const trade = Math.max(0, tradePotential || 0);
+    const nonTrade = Math.max(0, nonTradePotential || 0);
+    const total = trade + nonTrade;
+    if (cap <= 0 || total <= 0) {
+      return { tradeClaim: 0, nonTradeClaim: 0 };
+    }
+    if (total <= cap) {
+      return { tradeClaim: trade, nonTradeClaim: nonTrade };
+    }
+
+    // Proportional split when total requested claim exceeds master cap.
+    let tradeClaim = cap * (trade / total);
+    let nonTradeClaim = cap - tradeClaim;
+    tradeClaim = Math.min(trade, tradeClaim);
+    nonTradeClaim = Math.min(nonTrade, nonTradeClaim);
+
+    // Top-up remainder to whichever side still has unmet potential.
+    let remainder = cap - (tradeClaim + nonTradeClaim);
+    if (remainder > 0) {
+      const tradeHeadroom = trade - tradeClaim;
+      const nonTradeHeadroom = nonTrade - nonTradeClaim;
+      const tradeTopUp = Math.min(remainder, Math.max(0, tradeHeadroom));
+      tradeClaim += tradeTopUp;
+      remainder -= tradeTopUp;
+      if (remainder > 0) {
+        const nonTradeTopUp = Math.min(remainder, Math.max(0, nonTradeHeadroom));
+        nonTradeClaim += nonTradeTopUp;
+      }
+    }
+
+    return { tradeClaim, nonTradeClaim };
   }
 
   function buildThresholdParts(inputs, fyOverlaps) {
@@ -457,7 +495,17 @@
     result.property.propertyProfitAfterLossOffset = Math.max(0, pnl.rentalIncome - pnl.propertyLossBF);
     result.property.propertyLossCF = Math.max(0, pnl.propertyLossBF - pnl.rentalIncome);
 
-    // 3) Allocate profit to each AP split period and calculate tax per period
+    // 3) Split trading losses b/fwd across AP periods (day apportionment)
+    const lossPoolByPeriod = apSplits.map((period, idx) => {
+      if (idx === apSplits.length - 1) return 0;
+      return inputs.losses.tradingLossBF * (period.days / (inputs.apDays || 1));
+    });
+    if (apSplits.length) {
+      const allocatedBeforeLast = lossPoolByPeriod.reduce((s, x) => s + x, 0);
+      lossPoolByPeriod[apSplits.length - 1] = Math.max(0, inputs.losses.tradingLossBF - allocatedBeforeLast);
+    }
+
+    // 4) Allocate profit to each AP split period and calculate tax per period
     const periodResults = apSplits.map((period, periodIndex) => {
       // Build FY overlaps FOR THIS PERIOD ONLY
       const tmpInputs = {
@@ -473,34 +521,47 @@
 
       // Allocate inputs to this period
       const periodProfitBeforeTax = result.accounts.profitBeforeTax * (period.days / inputs.apDays);
-      const periodDividendIncome = pnl.dividendIncome * (period.days / inputs.apDays);
+      const periodRatio = (period.days / (inputs.apDays || 1));
+      const periodDividendIncome = pnl.dividendIncome * periodRatio;
+      const periodInterestIncome = pnl.interestIncome * periodRatio;
+      const periodPropertyProfit = result.property.propertyProfitAfterLossOffset * periodRatio;
       // PBT already includes gross rental income and interest income.
       // Only adjust rental to net property profit after property loss offset.
-      const periodPropertyAdjustment = (result.property.propertyProfitAfterLossOffset - pnl.rentalIncome) * (period.days / inputs.apDays);
+      const periodPropertyAdjustment = (result.property.propertyProfitAfterLossOffset - pnl.rentalIncome) * periodRatio;
 
       // Add-backs
       const periodAddBacks = TaxModel.roundPounds(
-        (pnl.depreciation + inputs.adjustments.disallowableExpenses + inputs.adjustments.otherAdjustments) * (period.days / inputs.apDays)
+        (pnl.depreciation + inputs.adjustments.disallowableExpenses + inputs.adjustments.otherAdjustments) * periodRatio
       );
 
-      // Capital allowances (AIA) - pro-rated cap
+      // Capital allowances (AIA) - separate trade/non-trade buckets and caps
       const periodAIACapTotal = aiaAlloc.totalCap;
-      const periodAIAAdditionsShare = inputs.capitalAllowances.aiaAdditions * (period.days / inputs.apDays);
-      const periodAIAClaimRaw = Math.min(periodAIAAdditionsShare, periodAIACapTotal);
-      const periodAIAClaim = TaxModel.roundPounds(periodAIAClaimRaw);
+      const periodTradeAIAAdditionsShare = inputs.capitalAllowances.aiaTradeAdditions * periodRatio;
+      const periodNonTradeAIAAdditionsShare = inputs.capitalAllowances.aiaNonTradeAdditions * periodRatio;
+      const periodAIAAdditionsShare = periodTradeAIAAdditionsShare + periodNonTradeAIAAdditionsShare;
 
-      // Taxable total profit base:
-      // AP PBT share + tax add-backs - AIA + rental net-off adjustment.
-      const periodTaxableBeforeLoss = TaxModel.roundPounds(
-        periodProfitBeforeTax + periodAddBacks - periodAIAClaim + periodPropertyAdjustment
+      // Taxable total profit base (before losses), then apply AIA to trade/non-trade separately.
+      const periodTaxableBeforeAIA = TaxModel.roundPounds(
+        periodProfitBeforeTax + periodAddBacks + periodPropertyAdjustment
       );
+      const periodNonTradingBeforeAIA = TaxModel.roundPounds(periodInterestIncome + periodPropertyProfit);
+      const periodTradingBeforeAIA = TaxModel.roundPounds(periodTaxableBeforeAIA - periodNonTradingBeforeAIA);
+      const tradePotentialClaim = Math.min(periodTradeAIAAdditionsShare, Math.max(0, periodTradingBeforeAIA));
+      const nonTradePotentialClaim = Math.min(periodNonTradeAIAAdditionsShare, Math.max(0, periodNonTradingBeforeAIA));
+      const sharedCapClaims = allocateSharedCap(tradePotentialClaim, nonTradePotentialClaim, periodAIACapTotal);
+      const periodTradeAIAClaim = TaxModel.roundPounds(sharedCapClaims.tradeClaim);
+      const periodNonTradeAIAClaim = TaxModel.roundPounds(sharedCapClaims.nonTradeClaim);
+      const periodAIAClaim = periodTradeAIAClaim + periodNonTradeAIAClaim;
+      const periodTradingAfterAIA = TaxModel.roundPounds(periodTradingBeforeAIA - periodTradeAIAClaim);
+      const periodNonTradingAfterAIA = TaxModel.roundPounds(periodNonTradingBeforeAIA - periodNonTradeAIAClaim);
+      const periodTaxableBeforeLoss = TaxModel.roundPounds(periodTradingAfterAIA + periodNonTradingAfterAIA);
 
-      // Trading loss offset (only applies in first period, then carry to next)
-      const periodLossUsed = period === apSplits[0]
-        ? Math.min(inputs.losses.tradingLossBF, Math.max(0, periodTaxableBeforeLoss))
-        : 0; // No fresh loss offset in short period
+      // Trading losses b/fwd (split by AP period) reduce trading profits only.
+      const periodLossPool = lossPoolByPeriod[periodIndex] || 0;
+      const periodLossUsed = Math.min(periodLossPool, Math.max(0, periodTradingAfterAIA));
+      const periodTradingAfterLoss = TaxModel.roundPounds(periodTradingAfterAIA - periodLossUsed);
 
-      const periodTaxableAfterLoss = TaxModel.roundPounds(periodTaxableBeforeLoss - periodLossUsed);
+      const periodTaxableAfterLoss = TaxModel.roundPounds(periodTradingAfterLoss + periodNonTradingAfterAIA);
       const periodTaxableTotal = Math.max(0, periodTaxableAfterLoss);
       // Augmented profit includes taxable profit + dividend income (for rate banding)
       const periodAugmentedProfit = TaxModel.roundPounds(periodTaxableTotal + periodDividendIncome);
@@ -565,13 +626,24 @@
         isShortPeriod: period.isShortPeriod,
         profitBeforeTax: TaxModel.roundPounds(periodProfitBeforeTax),
         taxableProfit: periodTaxableTotal,
+        tradingProfitAfterLoss: periodTradingAfterLoss,
+        nonTradingProfitAfterAIA: periodNonTradingAfterAIA,
         augmentedProfit: periodAugmentedProfit,
+        lossPool: TaxModel.roundPounds(periodLossPool),
         lossUsed: TaxModel.roundPounds(periodLossUsed),
         propertyAdjustment: TaxModel.roundPounds(periodPropertyAdjustment),
         taxableBeforeLoss: TaxModel.roundPounds(periodTaxableBeforeLoss),
         addBacks: TaxModel.roundPounds(periodAddBacks),
+        tradeAIACapTotal: TaxModel.roundPounds(periodAIACapTotal),
+        nonTradeAIACapTotal: TaxModel.roundPounds(periodAIACapTotal),
         aiaCapTotal: TaxModel.roundPounds(periodAIACapTotal),
+        tradeAIAPotentialClaim: TaxModel.roundPounds(tradePotentialClaim),
+        nonTradeAIAPotentialClaim: TaxModel.roundPounds(nonTradePotentialClaim),
+        tradeAIAAdditionsShare: TaxModel.roundPounds(periodTradeAIAAdditionsShare),
+        nonTradeAIAAdditionsShare: TaxModel.roundPounds(periodNonTradeAIAAdditionsShare),
         aiaAdditionsShare: TaxModel.roundPounds(periodAIAAdditionsShare),
+        tradeAIAClaimed: TaxModel.roundPounds(periodTradeAIAClaim),
+        nonTradeAIAClaimed: TaxModel.roundPounds(periodNonTradeAIAClaim),
         aiaClaimed: TaxModel.roundPounds(periodAIAClaim),
         byFY: periodByFY,
         ctCharge: TaxModel.roundPounds(periodByFY.reduce((s, x) => s + (x.ctCharge || 0), 0)),
@@ -584,21 +656,20 @@
     result.computation.addBacks = TaxModel.roundPounds(periodResults.reduce((s, p) => s + (pnl.depreciation + inputs.adjustments.disallowableExpenses + inputs.adjustments.otherAdjustments) * (p.days / inputs.apDays), 0));
     result.computation.capitalAllowances = TaxModel.roundPounds(periodResults.reduce((s, p) => s + p.aiaClaimed, 0));
     result.computation.deductions = result.computation.capitalAllowances;
-    result.computation.tradingLossUsed = TaxModel.roundPounds(periodResults[0].lossUsed);
+    result.computation.tradingLossUsed = TaxModel.roundPounds(periodResults.reduce((s, p) => s + (p.lossUsed || 0), 0));
     
     // taxableTradingProfit is the trading income only (after P&L, before adding interest/property)
     // This is for reporting/transparency only
-    const tradingBeforeNonTrading = TaxModel.roundPounds(periodResults.reduce((s, p) => s + p.taxableProfit, 0) - pnl.interestIncome - result.property.propertyProfitAfterLossOffset);
-    result.computation.taxableTradingProfit = Math.max(0, tradingBeforeNonTrading);
+    result.computation.taxableTradingProfit = TaxModel.roundPounds(Math.max(0, periodResults.reduce((s, p) => s + (p.tradingProfitAfterLoss || 0), 0)));
     
     // Total taxable profit = ALL sources (trading, interest, property after loss)
     // periodResults already includes all of these
     result.computation.taxableTotalProfits = Math.max(0, periodResults.reduce((s, p) => s + p.taxableProfit, 0));
     
     // For reporting: break down the non-trading portion
-    const totalInterestIncome = TaxModel.roundPounds(pnl.interestIncome);
-    const totalPropertyProfit = TaxModel.roundPounds(result.property.propertyProfitAfterLossOffset);
-    result.computation.taxableNonTradingProfits = TaxModel.roundPounds(totalInterestIncome + totalPropertyProfit);
+    result.computation.taxableNonTradingProfits = TaxModel.roundPounds(
+      Math.max(0, periodResults.reduce((s, p) => s + (p.nonTradingProfitAfterAIA || 0), 0))
+    );
     
     // Augmented profit (for rate banding) = Taxable Total + Dividend Income
     result.computation.augmentedProfits = TaxModel.roundPounds(result.computation.taxableTotalProfits + pnl.dividendIncome);
@@ -621,8 +692,17 @@
         property_adjustment: p.propertyAdjustment,
         add_backs: p.addBacks,
         loss_used: p.lossUsed,
+        loss_pool: p.lossPool,
+        trade_aia_cap_total: p.tradeAIACapTotal,
+        non_trade_aia_cap_total: p.nonTradeAIACapTotal,
         aia_cap_total: p.aiaCapTotal,
+        trade_aia_additions_share: p.tradeAIAAdditionsShare,
+        non_trade_aia_additions_share: p.nonTradeAIAAdditionsShare,
+        trade_aia_potential_claim: p.tradeAIAPotentialClaim,
+        non_trade_aia_potential_claim: p.nonTradeAIAPotentialClaim,
         aia_additions_share: p.aiaAdditionsShare,
+        trade_aia_claim: p.tradeAIAClaimed,
+        non_trade_aia_claim: p.nonTradeAIAClaimed,
         aia_claim: p.aiaClaimed,
         marginal_relief: p.marginalRelief,
         ct_charge: p.ctCharge,

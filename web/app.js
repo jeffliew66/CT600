@@ -46,6 +46,8 @@
       // Tax adjustments
       disallowableExpenses: toNum($("disallowableExpenses").value),
       otherAdjustments: toNum($("otherAdjustments").value),
+      aiaTradeAdditions: toNum($("aiaTrade").value),
+      aiaNonTradeAdditions: toNum($("aiaNonTrade").value),
       aiaAdditions: toNum($("aiaTrade").value) + toNum($("aiaNonTrade").value),
       // Loss carry-forward
       tradingLossBF: toNum($("tradingLossBF").value),
@@ -353,6 +355,18 @@
     if (typeof p2.aia_cap_total !== 'number') p2.aia_cap_total = 0;
     if (typeof p1.aia_additions_share !== 'number') p1.aia_additions_share = userInputs.aiaAdditions || 0;
     if (typeof p2.aia_additions_share !== 'number') p2.aia_additions_share = 0;
+    if (typeof p1.trade_aia_cap_total !== 'number') p1.trade_aia_cap_total = (p1.aia_cap_total || 0);
+    if (typeof p1.non_trade_aia_cap_total !== 'number') p1.non_trade_aia_cap_total = (p1.aia_cap_total || 0);
+    if (typeof p2.trade_aia_cap_total !== 'number') p2.trade_aia_cap_total = (p2.aia_cap_total || 0);
+    if (typeof p2.non_trade_aia_cap_total !== 'number') p2.non_trade_aia_cap_total = (p2.aia_cap_total || 0);
+    if (typeof p1.trade_aia_additions_share !== 'number') p1.trade_aia_additions_share = userInputs.aiaTradeAdditions || 0;
+    if (typeof p1.non_trade_aia_additions_share !== 'number') p1.non_trade_aia_additions_share = userInputs.aiaNonTradeAdditions || 0;
+    if (typeof p2.trade_aia_additions_share !== 'number') p2.trade_aia_additions_share = 0;
+    if (typeof p2.non_trade_aia_additions_share !== 'number') p2.non_trade_aia_additions_share = 0;
+    if (typeof p1.trade_aia_claim !== 'number') p1.trade_aia_claim = (p1.aia_claim || 0) / 2;
+    if (typeof p1.non_trade_aia_claim !== 'number') p1.non_trade_aia_claim = (p1.aia_claim || 0) / 2;
+    if (typeof p2.trade_aia_claim !== 'number') p2.trade_aia_claim = (p2.aia_claim || 0) / 2;
+    if (typeof p2.non_trade_aia_claim !== 'number') p2.non_trade_aia_claim = (p2.aia_claim || 0) / 2;
 
     const p1Revenue = totalIncome * ((p1.days || 0) / (apDays || 1));
     const p2Revenue = totalIncome * ((p2.days || 0) / (apDays || 1));
@@ -518,17 +532,30 @@
     setOutNumeric('outTotalMarginalReliefVar', marginalRelief, 'Total MR = sum of MR across all FY slices and AP periods', totalMRDetails);
     const p1AiaCap = Number(p1.aia_cap_total || 0);
     const p2AiaCap = Number(p2.aia_cap_total || 0);
-    const p1AiaAdditionsShare = Number(p1.aia_additions_share || 0);
-    const p2AiaAdditionsShare = Number(p2.aia_additions_share || 0);
+    const p1TradeAiaAdditionsShare = Number(p1.trade_aia_additions_share || 0);
+    const p1NonTradeAiaAdditionsShare = Number(p1.non_trade_aia_additions_share || 0);
+    const p2TradeAiaAdditionsShare = Number(p2.trade_aia_additions_share || 0);
+    const p2NonTradeAiaAdditionsShare = Number(p2.non_trade_aia_additions_share || 0);
+    const p1TradeAiaClaim = Number(p1.trade_aia_claim || 0);
+    const p1NonTradeAiaClaim = Number(p1.non_trade_aia_claim || 0);
+    const p2TradeAiaClaim = Number(p2.trade_aia_claim || 0);
+    const p2NonTradeAiaClaim = Number(p2.non_trade_aia_claim || 0);
     const totalAiaCap = p1AiaCap + p2AiaCap;
     setOutNumeric(
       'outTotalAIAClaimedVar',
       result.computation.capitalAllowances,
       'Total AIA claimed = sum of period AIA claims',
-      `AIA cap formula per slice: annual AIA limit x (slice days / 365) / (associated companies + 1)\n` +
+      `AIA MASTER cap formula per slice: annual AIA limit x period factor x (slice days / period days) / (associated companies + 1)\n` +
+      `Period factor = 1 for complete 12-month period, else period days / 365\n` +
       `Associated companies divisor = ${divisor}\n` +
-      `Period 1 cap: ${pounds(p1AiaCap)} | additions share: ${pounds(p1AiaAdditionsShare)} | claim: ${pounds(p1.aia_claim || 0)}\n` +
-      `Period 2 cap: ${pounds(p2AiaCap)} | additions share: ${pounds(p2AiaAdditionsShare)} | claim: ${pounds(p2.aia_claim || 0)}\n` +
+      `Period 1 master cap: ${pounds(p1AiaCap)}\n` +
+      `Period 1 trade additions ${pounds(p1TradeAiaAdditionsShare)} | non-trade additions ${pounds(p1NonTradeAiaAdditionsShare)}\n` +
+      `Period 1 trade potential ${pounds(p1.trade_aia_potential_claim || 0)} | non-trade potential ${pounds(p1.non_trade_aia_potential_claim || 0)}\n` +
+      `Period 1 allocated trade claim ${pounds(p1TradeAiaClaim)} | non-trade claim ${pounds(p1NonTradeAiaClaim)} | total claim ${pounds(p1.aia_claim || 0)}\n` +
+      `Period 2 master cap: ${pounds(p2AiaCap)}\n` +
+      `Period 2 trade additions ${pounds(p2TradeAiaAdditionsShare)} | non-trade additions ${pounds(p2NonTradeAiaAdditionsShare)}\n` +
+      `Period 2 trade potential ${pounds(p2.trade_aia_potential_claim || 0)} | non-trade potential ${pounds(p2.non_trade_aia_potential_claim || 0)}\n` +
+      `Period 2 allocated trade claim ${pounds(p2TradeAiaClaim)} | non-trade claim ${pounds(p2NonTradeAiaClaim)} | total claim ${pounds(p2.aia_claim || 0)}\n` +
       `Total cap across periods: ${pounds(totalAiaCap)}\n` +
       `Total claim: ${pounds(p1.aia_claim || 0)} + ${pounds(p2.aia_claim || 0)} = ${pounds(result.computation.capitalAllowances)}`
     );
@@ -540,10 +567,12 @@
     setOutNumeric(
       'outP1AIAClaimed',
       p1.aia_claim || 0,
-      'Period 1 AIA claim = min(AIA additions share, period AIA cap)',
-      `AIA cap (P1) = sum over P1 slices of [annual AIA limit x (slice days / 365) / ${divisor}] = ${pounds(p1AiaCap)}\n` +
-      `AIA additions share (P1) = total AIA additions x (P1 days / AP days) = ${pounds(p1AiaAdditionsShare)}\n` +
-      `AIA claim (P1) = min(${pounds(p1AiaAdditionsShare)}, ${pounds(p1AiaCap)}) = ${pounds(p1.aia_claim || 0)}`
+      'Period 1 AIA: shared master cap allocated across trade and non-trade claims',
+      `Master cap (P1) = ${pounds(p1AiaCap)}\n` +
+      `Trade potential claim (P1) = min(trade additions ${pounds(p1TradeAiaAdditionsShare)}, trade profit available) = ${pounds(p1.trade_aia_potential_claim || 0)}\n` +
+      `Non-trade potential claim (P1) = min(non-trade additions ${pounds(p1NonTradeAiaAdditionsShare)}, non-trade profit available) = ${pounds(p1.non_trade_aia_potential_claim || 0)}\n` +
+      `Allocated from shared cap -> trade claim ${pounds(p1TradeAiaClaim)} | non-trade claim ${pounds(p1NonTradeAiaClaim)}\n` +
+      `Total AIA claim (P1) = ${pounds(p1TradeAiaClaim)} + ${pounds(p1NonTradeAiaClaim)} = ${pounds(p1.aia_claim || 0)}`
     );
     const p1MrDetail = buildPeriodMRDetail(p1, 1, p1ByFY);
     setOutNumeric('outP1MarginalRelief', p1.marginal_relief || 0, p1MrDetail.formula, p1MrDetail.details);
@@ -555,10 +584,12 @@
     setOutNumeric(
       'outP2AIAClaimed',
       p2.aia_claim || 0,
-      'Period 2 AIA claim = min(AIA additions share, period AIA cap)',
-      `AIA cap (P2) = sum over P2 slices of [annual AIA limit x (slice days / 365) / ${divisor}] = ${pounds(p2AiaCap)}\n` +
-      `AIA additions share (P2) = total AIA additions x (P2 days / AP days) = ${pounds(p2AiaAdditionsShare)}\n` +
-      `AIA claim (P2) = min(${pounds(p2AiaAdditionsShare)}, ${pounds(p2AiaCap)}) = ${pounds(p2.aia_claim || 0)}`
+      'Period 2 AIA: shared master cap allocated across trade and non-trade claims',
+      `Master cap (P2) = ${pounds(p2AiaCap)}\n` +
+      `Trade potential claim (P2) = min(trade additions ${pounds(p2TradeAiaAdditionsShare)}, trade profit available) = ${pounds(p2.trade_aia_potential_claim || 0)}\n` +
+      `Non-trade potential claim (P2) = min(non-trade additions ${pounds(p2NonTradeAiaAdditionsShare)}, non-trade profit available) = ${pounds(p2.non_trade_aia_potential_claim || 0)}\n` +
+      `Allocated from shared cap -> trade claim ${pounds(p2TradeAiaClaim)} | non-trade claim ${pounds(p2NonTradeAiaClaim)}\n` +
+      `Total AIA claim (P2) = ${pounds(p2TradeAiaClaim)} + ${pounds(p2NonTradeAiaClaim)} = ${pounds(p2.aia_claim || 0)}`
     );
     const p2MrDetail = buildPeriodMRDetail(p2, 2, p2ByFY);
     setOutNumeric('outP2MarginalRelief', p2.marginal_relief || 0, p2MrDetail.formula, p2MrDetail.details);
