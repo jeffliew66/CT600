@@ -489,21 +489,17 @@
     );
     result.accounts.profitBeforeTax = TaxModel.roundPounds(result.accounts.totalIncome - result.accounts.totalExpenses);
 
-    // 2) Property loss offset
+    // 2) Property inputs (property loss b/fwd is applied sequentially per AP below)
     result.property.rentalIncome = pnl.rentalIncome;
     result.property.propertyLossBF = pnl.propertyLossBF;
-    result.property.propertyProfitAfterLossOffset = Math.max(0, pnl.rentalIncome - pnl.propertyLossBF);
-    result.property.propertyLossCF = Math.max(0, pnl.propertyLossBF - pnl.rentalIncome);
+    result.property.propertyProfitAfterLossOffset = 0;
+    result.property.propertyLossCF = Math.max(0, pnl.propertyLossBF);
 
-    // 3) Split trading losses b/fwd across AP periods (day apportionment)
-    const lossPoolByPeriod = apSplits.map((period, idx) => {
-      if (idx === apSplits.length - 1) return 0;
-      return inputs.losses.tradingLossBF * (period.days / (inputs.apDays || 1));
-    });
-    if (apSplits.length) {
-      const allocatedBeforeLast = lossPoolByPeriod.reduce((s, x) => s + x, 0);
-      lossPoolByPeriod[apSplits.length - 1] = Math.max(0, inputs.losses.tradingLossBF - allocatedBeforeLast);
-    }
+    // 3) Loss pools available at start of first AP (then carried sequentially).
+    let remainingPropertyLossPool = Math.max(0, Number(pnl.propertyLossBF) || 0);
+    // Trading losses b/fwd flow sequentially across APs:
+    // opening pool is available to AP1, unused balance carries forward to AP2, etc.
+    let remainingLossPool = Math.max(0, Number(inputs.losses.tradingLossBF) || 0);
 
     // 4) Allocate profit to each AP split period and calculate tax per period
     const periodResults = apSplits.map((period, periodIndex) => {
@@ -524,10 +520,13 @@
       const periodRatio = (period.days / (inputs.apDays || 1));
       const periodDividendIncome = pnl.dividendIncome * periodRatio;
       const periodInterestIncome = pnl.interestIncome * periodRatio;
-      const periodPropertyProfit = result.property.propertyProfitAfterLossOffset * periodRatio;
-      // PBT already includes gross rental income and interest income.
-      // Only adjust rental to net property profit after property loss offset.
-      const periodPropertyAdjustment = (result.property.propertyProfitAfterLossOffset - pnl.rentalIncome) * periodRatio;
+      const periodRentalIncomeGross = TaxModel.roundPounds(pnl.rentalIncome * periodRatio);
+      const periodPropertyLossPool = Math.max(0, remainingPropertyLossPool);
+      const periodPropertyLossUsed = Math.min(periodPropertyLossPool, Math.max(0, periodRentalIncomeGross));
+      remainingPropertyLossPool = Math.max(0, periodPropertyLossPool - periodPropertyLossUsed);
+      const periodPropertyProfit = TaxModel.roundPounds(Math.max(0, periodRentalIncomeGross - periodPropertyLossUsed));
+      // PBT already includes gross rental income; adjust to net property profit after sequential loss offset.
+      const periodPropertyAdjustment = TaxModel.roundPounds(periodPropertyProfit - periodRentalIncomeGross);
 
       // Add-backs
       const periodAddBacks = TaxModel.roundPounds(
@@ -556,9 +555,11 @@
       const periodNonTradingAfterAIA = TaxModel.roundPounds(periodNonTradingBeforeAIA - periodNonTradeAIAClaim);
       const periodTaxableBeforeLoss = TaxModel.roundPounds(periodTradingAfterAIA + periodNonTradingAfterAIA);
 
-      // Trading losses b/fwd (split by AP period) reduce trading profits only.
-      const periodLossPool = lossPoolByPeriod[periodIndex] || 0;
+      // Trading losses b/fwd reduce trading profits only.
+      // Opening pool for each AP is the carried-forward balance from prior AP.
+      const periodLossPool = Math.max(0, remainingLossPool);
       const periodLossUsed = Math.min(periodLossPool, Math.max(0, periodTradingAfterAIA));
+      remainingLossPool = Math.max(0, periodLossPool - periodLossUsed);
       const periodTradingAfterLoss = TaxModel.roundPounds(periodTradingAfterAIA - periodLossUsed);
 
       const periodTaxableAfterLoss = TaxModel.roundPounds(periodTradingAfterLoss + periodNonTradingAfterAIA);
@@ -631,6 +632,12 @@
         augmentedProfit: periodAugmentedProfit,
         lossPool: TaxModel.roundPounds(periodLossPool),
         lossUsed: TaxModel.roundPounds(periodLossUsed),
+        lossCarriedForward: TaxModel.roundPounds(remainingLossPool),
+        propertyRentalGross: TaxModel.roundPounds(periodRentalIncomeGross),
+        propertyLossPool: TaxModel.roundPounds(periodPropertyLossPool),
+        propertyLossUsed: TaxModel.roundPounds(periodPropertyLossUsed),
+        propertyLossCarriedForward: TaxModel.roundPounds(remainingPropertyLossPool),
+        propertyProfitAfterLoss: TaxModel.roundPounds(periodPropertyProfit),
         propertyAdjustment: TaxModel.roundPounds(periodPropertyAdjustment),
         taxableBeforeLoss: TaxModel.roundPounds(periodTaxableBeforeLoss),
         addBacks: TaxModel.roundPounds(periodAddBacks),
@@ -652,6 +659,8 @@
     });
 
     // Aggregate results across all periods
+    result.property.propertyProfitAfterLossOffset = TaxModel.roundPounds(periodResults.reduce((s, p) => s + (p.propertyProfitAfterLoss || 0), 0));
+    result.property.propertyLossCF = TaxModel.roundPounds(remainingPropertyLossPool);
     result.byFY = periodResults.flatMap((p) => p.byFY);
     result.computation.addBacks = TaxModel.roundPounds(periodResults.reduce((s, p) => s + (pnl.depreciation + inputs.adjustments.disallowableExpenses + inputs.adjustments.otherAdjustments) * (p.days / inputs.apDays), 0));
     result.computation.capitalAllowances = TaxModel.roundPounds(periodResults.reduce((s, p) => s + p.aiaClaimed, 0));
@@ -693,6 +702,12 @@
         add_backs: p.addBacks,
         loss_used: p.lossUsed,
         loss_pool: p.lossPool,
+        loss_cf: p.lossCarriedForward,
+        rental_income_gross: p.propertyRentalGross,
+        property_loss_pool: p.propertyLossPool,
+        property_loss_used: p.propertyLossUsed,
+        property_loss_cf: p.propertyLossCarriedForward,
+        property_profit_after_loss: p.propertyProfitAfterLoss,
         trade_aia_cap_total: p.tradeAIACapTotal,
         non_trade_aia_cap_total: p.nonTradeAIACapTotal,
         aia_cap_total: p.aiaCapTotal,

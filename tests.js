@@ -278,12 +278,12 @@ function checkAiaProrationAndAssociates() {
   assert(typeof p3.aia_cap_total === 'number', 'Missing period AIA cap metadata for assoc=3.');
 }
 
-function checkLossBfSplitAcrossApPeriods() {
+function checkLossBfSequentialAcrossApPeriods() {
   const out = run(baseInput({
     apStart: '2024-01-01',
     apEnd: '2025-06-30', // >12 months, AP split expected
     assocCompanies: 0,
-    turnover: 240000,
+    turnover: 80000,
     tradingLossBF: 120000
   }));
 
@@ -291,8 +291,54 @@ function checkLossBfSplitAcrossApPeriods() {
   assert(periods.length === 2, 'Expected two AP periods for loss split check.');
   const p1 = periods[0] || {};
   const p2 = periods[1] || {};
-  assert((p1.loss_pool || 0) > 0, 'Period 1 should have loss pool allocated.');
-  assert((p2.loss_pool || 0) > 0, 'Period 2 should have loss pool allocated.');
+  const openingLoss = 120000;
+  assert(Math.abs((p1.loss_pool || 0) - openingLoss) <= 1, 'Period 1 opening loss pool should equal full losses brought forward.');
+
+  const expectedP2Pool = Math.max(0, (p1.loss_pool || 0) - (p1.loss_used || 0));
+  assert(
+    Math.abs((p2.loss_pool || 0) - expectedP2Pool) <= 1,
+    'Period 2 opening loss pool should equal unused loss carried forward from Period 1.'
+  );
+
+  const daySplitPool = openingLoss * ((p1.days || 0) / (out.inputs.apDays || 1));
+  assert(
+    Math.abs((p1.loss_pool || 0) - daySplitPool) > 1000,
+    'Loss pool appears day-apportioned instead of sequential carry-forward.'
+  );
+}
+
+function checkPropertyLossBfSequentialAcrossApPeriods() {
+  const openingPropertyLoss = 100000;
+  const out = run(baseInput({
+    apStart: '2024-01-01',
+    apEnd: '2025-06-30', // >12 months, AP split expected
+    assocCompanies: 0,
+    turnover: 0,
+    rentalIncome: 180000,
+    propertyLossBF: openingPropertyLoss
+  }));
+
+  const periods = out.result.metadata.periods || [];
+  assert(periods.length === 2, 'Expected two AP periods for property loss split check.');
+  const p1 = periods[0] || {};
+  const p2 = periods[1] || {};
+
+  assert(
+    Math.abs((p1.property_loss_pool || 0) - openingPropertyLoss) <= 1,
+    'Period 1 opening property loss pool should equal full property loss b/fwd.'
+  );
+
+  const expectedP2Pool = Math.max(0, (p1.property_loss_pool || 0) - (p1.property_loss_used || 0));
+  assert(
+    Math.abs((p2.property_loss_pool || 0) - expectedP2Pool) <= 1,
+    'Period 2 opening property loss pool should equal unused property loss from Period 1.'
+  );
+
+  const daySplitPool = openingPropertyLoss * ((p1.days || 0) / (out.inputs.apDays || 1));
+  assert(
+    Math.abs((p1.property_loss_pool || 0) - daySplitPool) > 1000,
+    'Property loss pool appears day-apportioned instead of sequential carry-forward.'
+  );
 }
 
 function checkSeparateTradeNonTradeAiaBuckets() {
@@ -442,7 +488,8 @@ function main() {
   checkNoChangeRegimeCollapsesStraddle();
   checkShortPeriodThresholdProration();
   checkAiaProrationAndAssociates();
-  checkLossBfSplitAcrossApPeriods();
+  checkLossBfSequentialAcrossApPeriods();
+  checkPropertyLossBfSequentialAcrossApPeriods();
   checkSeparateTradeNonTradeAiaBuckets();
   printSummary(rows);
   console.log('\nPASS: all matrix checks passed.');

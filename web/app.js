@@ -412,7 +412,12 @@
       const ratio = apDays ? (days / apDays) : 0;
       const pbtShare = Number(period.profit_before_tax ?? (profitBeforeTax * ratio));
       const addBackShare = Number(period.add_backs ?? ((userInputs.depreciation + userInputs.disallowableExpenses + userInputs.otherAdjustments) * ratio));
-      const propertyAdjustment = Number(period.property_adjustment ?? ((result.property.propertyProfitAfterLossOffset - userInputs.rentalIncome) * ratio));
+      const periodRentalGross = Number(period.rental_income_gross ?? (userInputs.rentalIncome * ratio));
+      const periodPropertyLossPool = Number(period.property_loss_pool ?? 0);
+      const periodPropertyLossUsed = Number(period.property_loss_used ?? Math.min(Math.max(0, periodPropertyLossPool), Math.max(0, periodRentalGross)));
+      const periodPropertyProfitAfterLoss = Number(period.property_profit_after_loss ?? Math.max(0, periodRentalGross - periodPropertyLossUsed));
+      const periodPropertyLossCF = Number(period.property_loss_cf ?? Math.max(0, periodPropertyLossPool - periodPropertyLossUsed));
+      const propertyAdjustment = Number(period.property_adjustment ?? (periodPropertyProfitAfterLoss - periodRentalGross));
       const aiaClaim = Number(period.aia_claim || 0);
       const taxableBeforeLoss = Number(period.taxable_before_loss ?? (pbtShare + addBackShare - aiaClaim + propertyAdjustment));
       const lossUsed = Number(period.loss_used || 0);
@@ -421,16 +426,20 @@
       return {
         formula: `Period ${periodIndex} taxable profit = max(0, taxable before loss - trading loss used)\n` +
           `taxable before loss = PBT share + add-backs share - AIA claim + property adjustment\n` +
-          `property adjustment = (net property income - rental income) share`,
+          `property adjustment (period) = net property income after property loss b/fwd (period) - gross rental income (period)`,
         details:
           `STEP 1: PBT share\n` +
           `  ${pounds(profitBeforeTax)} x (${days}/${apDays}) = ${pounds(pbtShare)}\n\n` +
           `STEP 2: Add-backs share\n` +
           `  (Depreciation + Disallowables + Other adjustments) x (${days}/${apDays})\n` +
           `  = (${pounds(userInputs.depreciation)} + ${pounds(userInputs.disallowableExpenses)} + ${pounds(userInputs.otherAdjustments)}) x (${days}/${apDays}) = ${pounds(addBackShare)}\n\n` +
-          `STEP 3: Property adjustment share (to avoid double count and apply property losses)\n` +
-          `  (Net property - Rental income) x (${days}/${apDays})\n` +
-          `  = (${pounds(result.property.propertyProfitAfterLossOffset)} - ${pounds(userInputs.rentalIncome)}) x (${days}/${apDays}) = ${pounds(propertyAdjustment)}\n\n` +
+          `STEP 3: Property adjustment for period ${periodIndex} (sequential property loss offset)\n` +
+          `  Gross rental income (period) = ${pounds(periodRentalGross)}\n` +
+          `  Property loss pool opening = ${pounds(periodPropertyLossPool)}\n` +
+          `  Property loss used = min(${pounds(periodPropertyLossPool)}, positive gross rental) = ${pounds(periodPropertyLossUsed)}\n` +
+          `  Property loss c/f = ${pounds(periodPropertyLossCF)}\n` +
+          `  Net property profit after loss = ${pounds(periodPropertyProfitAfterLoss)}\n` +
+          `  Property adjustment = ${pounds(periodPropertyProfitAfterLoss)} - ${pounds(periodRentalGross)} = ${pounds(propertyAdjustment)}\n\n` +
           `STEP 4: Taxable before loss\n` +
           `  ${pounds(pbtShare)} + ${pounds(addBackShare)} - ${pounds(aiaClaim)} + ${pounds(propertyAdjustment)} = ${pounds(taxableBeforeLoss)}\n\n` +
           `STEP 5: Trading loss used in period ${periodIndex}\n` +
