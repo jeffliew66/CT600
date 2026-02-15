@@ -153,8 +153,6 @@
       `Raw materials ${pounds(userInputs.costOfSales)} + Staff ${pounds(userInputs.staffCosts)} + Depreciation ${pounds(userInputs.depreciation)} + Other charges ${pounds(userInputs.otherCharges)} = ${pounds(totalExpenses)}`
     );
     setRawMeta('totalExpenses', totalExpenses, roundPounds(totalExpenses));
-    const expensesGroupTotalEl = $('outExpensesGroupTotal');
-    if (expensesGroupTotalEl) expensesGroupTotalEl.textContent = pounds(totalExpenses);
 
     // Detailed PBT formula
     const pbtDetail = `STEP-BY-STEP CALCULATION:\n\nTotal Income (accounting, excludes dividends)\n  = Turnover + Govt Grants + Interest + Rental + Disposal gains + Capital gains\n  = GBP ${roundPounds(userInputs.turnover).toLocaleString()} + GBP ${roundPounds(userInputs.govtGrants).toLocaleString()} + GBP ${roundPounds(userInputs.interestIncome).toLocaleString()} + GBP ${roundPounds(userInputs.rentalIncome).toLocaleString()} + GBP ${roundPounds(userInputs.disposalGains).toLocaleString()} + GBP ${roundPounds(userInputs.capitalGains).toLocaleString()}\n  = GBP ${roundPounds(totalIncome).toLocaleString()}\n\nTotal Expenses\n  = Raw Materials + Staff + Depreciation + Other\n  = GBP ${roundPounds(userInputs.costOfSales).toLocaleString()} + GBP ${roundPounds(userInputs.staffCosts).toLocaleString()} + GBP ${roundPounds(userInputs.depreciation).toLocaleString()} + GBP ${roundPounds(userInputs.otherCharges).toLocaleString()}\n  = GBP ${roundPounds(totalExpenses).toLocaleString()}\n\nProfit Before Tax\n  = Total Income - Total Expenses\n  = GBP ${roundPounds(totalIncome).toLocaleString()} - GBP ${roundPounds(totalExpenses).toLocaleString()}\n  = GBP ${roundPounds(profitBeforeTax).toLocaleString()}`;
@@ -331,6 +329,106 @@
     // Profit for period
     setOut('profitForPeriod', roundPounds(profitForPeriod), 'Profit After Tax', `GBP ${roundPounds(profitBeforeTax).toLocaleString()} - GBP ${roundPounds(corporationTaxCharge).toLocaleString()} = GBP ${roundPounds(profitForPeriod).toLocaleString()}`);
     setRawMeta('profitForPeriod', profitForPeriod, roundPounds(profitForPeriod));
+
+    // Presentation totals for Section 2/3/4 (UI only)
+    const periodsMeta = (result.metadata && result.metadata.periods) ? result.metadata.periods : [];
+    const nonTradeAIAClaimTotal = periodsMeta.reduce((s, p) => s + Number(p.non_trade_aia_claim || 0), 0);
+    const tradingIncomeTotal = userInputs.turnover + userInputs.govtGrants;
+    const tradingExpenseTotal = totalExpenses;
+    const tradingProfits = tradingIncomeTotal - tradingExpenseTotal;
+    const tradingProfitsTaxable = taxableTradingProfit;
+    const chargeableGainsTotal = userInputs.disposalGains + userInputs.capitalGains;
+    const rentalAfterLossBeforeAIA = result.property.propertyProfitAfterLossOffset;
+    const rentalPropertyTotal = rentalAfterLossBeforeAIA - nonTradeAIAClaimTotal;
+    const nonTradingProfits =
+      userInputs.interestIncome +
+      chargeableGainsTotal +
+      rentalPropertyTotal +
+      userInputs.dividendIncome;
+
+    setOut(
+      'outTradingIncomeTotal',
+      roundPounds(tradingIncomeTotal),
+      'Trading income = Turnover + Government grants & subsidies',
+      `${pounds(userInputs.turnover)} + ${pounds(userInputs.govtGrants)} = ${pounds(tradingIncomeTotal)}`
+    );
+    setRawMeta('outTradingIncomeTotal', tradingIncomeTotal, roundPounds(tradingIncomeTotal));
+
+    setOut(
+      'outTradingExpenseTotal',
+      roundPounds(tradingExpenseTotal),
+      'Trading expenses = Raw materials + Staff cost + Depreciation + Other charges',
+      `${pounds(userInputs.costOfSales)} + ${pounds(userInputs.staffCosts)} + ${pounds(userInputs.depreciation)} + ${pounds(userInputs.otherCharges)} = ${pounds(tradingExpenseTotal)}`
+    );
+    setRawMeta('outTradingExpenseTotal', tradingExpenseTotal, roundPounds(tradingExpenseTotal));
+
+    setOut(
+      'outTradingProfits',
+      roundPounds(tradingProfits),
+      'Trading profits = Trading income - Trading expenses',
+      `${pounds(tradingIncomeTotal)} - ${pounds(tradingExpenseTotal)} = ${pounds(tradingProfits)}`
+    );
+    setRawMeta('outTradingProfits', tradingProfits, roundPounds(tradingProfits));
+
+    setOut(
+      'outTradingProfitsTaxable',
+      roundPounds(tradingProfitsTaxable),
+      'Trading profits subjected to corporation tax = trading component after trade AIA and trading loss usage',
+      `Engine taxable trading profit = ${pounds(tradingProfitsTaxable)}`
+    );
+    setRawMeta('outTradingProfitsTaxable', tradingProfitsTaxable, roundPounds(tradingProfitsTaxable));
+
+    setOut(
+      'outChargeableGainsTotal',
+      roundPounds(chargeableGainsTotal),
+      'Chargeable gains = Disposal gains + Capital gains',
+      `${pounds(userInputs.disposalGains)} + ${pounds(userInputs.capitalGains)} = ${pounds(chargeableGainsTotal)}\n` +
+      `Capital gains source file: ${userInputs.capitalGainsFileName || 'No file selected'}`
+    );
+    setRawMeta('outChargeableGainsTotal', chargeableGainsTotal, roundPounds(chargeableGainsTotal));
+
+    setOut(
+      'outRentalPropertyTotal',
+      roundPounds(rentalPropertyTotal),
+      'Rental & property total = (Rental income after property loss BF) - rental/property AIA used',
+      `Rental after property loss BF = ${pounds(rentalAfterLossBeforeAIA)}\n` +
+      `Less rental/property AIA used = ${pounds(nonTradeAIAClaimTotal)}\n` +
+      `Total = ${pounds(rentalPropertyTotal)}`
+    );
+    setRawMeta('outRentalPropertyTotal', rentalPropertyTotal, roundPounds(rentalPropertyTotal));
+
+    setOut(
+      'outNonTradingProfits',
+      roundPounds(nonTradingProfits),
+      'Non-trading profits = Interest + Chargeable gains + Rental/property total + Dividends',
+      `${pounds(userInputs.interestIncome)} + ${pounds(chargeableGainsTotal)} + ${pounds(rentalPropertyTotal)} + ${pounds(userInputs.dividendIncome)} = ${pounds(nonTradingProfits)}`
+    );
+    setRawMeta('outNonTradingProfits', nonTradingProfits, roundPounds(nonTradingProfits));
+
+    setOut(
+      'outNonTradingProfitsTaxable',
+      roundPounds(taxableNonTradeIncome),
+      'Non-trading profits subjected to corporation tax = taxable non-trading component from engine',
+      `Taxable non-trading component = ${pounds(taxableNonTradeIncome)}\n` +
+      `Dividends are excluded from taxable non-trading profits.`
+    );
+    setRawMeta('outNonTradingProfitsTaxable', taxableNonTradeIncome, roundPounds(taxableNonTradeIncome));
+
+    setOut(
+      'outTotalProfitsCTTrade',
+      roundPounds(tradingProfitsTaxable),
+      'Trade profits subjected to corporation tax',
+      `${pounds(tradingProfitsTaxable)}`
+    );
+    setRawMeta('outTotalProfitsCTTrade', tradingProfitsTaxable, roundPounds(tradingProfitsTaxable));
+
+    setOut(
+      'outTotalProfitsCTNonTrade',
+      roundPounds(taxableNonTradeIncome),
+      'Non-trade profits subjected to corporation tax',
+      `${pounds(taxableNonTradeIncome)}`
+    );
+    setRawMeta('outTotalProfitsCTNonTrade', taxableNonTradeIncome, roundPounds(taxableNonTradeIncome));
 
     // Section 3 outputs
     setOut('tradingProfitBeforeTax', roundPounds(profitBeforeTax), 'Operating Profit (before tax)', `GBP ${roundPounds(profitBeforeTax).toLocaleString()}`);
