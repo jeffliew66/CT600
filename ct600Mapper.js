@@ -30,6 +30,8 @@
     boxes.box_145_trade_turnover = round(inputs.pnl.turnover);
     boxes.box_170_interest_income = round(inputs.pnl.interestIncome);
     boxes.box_190_rental_income = round(inputs.pnl.rentalIncome);
+    boxes.box_205_disposal_gains = round(inputs.pnl.disposalGains || 0);
+    boxes.box_210_chargeable_gains = round(inputs.pnl.capitalGains || 0);
     boxes.box_620_dividend_income = round(inputs.pnl.dividendIncome);
 
     // Trading profit
@@ -41,12 +43,12 @@
     boxes.box_250_prop_losses_bfwd = round(inputs.pnl.propertyLossBF);
     boxes.box_250_prop_losses_cfwd = round(result.property.propertyLossCF);
 
-    // Profit subtotal (simplified): taxable trading profit + interest + property profit
-    // NOTE: Does NOT include govtGrants (they affect PBT but not the tax-base Box 235)
+    // Profit subtotal (simplified): taxable trading + taxable non-trading
+    // (includes interest, rental/property net, disposal gains, capital gains as computed by engine)
     boxes.box_235_profits_subtotal = round(
-      result.computation.taxableTradingProfit + inputs.pnl.interestIncome + result.property.propertyProfitAfterLossOffset
+      result.computation.taxableTradingProfit + result.computation.taxableNonTradingProfits
     );
-    boxes.box_300_profits_before_deductions = boxes.box_235_profits_subtotal;  // Simplified: no capital gains
+    boxes.box_300_profits_before_deductions = boxes.box_235_profits_subtotal;
     boxes.box_305_donations = 0;  // Not modeled in v1
     boxes.box_310_group_relief = 0;  // Not modeled in v1
     boxes.box_312_other_deductions = 0;  // Not modeled in v1

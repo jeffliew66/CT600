@@ -29,6 +29,8 @@ function baseInput(overrides) {
     govtGrants: 0,
     rentalIncome: 0,
     interestIncome: 0,
+    disposalGains: 0,
+    capitalGains: 0,
     dividendIncome: 0,
     costOfSales: 0,
     staffCosts: 0,
@@ -40,6 +42,7 @@ function baseInput(overrides) {
     aiaNonTradeAdditions: 0,
     aiaAdditions: 0,
     tradingLossBF: 0,
+    tradingLossUseRequested: undefined,
     propertyLossBF: 0,
     ...overrides
   };
@@ -110,7 +113,13 @@ function checkCoreRules(rows) {
       `Augmented profit mismatch: ${keyOf(input)}`
     );
     assert(
-      result.accounts.totalIncome === input.turnover + input.govtGrants + input.rentalIncome + input.interestIncome,
+      result.accounts.totalIncome ===
+        input.turnover +
+        input.govtGrants +
+        input.rentalIncome +
+        input.interestIncome +
+        input.disposalGains +
+        input.capitalGains,
       `Dividend leaked into taxable income: ${keyOf(input)}`
     );
 
@@ -341,6 +350,39 @@ function checkPropertyLossBfSequentialAcrossApPeriods() {
   );
 }
 
+function checkLossUseRequestedCap() {
+  const out = run(baseInput({
+    apStart: '2024-04-01',
+    apEnd: '2025-03-31',
+    assocCompanies: 0,
+    turnover: 200000,
+    tradingLossBF: 120000,
+    tradingLossUseRequested: 30000
+  }));
+
+  assert(
+    out.result.computation.tradingLossUsed === 30000,
+    'Trading loss usage should be capped by user-requested amount.'
+  );
+}
+
+function checkDisposalAndCapitalGainsTaxable() {
+  const out = run(baseInput({
+    apStart: '2024-04-01',
+    apEnd: '2025-03-31',
+    assocCompanies: 0,
+    turnover: 0,
+    rentalIncome: 0,
+    interestIncome: 0,
+    disposalGains: 40000,
+    capitalGains: 60000,
+    dividendIncome: 0
+  }));
+
+  assert(out.result.accounts.totalIncome === 100000, 'Disposal/capital gains should be included in accounting income.');
+  assert(out.result.computation.taxableTotalProfits === 100000, 'Disposal/capital gains should be taxable.');
+}
+
 function checkSeparateTradeNonTradeAiaBuckets() {
   const common = baseInput({
     apStart: '2024-04-01',
@@ -439,6 +481,8 @@ function checkIncomeNotDoubleCounted() {
     rentalIncome: 20000,
     propertyLossBF: 3000,
     interestIncome: 4000,
+    disposalGains: 2500,
+    capitalGains: 1500,
     dividendIncome: 7000,
     costOfSales: 25000,
     staffCosts: 15000,
@@ -453,7 +497,13 @@ function checkIncomeNotDoubleCounted() {
   const out = run(input);
   const r = out.result;
 
-  const expectedTotalIncome = input.turnover + input.govtGrants + input.rentalIncome + input.interestIncome;
+  const expectedTotalIncome =
+    input.turnover +
+    input.govtGrants +
+    input.rentalIncome +
+    input.interestIncome +
+    input.disposalGains +
+    input.capitalGains;
   assert(r.accounts.totalIncome === expectedTotalIncome, 'Total income mismatch with source fields.');
 
   const expectedNetProperty = Math.max(0, input.rentalIncome - input.propertyLossBF);
@@ -462,11 +512,13 @@ function checkIncomeNotDoubleCounted() {
   const recomposedTTP =
     r.computation.taxableTradingProfit +
     input.interestIncome +
+    input.disposalGains +
+    input.capitalGains +
     r.property.propertyProfitAfterLossOffset;
 
   assert(
     r.computation.taxableTotalProfits === recomposedTTP,
-    'Taxable Total Profits is not equal to trading + interest + net property (possible double counting).'
+    'Taxable Total Profits is not equal to trading + interest + disposal gains + capital gains + net property (possible double counting).'
   );
 
   assert(
@@ -507,6 +559,8 @@ function main() {
   checkAiaProrationAndAssociates();
   checkLossBfSequentialAcrossApPeriods();
   checkPropertyLossBfSequentialAcrossApPeriods();
+  checkLossUseRequestedCap();
+  checkDisposalAndCapitalGainsTaxable();
   checkSeparateTradeNonTradeAiaBuckets();
   checkAiaCanCreateLoss();
   printSummary(rows);

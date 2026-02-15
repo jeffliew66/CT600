@@ -64,6 +64,9 @@
             <label>Less: Trading losses brought forward
               <input type="number" id="tradingLossBF" step="0.01" value="0" />
             </label>
+            <label>Trading losses to use this return
+              <input type="number" id="tradingLossUseRequested" step="0.01" placeholder="Leave blank to auto-use available" />
+            </label>
             <div class="groupBlock">
               <div class="groupHead">
                 <h3>Summary</h3>
@@ -80,6 +83,9 @@
               <label class="computed">Net trading profits [C]
                 <input type="text" id="netTradingProfits" readonly data-key="netTradingProfits" />
               </label>
+              <label class="computed">Trading losses used [C]
+                <input type="text" id="outTradingLossUsed" readonly data-key="outTradingLossUsed" />
+              </label>
             </div>
           </section>
         </div>
@@ -95,6 +101,15 @@
             </label>
             <label>Dividend income
               <input type="number" id="dividendIncome" step="0.01" value="0" />
+            </label>
+            <label>Disposal gains (taxable)
+              <input type="number" id="disposalGains" step="0.01" value="0" />
+            </label>
+            <label>Capital gains source file (Excel/CSV)
+              <input type="file" id="capitalGainsFile" accept=".xlsx,.xls,.csv,.xlsm" />
+            </label>
+            <label>Capital gains (taxable, from uploaded file)
+              <input type="number" id="capitalGains" step="0.01" value="0" />
             </label>
             <div class="groupBlock">
               <div class="groupHead">
@@ -118,6 +133,12 @@
             </label>
             <label class="computed">Dividend income [C]
               <input type="text" id="outDividendIncome" readonly data-key="outDividendIncome" />
+            </label>
+            <label class="computed">Disposal gains [C]
+              <input type="text" id="outDisposalGains" readonly data-key="outDisposalGains" />
+            </label>
+            <label class="computed">Capital gains [C]
+              <input type="text" id="outCapitalGains" readonly data-key="outCapitalGains" />
             </label>
             <label class="computed">Rental & property income [C]
               <input type="text" id="outRentalIncome" readonly data-key="outRentalIncome" />

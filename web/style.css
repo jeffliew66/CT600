@@ -151,6 +151,7 @@ label{
 
 input[type=date],
 input[type=number],
+input[type=file],
 input[readonly],
 input[type=text]{
   width:100%;

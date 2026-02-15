@@ -481,7 +481,7 @@
     // CRITICAL: Do NOT include dividend in totalIncome - dividend affects rate, not taxable profit
     const pnl = inputs.pnl;
     result.accounts.totalIncome = TaxModel.roundPounds(
-      pnl.turnover + pnl.govtGrants + pnl.rentalIncome + pnl.interestIncome
+      pnl.turnover + pnl.govtGrants + pnl.rentalIncome + pnl.interestIncome + pnl.disposalGains + pnl.capitalGains
       // NOTE: pnl.dividendIncome is NOT included here - handled separately for augmented profit
     );
     result.accounts.totalExpenses = TaxModel.roundPounds(
@@ -500,6 +500,11 @@
     // Trading losses b/fwd flow sequentially across APs:
     // opening pool is available to AP1, unused balance carries forward to AP2, etc.
     let remainingLossPool = Math.max(0, Number(inputs.losses.tradingLossBF) || 0);
+    const requestedLossTotal =
+      inputs.losses.tradingLossUseRequested == null
+        ? remainingLossPool
+        : Math.min(remainingLossPool, Math.max(0, Number(inputs.losses.tradingLossUseRequested) || 0));
+    let remainingLossUseRequested = requestedLossTotal;
 
     // 4) Allocate profit to each AP split period and calculate tax per period
     const periodResults = apSplits.map((period, periodIndex) => {
@@ -520,6 +525,8 @@
       const periodRatio = (period.days / (inputs.apDays || 1));
       const periodDividendIncome = pnl.dividendIncome * periodRatio;
       const periodInterestIncome = pnl.interestIncome * periodRatio;
+      const periodDisposalGains = pnl.disposalGains * periodRatio;
+      const periodCapitalGains = pnl.capitalGains * periodRatio;
       const periodRentalIncomeGross = TaxModel.roundPounds(pnl.rentalIncome * periodRatio);
       const periodPropertyLossPool = Math.max(0, remainingPropertyLossPool);
       const periodPropertyLossUsed = Math.min(periodPropertyLossPool, Math.max(0, periodRentalIncomeGross));
@@ -543,7 +550,9 @@
       const periodTaxableBeforeAIA = TaxModel.roundPounds(
         periodProfitBeforeTax + periodAddBacks + periodPropertyAdjustment
       );
-      const periodNonTradingBeforeAIA = TaxModel.roundPounds(periodInterestIncome + periodPropertyProfit);
+      const periodNonTradingBeforeAIA = TaxModel.roundPounds(
+        periodInterestIncome + periodPropertyProfit + periodDisposalGains + periodCapitalGains
+      );
       const periodTradingBeforeAIA = TaxModel.roundPounds(periodTaxableBeforeAIA - periodNonTradingBeforeAIA);
       // AIA claim is driven by qualifying additions (subject to shared cap),
       // and can create/increase a loss. Do not cap claim by current-period profit.
@@ -556,14 +565,17 @@
       const periodTradingAfterAIA = TaxModel.roundPounds(periodTradingBeforeAIA - periodTradeAIAClaim);
       // Rental/property AIA offsets the rental/property stream only (not interest).
       const periodPropertyAfterAIA = TaxModel.roundPounds(periodPropertyProfit - periodNonTradeAIAClaim);
-      const periodNonTradingAfterAIA = TaxModel.roundPounds(periodInterestIncome + periodPropertyAfterAIA);
+      const periodNonTradingAfterAIA = TaxModel.roundPounds(
+        periodInterestIncome + periodPropertyAfterAIA + periodDisposalGains + periodCapitalGains
+      );
       const periodTaxableBeforeLoss = TaxModel.roundPounds(periodTradingAfterAIA + periodNonTradingAfterAIA);
 
       // Trading losses b/fwd reduce trading profits only.
       // Opening pool for each AP is the carried-forward balance from prior AP.
       const periodLossPool = Math.max(0, remainingLossPool);
-      const periodLossUsed = Math.min(periodLossPool, Math.max(0, periodTradingAfterAIA));
+      const periodLossUsed = Math.min(periodLossPool, remainingLossUseRequested, Math.max(0, periodTradingAfterAIA));
       remainingLossPool = Math.max(0, periodLossPool - periodLossUsed);
+      remainingLossUseRequested = Math.max(0, remainingLossUseRequested - periodLossUsed);
       const periodTradingAfterLoss = TaxModel.roundPounds(periodTradingAfterAIA - periodLossUsed);
 
       const periodTaxableAfterLoss = TaxModel.roundPounds(periodTradingAfterLoss + periodNonTradingAfterAIA);
@@ -637,6 +649,7 @@
         lossPool: TaxModel.roundPounds(periodLossPool),
         lossUsed: TaxModel.roundPounds(periodLossUsed),
         lossCarriedForward: TaxModel.roundPounds(remainingLossPool),
+        lossUseRequestedRemaining: TaxModel.roundPounds(remainingLossUseRequested),
         propertyRentalGross: TaxModel.roundPounds(periodRentalIncomeGross),
         propertyLossPool: TaxModel.roundPounds(periodPropertyLossPool),
         propertyLossUsed: TaxModel.roundPounds(periodPropertyLossUsed),
@@ -695,6 +708,9 @@
     result.metadata = {
       ap_days: inputs.apDays,
       ap_split: hasMultiplePeriods,
+      trading_loss_bf_available: TaxModel.roundPounds(inputs.losses.tradingLossBF),
+      trading_loss_use_requested: TaxModel.roundPounds(requestedLossTotal),
+      trading_loss_use_remaining: TaxModel.roundPounds(remainingLossUseRequested),
       periods: periodResults.map((p) => ({
         name: p.periodName,
         days: p.days,
@@ -707,6 +723,7 @@
         loss_used: p.lossUsed,
         loss_pool: p.lossPool,
         loss_cf: p.lossCarriedForward,
+        loss_use_requested_remaining: p.lossUseRequestedRemaining,
         rental_income_gross: p.propertyRentalGross,
         property_loss_pool: p.propertyLossPool,
         property_loss_used: p.propertyLossUsed,

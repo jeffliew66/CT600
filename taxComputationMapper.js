@@ -61,10 +61,18 @@
       other_income: {
         rental_income_net: round(result.property.propertyProfitAfterLossOffset),
         interest_income: round(inputs.pnl.interestIncome),
+        disposal_gains: round(inputs.pnl.disposalGains || 0),
+        capital_gains: round(inputs.pnl.capitalGains || 0),
+        capital_gains_source_file: String(inputs.pnl.capitalGainsFileName || ''),
         dividend_income: round(inputs.pnl.dividendIncome),
         govt_grants: round(inputs.pnl.govtGrants),
         total_other_income: round(
-          result.property.propertyProfitAfterLossOffset + inputs.pnl.interestIncome + inputs.pnl.dividendIncome + inputs.pnl.govtGrants
+          result.property.propertyProfitAfterLossOffset +
+          inputs.pnl.interestIncome +
+          (inputs.pnl.disposalGains || 0) +
+          (inputs.pnl.capitalGains || 0) +
+          inputs.pnl.dividendIncome +
+          inputs.pnl.govtGrants
         )
       },
 
@@ -165,8 +173,13 @@
    * Builds "Trading Loss Claim" (CT600 Section 2)
    */
   function buildTradingLossSchedule(inputs, result) {
+    const requested =
+      inputs.losses.tradingLossUseRequested == null
+        ? inputs.losses.tradingLossBF
+        : Math.min(inputs.losses.tradingLossBF, inputs.losses.tradingLossUseRequested);
     return {
       trading_loss_bfwd_available: round(inputs.losses.tradingLossBF),
+      trading_loss_use_requested: round(requested),
       trading_loss_bfwd_used_this_period: round(result.computation.tradingLossUsed),
       trading_loss_cfwd: round(
         inputs.losses.tradingLossBF - result.computation.tradingLossUsed

@@ -51,6 +51,9 @@
     const rentalIncome = roundPounds(ui.rentalIncome ?? ui.box_190_rental_income ?? 0);
     const propertyLossBF = roundPounds(ui.propertyLossBF ?? ui.box_250_prop_losses_bfwd ?? 0);
     const interestIncome = roundPounds(ui.interestIncome ?? ui.box_170_interest_income ?? 0);
+    const disposalGains = roundPounds(ui.disposalGains ?? ui.box_205_disposal_gains ?? 0);
+    const capitalGains = roundPounds(ui.capitalGains ?? ui.box_210_chargeable_gains ?? 0);
+    const capitalGainsFileName = String(ui.capitalGainsFileName ?? ui.capital_gains_source_file ?? '');
     const dividendIncome = roundPounds(ui.dividendIncome ?? ui.box_620_dividend_income ?? 0);
 
     // Expenses
@@ -77,6 +80,15 @@
 
     // Trading losses
     const tradingLossBF = roundPounds(ui.tradingLossBF ?? ui.box_160_trading_losses_bfwd ?? 0);
+    const tradingLossUseRequestedRaw = ui.tradingLossUseRequested ?? ui.box_161_trading_losses_use_requested;
+    const tradingLossUseRequested = (tradingLossUseRequestedRaw === '' || tradingLossUseRequestedRaw == null)
+      ? null
+      : (() => {
+          const tradingLossUseRequestedNum = Number(tradingLossUseRequestedRaw);
+          return Number.isFinite(tradingLossUseRequestedNum)
+            ? roundPounds(Math.max(0, tradingLossUseRequestedNum))
+            : null;
+        })();
 
     return {
       apStart,
@@ -92,6 +104,9 @@
         rentalIncome,
         propertyLossBF,
         interestIncome,
+        disposalGains,
+        capitalGains,
+        capitalGainsFileName,
         dividendIncome,
 
         costOfSales,
@@ -112,7 +127,8 @@
       },
 
       losses: {
-        tradingLossBF
+        tradingLossBF,
+        tradingLossUseRequested
       }
     };
   }

@@ -5,6 +5,11 @@
 
   function $(id){ return document.getElementById(id); }
   function toNum(v){ return Number(v) || 0; }
+  function toOptionalNum(v){
+    if (v === '' || v == null) return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
   function roundPounds(n){ return Math.round((Number(n) || 0)); }
   function pct(n){ return (Number(n) * 100).toFixed(2); }
   function pounds(n){ return `GBP ${roundPounds(n).toLocaleString()}`; }
@@ -28,6 +33,10 @@
     }
 
     // Collect all form inputs
+    const capitalFileInput = $("capitalGainsFile");
+    const capitalGainsFileName = (capitalFileInput && capitalFileInput.files && capitalFileInput.files[0])
+      ? capitalFileInput.files[0].name
+      : '';
     const userInputs = {
       apStart: apStartValue,
       apEnd: apEndValue,
@@ -37,6 +46,9 @@
       govtGrants: toNum($("govtGrants").value),
       rentalIncome: toNum($("rentalIncome").value),
       interestIncome: toNum($("interestIncome").value),
+      disposalGains: toNum($("disposalGains").value),
+      capitalGains: toNum($("capitalGains").value),
+      capitalGainsFileName,
       dividendIncome: toNum($("dividendIncome").value),
       // P&L expenses
       costOfSales: toNum($("rawMaterials").value),
@@ -51,6 +63,7 @@
       aiaAdditions: toNum($("aiaTrade").value) + toNum($("aiaNonTrade").value),
       // Loss carry-forward
       tradingLossBF: toNum($("tradingLossBF").value),
+      tradingLossUseRequested: toOptionalNum($("tradingLossUseRequested").value),
       propertyLossBF: toNum($("rentalLossBF").value)
     };
 
@@ -116,13 +129,19 @@
 
     // Populate P&L fields
     const tradeAccountingIncome = userInputs.turnover;
-    const nonTradeAccountingIncome = userInputs.govtGrants + userInputs.interestIncome + userInputs.rentalIncome;
+    const nonTradeAccountingIncome =
+      userInputs.govtGrants +
+      userInputs.interestIncome +
+      userInputs.rentalIncome +
+      userInputs.disposalGains +
+      userInputs.capitalGains;
     setOut(
       "totalIncome",
       roundPounds(totalIncome),
       "Total accounting income = trade income + non-trade income (dividends excluded)",
       `Trade income = Turnover = ${pounds(tradeAccountingIncome)}\n` +
-      `Non-trade income = Govt grants + Interest + Rental = ${pounds(userInputs.govtGrants)} + ${pounds(userInputs.interestIncome)} + ${pounds(userInputs.rentalIncome)} = ${pounds(nonTradeAccountingIncome)}\n` +
+      `Non-trade income = Govt grants + Interest + Rental + Disposal gains + Capital gains\n` +
+      `= ${pounds(userInputs.govtGrants)} + ${pounds(userInputs.interestIncome)} + ${pounds(userInputs.rentalIncome)} + ${pounds(userInputs.disposalGains)} + ${pounds(userInputs.capitalGains)} = ${pounds(nonTradeAccountingIncome)}\n` +
       `Total accounting income = ${pounds(tradeAccountingIncome)} + ${pounds(nonTradeAccountingIncome)} = ${pounds(totalIncome)}`
     );
     setRawMeta('totalIncome', totalIncome, roundPounds(totalIncome));
@@ -138,7 +157,7 @@
     if (expensesGroupTotalEl) expensesGroupTotalEl.textContent = pounds(totalExpenses);
 
     // Detailed PBT formula
-    const pbtDetail = `STEP-BY-STEP CALCULATION:\n\nTotal Income (accounting, excludes dividends)\n  = Turnover + Govt Grants + Interest + Rental\n  = GBP ${roundPounds(userInputs.turnover).toLocaleString()} + GBP ${roundPounds(userInputs.govtGrants).toLocaleString()} + GBP ${roundPounds(userInputs.interestIncome).toLocaleString()} + GBP ${roundPounds(userInputs.rentalIncome).toLocaleString()}\n  = GBP ${roundPounds(totalIncome).toLocaleString()}\n\nTotal Expenses\n  = Raw Materials + Staff + Depreciation + Other\n  = GBP ${roundPounds(userInputs.costOfSales).toLocaleString()} + GBP ${roundPounds(userInputs.staffCosts).toLocaleString()} + GBP ${roundPounds(userInputs.depreciation).toLocaleString()} + GBP ${roundPounds(userInputs.otherCharges).toLocaleString()}\n  = GBP ${roundPounds(totalExpenses).toLocaleString()}\n\nProfit Before Tax\n  = Total Income - Total Expenses\n  = GBP ${roundPounds(totalIncome).toLocaleString()} - GBP ${roundPounds(totalExpenses).toLocaleString()}\n  = GBP ${roundPounds(profitBeforeTax).toLocaleString()}`;
+    const pbtDetail = `STEP-BY-STEP CALCULATION:\n\nTotal Income (accounting, excludes dividends)\n  = Turnover + Govt Grants + Interest + Rental + Disposal gains + Capital gains\n  = GBP ${roundPounds(userInputs.turnover).toLocaleString()} + GBP ${roundPounds(userInputs.govtGrants).toLocaleString()} + GBP ${roundPounds(userInputs.interestIncome).toLocaleString()} + GBP ${roundPounds(userInputs.rentalIncome).toLocaleString()} + GBP ${roundPounds(userInputs.disposalGains).toLocaleString()} + GBP ${roundPounds(userInputs.capitalGains).toLocaleString()}\n  = GBP ${roundPounds(totalIncome).toLocaleString()}\n\nTotal Expenses\n  = Raw Materials + Staff + Depreciation + Other\n  = GBP ${roundPounds(userInputs.costOfSales).toLocaleString()} + GBP ${roundPounds(userInputs.staffCosts).toLocaleString()} + GBP ${roundPounds(userInputs.depreciation).toLocaleString()} + GBP ${roundPounds(userInputs.otherCharges).toLocaleString()}\n  = GBP ${roundPounds(totalExpenses).toLocaleString()}\n\nProfit Before Tax\n  = Total Income - Total Expenses\n  = GBP ${roundPounds(totalIncome).toLocaleString()} - GBP ${roundPounds(totalExpenses).toLocaleString()}\n  = GBP ${roundPounds(profitBeforeTax).toLocaleString()}`;
     setOut('profitBeforeTax', roundPounds(profitBeforeTax), 'Total Income - Total Expenses', pbtDetail);
     setRawMeta('profitBeforeTax', profitBeforeTax, roundPounds(profitBeforeTax));
 
@@ -227,11 +246,11 @@
     verificationDetail += `Dividend Income used for augmented profit: ${pounds(userInputs.dividendIncome)}\n`;
     verificationDetail += `Augmented Profits: ${pounds(augmentedProfits)}\n\n`;
     verificationDetail += `FORMULA TEMPLATE (SYMBOLIC):\n`;
-    verificationDetail += `  Total Income = Turnover + Govt Grants + Interest + Rental\n`;
+    verificationDetail += `  Total Income = Turnover + Govt Grants + Interest + Rental + Disposal gains + Capital gains\n`;
     verificationDetail += `  Profit Before Tax = Total Income - Total Expenses\n`;
     verificationDetail += `  Taxable Trading Profit = trading component after trade AIA and trading loss relief\n`;
     verificationDetail += `  Taxable Total Profits (TTP) = max(0, Taxable Trading Profit + Taxable Non-Trading Income)\n`;
-    verificationDetail += `  Taxable Non-Trading Income = Interest + (Rental/Property after property loss BF and rental/property AIA)\n`;
+    verificationDetail += `  Taxable Non-Trading Income = Interest + Disposal gains + Capital gains + (Rental/Property after property loss BF and rental/property AIA)\n`;
     verificationDetail += `  Augmented Profits = TTP + Dividends\n`;
     verificationDetail += `  Period factor = 1.0 for complete 12-month period, else (period days / 365)\n`;
     verificationDetail += `  Lower Threshold (period) = 50,000 x Period factor / (Associated Companies + 1)\n`;
@@ -247,13 +266,19 @@
     verificationDetail += `WITH YOUR FIGURES:\n`;
     verificationDetail += `Profit build-up (independently checkable):\n`;
     verificationDetail += `  Accounting income (excludes dividends): ${pounds(totalIncome)}\n`;
+    verificationDetail += `    Includes disposal gains ${pounds(userInputs.disposalGains)} and capital gains ${pounds(userInputs.capitalGains)}\n`;
+    if (userInputs.capitalGains) {
+      verificationDetail += `    Capital gains source file: ${userInputs.capitalGainsFileName || 'No file selected'}\n`;
+    }
     verificationDetail += `  Less accounting expenses: ${pounds(totalExpenses)}\n`;
     verificationDetail += `  Profit before tax: ${pounds(profitBeforeTax)}\n`;
     verificationDetail += `  Add-backs (depreciation + disallowables + adjustments): ${pounds(result.computation.addBacks)}\n`;
     verificationDetail += `  Less capital allowances (AIA used): ${pounds(result.computation.capitalAllowances)}\n`;
+    verificationDetail += `  Trading losses available b/f: ${pounds(userInputs.tradingLossBF)}\n`;
+    verificationDetail += `  Trading losses requested to use: ${userInputs.tradingLossUseRequested == null ? 'Auto (up to available)' : pounds(userInputs.tradingLossUseRequested)}\n`;
     verificationDetail += `  Less trading losses used: ${pounds(result.computation.tradingLossUsed)}\n`;
     verificationDetail += `  Taxable trading profit: ${pounds(taxableTradingProfit)}\n`;
-    verificationDetail += `  Taxable non-trading income (interest + rental/property after rental/property AIA): ${pounds(taxableNonTradeIncome)}\n`;
+    verificationDetail += `  Taxable non-trading income (interest + disposal gains + capital gains + rental/property after rental/property AIA): ${pounds(taxableNonTradeIncome)}\n`;
     verificationDetail += `  Taxable Total Profits = max(0, ${pounds(taxableTradingProfit)} + ${pounds(taxableNonTradeIncome)}) = ${pounds(taxableTotalProfits)}\n`;
     verificationDetail += `  Augmented Profits = TTP + dividends = ${pounds(taxableTotalProfits)} + ${pounds(userInputs.dividendIncome)} = ${pounds(augmentedProfits)}\n\n`;
 
@@ -316,6 +341,16 @@
 
     setOut('netTradingProfits', roundPounds(taxableTradingProfit), 'Trading profit after adjustments & losses', `GBP ${roundPounds(taxableTradingProfit).toLocaleString()}`);
     setRawMeta('netTradingProfits', taxableTradingProfit, roundPounds(taxableTradingProfit));
+    setOut(
+      'outTradingLossUsed',
+      roundPounds(result.computation.tradingLossUsed),
+      'Trading losses used = min(losses available, losses requested, positive trading profit after AIA)',
+      `Losses available (BF): ${pounds(userInputs.tradingLossBF)}\n` +
+      `Losses requested to use: ${userInputs.tradingLossUseRequested == null ? 'Auto (up to available)' : pounds(userInputs.tradingLossUseRequested)}\n` +
+      `Losses used this return: ${pounds(result.computation.tradingLossUsed)}\n` +
+      `Losses carried forward: ${pounds(Math.max(0, userInputs.tradingLossBF - result.computation.tradingLossUsed))}`
+    );
+    setRawMeta('outTradingLossUsed', result.computation.tradingLossUsed, roundPounds(result.computation.tradingLossUsed));
 
     // Section 4 outputs
     setOut('outInterestIncome', roundPounds(userInputs.interestIncome), 'Interest earned', `GBP ${roundPounds(userInputs.interestIncome).toLocaleString()}`);
@@ -326,6 +361,17 @@
 
     setOut('outDividendIncome', roundPounds(userInputs.dividendIncome), 'Dividend income (affects rate, not taxable)', `GBP ${roundPounds(userInputs.dividendIncome).toLocaleString()}`);
     setRawMeta('outDividendIncome', userInputs.dividendIncome, roundPounds(userInputs.dividendIncome));
+    setOut('outDisposalGains', roundPounds(userInputs.disposalGains), 'Disposal gains are taxable non-trading income', `${pounds(userInputs.disposalGains)}`);
+    setRawMeta('outDisposalGains', userInputs.disposalGains, roundPounds(userInputs.disposalGains));
+    setOut(
+      'outCapitalGains',
+      roundPounds(userInputs.capitalGains),
+      'Capital gains are taxable and passed through from user-uploaded schedule',
+      `Capital gains used in computation: ${pounds(userInputs.capitalGains)}\n` +
+      `Source file: ${userInputs.capitalGainsFileName || 'No file selected'}\n` +
+      `This tool does not parse the file; it uses the entered figure directly.`
+    );
+    setRawMeta('outCapitalGains', userInputs.capitalGains, roundPounds(userInputs.capitalGains));
 
     setOut('outRentalIncome', roundPounds(result.property.rentalIncome), 'Rental income', `GBP ${roundPounds(result.property.rentalIncome).toLocaleString()}`);
     setRawMeta('outRentalIncome', result.property.rentalIncome, roundPounds(result.property.rentalIncome));
@@ -555,7 +601,7 @@
       taxableTotalProfits,
       'Profits chargeable to corporation tax (TTP) = max(0, taxable trading + taxable non-trading)',
       `Taxable trading = ${pounds(result.computation.taxableTradingProfit)}\n` +
-      `Taxable non-trading (interest + rental/property after rental/property AIA) = ${pounds(taxableNonTradeIncome)}\n` +
+      `Taxable non-trading (interest + disposal gains + capital gains + rental/property after rental/property AIA) = ${pounds(taxableNonTradeIncome)}\n` +
       `TTP = max(0, ${pounds(result.computation.taxableTradingProfit)} + ${pounds(taxableNonTradeIncome)}) = ${pounds(taxableTotalProfits)}`
     );
 
@@ -564,7 +610,7 @@
       augmentedProfits,
       'Augmented profits = Taxable Total Profits + dividends',
       `STEP 1: Taxable trading profit = ${pounds(result.computation.taxableTradingProfit)}\n` +
-      `STEP 2: Taxable non-trading income (interest + rental/property after rental/property AIA) = ${pounds(taxableNonTradeIncome)}\n` +
+      `STEP 2: Taxable non-trading income (interest + disposal gains + capital gains + rental/property after rental/property AIA) = ${pounds(taxableNonTradeIncome)}\n` +
       `STEP 3: Taxable Total Profits = max(0, ${pounds(result.computation.taxableTradingProfit)} + ${pounds(taxableNonTradeIncome)}) = ${pounds(taxableTotalProfits)}\n` +
       `STEP 4: Augmented profits = ${pounds(taxableTotalProfits)} + ${pounds(userInputs.dividendIncome)} = ${pounds(augmentedProfits)}`
     );
@@ -715,17 +761,19 @@
 
     // AUTO-CALCULATE ON INPUT CHANGE (real-time updates)
     // Add listeners to all form inputs to trigger compute() whenever any value changes
-    const formInputs = document.querySelectorAll('#dataForm input[type="text"], #dataForm input[type="number"], #dataForm input[type="date"]');
+    const formInputs = document.querySelectorAll('#dataForm input[type="text"], #dataForm input[type="number"], #dataForm input[type="date"], #dataForm input[type="file"]');
     formInputs.forEach(input => {
       // Debounce: wait 300ms after typing stops before computing
       let debounceTimer;
-      input.addEventListener('input', function() {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-          console.log('-> Auto-compute triggered by input change to', this.id);
-          compute({ silent: true });
-        }, 300);
-      });
+      if (input.type !== 'file') {
+        input.addEventListener('input', function() {
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            console.log('-> Auto-compute triggered by input change to', this.id);
+            compute({ silent: true });
+          }, 300);
+        });
+      }
       
       // Also compute on blur (when user leaves the field)
       input.addEventListener('change', function() {
