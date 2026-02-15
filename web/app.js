@@ -56,27 +56,27 @@
     const { inputs, result, corpTaxYears } = TaxEngine.run(userInputs, {});
     
     // DEBUG: Full calculation output
-    console.log('═══════════════════════════════════════════════════════════════');
+    console.log('----------------------------------------------------------------');
     console.log('TAX CALCULATION DEBUG OUTPUT');
-    console.log('═══════════════════════════════════════════════════════════════');
+    console.log('----------------------------------------------------------------');
     console.log('AP:', userInputs.apStart, 'to', userInputs.apEnd);
     console.log('AP Days:', inputs.apDays, '| Associates:', userInputs.assocCompanies, '| Divisor:', (userInputs.assocCompanies || 0) + 1);
     console.log('Turnover:', userInputs.turnover, '| Expenses:', userInputs.costOfSales + userInputs.staffCosts + userInputs.depreciation + userInputs.otherCharges);
     console.log('');
     console.log('PERIODS:');
     result.metadata.periods.forEach((p, i) => {
-      console.log(`  Prd${i+1}: ${p.days}d | TxPrf=£${p.taxable_profit.toLocaleString()} | CT=£${p.ct_charge.toLocaleString()}`);
+      console.log(`  Prd${i+1}: ${p.days}d | TxPrf=GBP ${p.taxable_profit.toLocaleString()} | CT=GBP ${p.ct_charge.toLocaleString()}`);
     });
     console.log('');
     console.log('BY FY:');
     result.byFY.forEach(fy => {
       const thresholds = result.metadata.thresholds?.[fy.fy_year] || {};
-      console.log(`  FY${fy.fy_year}: Thresholds[Lower/Upper]=£${(thresholds.small || '?').toLocaleString?.()}/£${(thresholds.upper || '?').toLocaleString?.()}`);
-      console.log(`    TaxPrf=£${Math.round(fy.taxableProfit).toLocaleString()} | AugPrf=£${Math.round(fy.augmentedProfit).toLocaleString()} | CT=£${Math.round(fy.ctCharge).toLocaleString()} | MR=£${Math.round(fy.marginalRelief).toLocaleString()}`);
+      console.log(`  FY${fy.fy_year}: Thresholds[Lower/Upper]=GBP ${(thresholds.small || '?').toLocaleString?.()}/GBP ${(thresholds.upper || '?').toLocaleString?.()}`);
+      console.log(`    TaxPrf=GBP ${Math.round(fy.taxableProfit).toLocaleString()} | AugPrf=GBP ${Math.round(fy.augmentedProfit).toLocaleString()} | CT=GBP ${Math.round(fy.ctCharge).toLocaleString()} | MR=GBP ${Math.round(fy.marginalRelief).toLocaleString()}`);
     });
     console.log('');
-    console.log('TOTAL CT: £' + result.tax.corporationTaxCharge.toLocaleString());
-    console.log('═══════════════════════════════════════════════════════════════');
+    console.log('TOTAL CT: GBP ' + result.tax.corporationTaxCharge.toLocaleString());
+    console.log('----------------------------------------------------------------');
     
     const totalIncome = result.accounts.totalIncome;
     const totalExpenses = result.accounts.totalExpenses;
@@ -110,12 +110,12 @@
     document.getElementById('totalIncome').dataset.raw = String(totalIncome);
     document.getElementById('totalIncome').dataset.orig = String(roundPounds(totalIncome));
 
-    setOut('totalExpenses', roundPounds(totalExpenses), 'Sum of all expenses', `Raw Materials + Staff + Depreciation + Other = £${roundPounds(totalExpenses).toLocaleString()}`);
+    setOut('totalExpenses', roundPounds(totalExpenses), 'Sum of all expenses', `Raw Materials + Staff + Depreciation + Other = GBP ${roundPounds(totalExpenses).toLocaleString()}`);
     document.getElementById('totalExpenses').dataset.raw = String(totalExpenses);
     document.getElementById('totalExpenses').dataset.orig = String(roundPounds(totalExpenses));
 
     // Detailed PBT formula
-    const pbtDetail = `STEP-BY-STEP CALCULATION:\n\nTotal Income (accounting, excludes dividends)\n  = Turnover + Govt Grants + Interest + Rental\n  = £${roundPounds(userInputs.turnover).toLocaleString()} + £${roundPounds(userInputs.govtGrants).toLocaleString()} + £${roundPounds(userInputs.interestIncome).toLocaleString()} + £${roundPounds(userInputs.rentalIncome).toLocaleString()}\n  = £${roundPounds(totalIncome).toLocaleString()}\n\nTotal Expenses\n  = Raw Materials + Staff + Depreciation + Other\n  = £${roundPounds(userInputs.costOfSales).toLocaleString()} + £${roundPounds(userInputs.staffCosts).toLocaleString()} + £${roundPounds(userInputs.depreciation).toLocaleString()} + £${roundPounds(userInputs.otherCharges).toLocaleString()}\n  = £${roundPounds(totalExpenses).toLocaleString()}\n\nProfit Before Tax\n  = Total Income - Total Expenses\n  = £${roundPounds(totalIncome).toLocaleString()} - £${roundPounds(totalExpenses).toLocaleString()}\n  = £${roundPounds(profitBeforeTax).toLocaleString()}`;
+    const pbtDetail = `STEP-BY-STEP CALCULATION:\n\nTotal Income (accounting, excludes dividends)\n  = Turnover + Govt Grants + Interest + Rental\n  = GBP ${roundPounds(userInputs.turnover).toLocaleString()} + GBP ${roundPounds(userInputs.govtGrants).toLocaleString()} + GBP ${roundPounds(userInputs.interestIncome).toLocaleString()} + GBP ${roundPounds(userInputs.rentalIncome).toLocaleString()}\n  = GBP ${roundPounds(totalIncome).toLocaleString()}\n\nTotal Expenses\n  = Raw Materials + Staff + Depreciation + Other\n  = GBP ${roundPounds(userInputs.costOfSales).toLocaleString()} + GBP ${roundPounds(userInputs.staffCosts).toLocaleString()} + GBP ${roundPounds(userInputs.depreciation).toLocaleString()} + GBP ${roundPounds(userInputs.otherCharges).toLocaleString()}\n  = GBP ${roundPounds(totalExpenses).toLocaleString()}\n\nProfit Before Tax\n  = Total Income - Total Expenses\n  = GBP ${roundPounds(totalIncome).toLocaleString()} - GBP ${roundPounds(totalExpenses).toLocaleString()}\n  = GBP ${roundPounds(profitBeforeTax).toLocaleString()}`;
     setOut('profitBeforeTax', roundPounds(profitBeforeTax), 'Total Income - Total Expenses', pbtDetail);
     document.getElementById('profitBeforeTax').dataset.raw = String(profitBeforeTax);
     document.getElementById('profitBeforeTax').dataset.orig = String(roundPounds(profitBeforeTax));
@@ -141,7 +141,7 @@
     const hasMarginalRelief = fySlices.some((s) => s.marginalRelief > 0);
     let taxDetail = ``;
     if (isSplit) {
-      taxDetail += `⚠️  ACCOUNTING PERIOD SPLIT (HMRC Rule)\n\n`;
+      taxDetail += `WARNING: ACCOUNTING PERIOD SPLIT (HMRC Rule)\n\n`;
       const p1 = (result.metadata && result.metadata.periods && result.metadata.periods[0]) || null;
       const p2 = (result.metadata && result.metadata.periods && result.metadata.periods[1]) || null;
       taxDetail += `AP Length: ${apDays} days (> 12 months)\n`;
@@ -151,32 +151,32 @@
     }
     
     taxDetail += `TAXABLE PROFIT & AUGMENTED PROFIT:\n`;
-    taxDetail += `  Taxable Total Profits: £${roundPounds(taxableTotalProfits).toLocaleString()}\n`;
-    taxDetail += `  Dividend Income (NOT in TTP): £${roundPounds(userInputs.dividendIncome).toLocaleString()}\n`;
-    taxDetail += `  Augmented Profit (for rate banding): £${roundPounds(augmentedProfits).toLocaleString()}\n\n`;
+    taxDetail += `  Taxable Total Profits: GBP ${roundPounds(taxableTotalProfits).toLocaleString()}\n`;
+    taxDetail += `  Dividend Income (NOT in TTP): GBP ${roundPounds(userInputs.dividendIncome).toLocaleString()}\n`;
+    taxDetail += `  Augmented Profit (for rate banding): GBP ${roundPounds(augmentedProfits).toLocaleString()}\n\n`;
     
     taxDetail += `THRESHOLDS (with associates divisor ${divisor}):\n`;
-    taxDetail += `  Small profit threshold: £50,000 ÷ ${divisor} = £${roundPounds(smallThreshold).toLocaleString()}\n`;
-    taxDetail += `  Main rate threshold: £250,000 ÷ ${divisor} = £${roundPounds(upperThreshold).toLocaleString()}\n\n`;
+    taxDetail += `  Small profit threshold: GBP 50,000 / ${divisor} = GBP ${roundPounds(smallThreshold).toLocaleString()}\n`;
+    taxDetail += `  Main rate threshold: GBP 250,000 / ${divisor} = GBP ${roundPounds(upperThreshold).toLocaleString()}\n\n`;
 
     if (augmentedProfits <= smallThreshold) {
-      taxDetail += `Augmented profit £${roundPounds(augmentedProfits).toLocaleString()} ≤ £${roundPounds(smallThreshold).toLocaleString()}\n`;
-      taxDetail += `→ Apply SMALL PROFITS RATE (19%)\n\n`;
-      taxDetail += `CT = £${roundPounds(taxableTotalProfits).toLocaleString()} × 0.19 = £${Math.round(corporationTaxCharge).toLocaleString()}`;
+      taxDetail += `Augmented profit GBP ${roundPounds(augmentedProfits).toLocaleString()} <= GBP ${roundPounds(smallThreshold).toLocaleString()}\n`;
+      taxDetail += `-> Apply SMALL PROFITS RATE (19%)\n\n`;
+      taxDetail += `CT = GBP ${roundPounds(taxableTotalProfits).toLocaleString()} x 0.19 = GBP ${Math.round(corporationTaxCharge).toLocaleString()}`;
     } else if (augmentedProfits >= upperThreshold) {
-      taxDetail += `Augmented profit £${roundPounds(augmentedProfits).toLocaleString()} ≥ £${roundPounds(upperThreshold).toLocaleString()}\n`;
-      taxDetail += `→ Apply MAIN RATE (25%)\n\n`;
-      taxDetail += `CT = £${roundPounds(taxableTotalProfits).toLocaleString()} × 0.25 = £${Math.round(corporationTaxCharge).toLocaleString()}`;
+      taxDetail += `Augmented profit GBP ${roundPounds(augmentedProfits).toLocaleString()} >= GBP ${roundPounds(upperThreshold).toLocaleString()}\n`;
+      taxDetail += `-> Apply MAIN RATE (25%)\n\n`;
+      taxDetail += `CT = GBP ${roundPounds(taxableTotalProfits).toLocaleString()} x 0.25 = GBP ${Math.round(corporationTaxCharge).toLocaleString()}`;
     } else {
       const mainCT = taxableTotalProfits * 0.25;
       const ratio = augmentedProfits > 0 ? (taxableTotalProfits / augmentedProfits) : 0;
-      taxDetail += `Augmented profit £${roundPounds(augmentedProfits).toLocaleString()} is BETWEEN thresholds\n`;
-      taxDetail += `→ Apply MARGINAL RELIEF\n\n`;
-      taxDetail += `Step 1: CT at main rate = £${roundPounds(taxableTotalProfits).toLocaleString()} × 0.25 = £${Math.round(mainCT).toLocaleString()}\n`;
-      taxDetail += `Step 2: Relief ratio = £${roundPounds(taxableTotalProfits).toLocaleString()} ÷ £${roundPounds(augmentedProfits).toLocaleString()} = ${ratio.toFixed(4)}\n`;
-      taxDetail += `Step 3: MR = 1.5% × (£${roundPounds(upperThreshold).toLocaleString()} - £${roundPounds(augmentedProfits).toLocaleString()}) × ${ratio.toFixed(4)}\n`;
-      taxDetail += `       = 0.015 × £${roundPounds(upperThreshold - augmentedProfits).toLocaleString()} × ${ratio.toFixed(4)} = £${Math.round(marginalRelief).toLocaleString()}\n`;
-      taxDetail += `Step 4: Final CT = £${Math.round(mainCT).toLocaleString()} - £${Math.round(marginalRelief).toLocaleString()} = £${Math.round(corporationTaxCharge).toLocaleString()}`;
+      taxDetail += `Augmented profit GBP ${roundPounds(augmentedProfits).toLocaleString()} is BETWEEN thresholds\n`;
+      taxDetail += `-> Apply MARGINAL RELIEF\n\n`;
+      taxDetail += `Step 1: CT at main rate = GBP ${roundPounds(taxableTotalProfits).toLocaleString()} x 0.25 = GBP ${Math.round(mainCT).toLocaleString()}\n`;
+      taxDetail += `Step 2: Relief ratio = GBP ${roundPounds(taxableTotalProfits).toLocaleString()} / GBP ${roundPounds(augmentedProfits).toLocaleString()} = ${ratio.toFixed(4)}\n`;
+      taxDetail += `Step 3: MR = 1.5% x (GBP ${roundPounds(upperThreshold).toLocaleString()} - GBP ${roundPounds(augmentedProfits).toLocaleString()}) x ${ratio.toFixed(4)}\n`;
+      taxDetail += `       = 0.015 x GBP ${roundPounds(upperThreshold - augmentedProfits).toLocaleString()} x ${ratio.toFixed(4)} = GBP ${Math.round(marginalRelief).toLocaleString()}\n`;
+      taxDetail += `Step 4: Final CT = GBP ${Math.round(mainCT).toLocaleString()} - GBP ${Math.round(marginalRelief).toLocaleString()} = GBP ${Math.round(corporationTaxCharge).toLocaleString()}`;
     }
     let verificationDetail = `FULL VERIFIABLE TAX BREAKDOWN\n\n`;
     verificationDetail += `Accounting period: ${userInputs.apStart} to ${userInputs.apEnd} (${apDays} days)\n`;
@@ -260,46 +260,46 @@
     document.getElementById('taxOnProfit').dataset.orig = String(Math.round(corporationTaxCharge));
 
     // Profit for period
-    setOut('profitForPeriod', roundPounds(profitForPeriod), 'Profit After Tax', `£${roundPounds(profitBeforeTax).toLocaleString()} - £${roundPounds(corporationTaxCharge).toLocaleString()} = £${roundPounds(profitForPeriod).toLocaleString()}`);
+    setOut('profitForPeriod', roundPounds(profitForPeriod), 'Profit After Tax', `GBP ${roundPounds(profitBeforeTax).toLocaleString()} - GBP ${roundPounds(corporationTaxCharge).toLocaleString()} = GBP ${roundPounds(profitForPeriod).toLocaleString()}`);
     document.getElementById('profitForPeriod').dataset.raw = String(profitForPeriod);
     document.getElementById('profitForPeriod').dataset.orig = String(roundPounds(profitForPeriod));
 
     // Section 3 outputs
-    setOut('tradingProfitBeforeTax', roundPounds(profitBeforeTax), 'Operating Profit (before tax)', `£${roundPounds(profitBeforeTax).toLocaleString()}`);
+    setOut('tradingProfitBeforeTax', roundPounds(profitBeforeTax), 'Operating Profit (before tax)', `GBP ${roundPounds(profitBeforeTax).toLocaleString()}`);
     document.getElementById('tradingProfitBeforeTax').dataset.raw = String(profitBeforeTax);
     document.getElementById('tradingProfitBeforeTax').dataset.orig = String(roundPounds(profitBeforeTax));
 
-    setOut('addbackDepreciation', roundPounds(userInputs.depreciation), 'Tax add-back (depreciation is not deductible)', `£${roundPounds(userInputs.depreciation).toLocaleString()}`);
+    setOut('addbackDepreciation', roundPounds(userInputs.depreciation), 'Tax add-back (depreciation is not deductible)', `GBP ${roundPounds(userInputs.depreciation).toLocaleString()}`);
     document.getElementById('addbackDepreciation').dataset.raw = String(userInputs.depreciation);
     document.getElementById('addbackDepreciation').dataset.orig = String(roundPounds(userInputs.depreciation));
 
-    setOut('netTradingProfits', roundPounds(taxableTradingProfit), 'Trading profit after adjustments & losses', `£${roundPounds(taxableTradingProfit).toLocaleString()}`);
+    setOut('netTradingProfits', roundPounds(taxableTradingProfit), 'Trading profit after adjustments & losses', `GBP ${roundPounds(taxableTradingProfit).toLocaleString()}`);
     document.getElementById('netTradingProfits').dataset.raw = String(taxableTradingProfit);
     document.getElementById('netTradingProfits').dataset.orig = String(roundPounds(taxableTradingProfit));
 
     // Section 4 outputs
-    setOut('outInterestIncome', roundPounds(userInputs.interestIncome), 'Interest earned', `£${roundPounds(userInputs.interestIncome).toLocaleString()}`);
+    setOut('outInterestIncome', roundPounds(userInputs.interestIncome), 'Interest earned', `GBP ${roundPounds(userInputs.interestIncome).toLocaleString()}`);
     document.getElementById('outInterestIncome').dataset.raw = String(userInputs.interestIncome);
     document.getElementById('outInterestIncome').dataset.orig = String(roundPounds(userInputs.interestIncome));
 
-    setOut('outGovtGrants', roundPounds(userInputs.govtGrants), 'Government grants', `£${roundPounds(userInputs.govtGrants).toLocaleString()}`);
+    setOut('outGovtGrants', roundPounds(userInputs.govtGrants), 'Government grants', `GBP ${roundPounds(userInputs.govtGrants).toLocaleString()}`);
     document.getElementById('outGovtGrants').dataset.raw = String(userInputs.govtGrants);
     document.getElementById('outGovtGrants').dataset.orig = String(roundPounds(userInputs.govtGrants));
 
-    setOut('outDividendIncome', roundPounds(userInputs.dividendIncome), 'Dividend income (affects rate, not taxable)', `£${roundPounds(userInputs.dividendIncome).toLocaleString()}`);
+    setOut('outDividendIncome', roundPounds(userInputs.dividendIncome), 'Dividend income (affects rate, not taxable)', `GBP ${roundPounds(userInputs.dividendIncome).toLocaleString()}`);
     document.getElementById('outDividendIncome').dataset.raw = String(userInputs.dividendIncome);
     document.getElementById('outDividendIncome').dataset.orig = String(roundPounds(userInputs.dividendIncome));
 
-    setOut('outRentalIncome', roundPounds(result.property.rentalIncome), 'Rental income', `£${roundPounds(result.property.rentalIncome).toLocaleString()}`);
+    setOut('outRentalIncome', roundPounds(result.property.rentalIncome), 'Rental income', `GBP ${roundPounds(result.property.rentalIncome).toLocaleString()}`);
     document.getElementById('outRentalIncome').dataset.raw = String(result.property.rentalIncome);
     document.getElementById('outRentalIncome').dataset.orig = String(roundPounds(result.property.rentalIncome));
 
-    setOut('netRentalIncome', roundPounds(result.property.propertyProfitAfterLossOffset), 'Rental income after loss offset', `£${roundPounds(result.property.propertyProfitAfterLossOffset).toLocaleString()}`);
+    setOut('netRentalIncome', roundPounds(result.property.propertyProfitAfterLossOffset), 'Rental income after loss offset', `GBP ${roundPounds(result.property.propertyProfitAfterLossOffset).toLocaleString()}`);
     document.getElementById('netRentalIncome').dataset.raw = String(result.property.propertyProfitAfterLossOffset);
     document.getElementById('netRentalIncome').dataset.orig = String(roundPounds(result.property.propertyProfitAfterLossOffset));
 
     // Section 5 outputs
-    setOut('ttProfitsChargeable', roundPounds(taxableTotalProfits), 'Total taxable profit (on which CT is calculated)', `Trading £${roundPounds(taxableTradingProfit).toLocaleString()} + Interest £${roundPounds(userInputs.interestIncome).toLocaleString()} + Property £${roundPounds(result.property.propertyProfitAfterLossOffset).toLocaleString()} = £${roundPounds(taxableTotalProfits).toLocaleString()}`);
+    setOut('ttProfitsChargeable', roundPounds(taxableTotalProfits), 'Total taxable profit (on which CT is calculated)', `Trading GBP ${roundPounds(taxableTradingProfit).toLocaleString()} + Interest GBP ${roundPounds(userInputs.interestIncome).toLocaleString()} + Property GBP ${roundPounds(result.property.propertyProfitAfterLossOffset).toLocaleString()} = GBP ${roundPounds(taxableTotalProfits).toLocaleString()}`);
     document.getElementById('ttProfitsChargeable').dataset.raw = String(taxableTotalProfits);
     document.getElementById('ttProfitsChargeable').dataset.orig = String(roundPounds(taxableTotalProfits));
 
@@ -344,31 +344,147 @@
     setOut('outUpperRate', `${pct(upperRate)}%`, 'Upper rate from FY tier 3', `FY ${fyYear || 'n/a'} upper rate = ${pct(upperRate)}%`);
     document.getElementById('outUpperRate').dataset.raw = String(upperRate * 100);
     document.getElementById('outUpperRate').dataset.orig = String(roundPounds(upperRate * 100));
-    setOutNumeric('outAugmentedProfitsVar', augmentedProfits, 'Augmented profits = TTP + dividends', `${pounds(taxableTotalProfits)} + ${pounds(userInputs.dividendIncome)} = ${pounds(augmentedProfits)}`);
-    setOutNumeric('outTotalMarginalReliefVar', marginalRelief, 'Total MR = sum of MR across all FY slices/periods', `${(result.byFY || []).map((x) => pounds(x.marginalRelief || 0)).join(' + ') || '0'} = ${pounds(marginalRelief)}`);
+    const p1ByFY = (p1.by_fy || ((result.byFY || []).filter((x) => (x.period_index || 1) === 1)));
+    const p2ByFY = (p2.by_fy || ((result.byFY || []).filter((x) => (x.period_index || 0) === 2)));
+
+    function buildPeriodTaxableDetail(period, periodIndex) {
+      const days = Number(period.days || 0);
+      if (!days) {
+        return {
+          formula: `Period ${periodIndex} taxable profit = max(0, taxable before loss - trading loss used)`,
+          details: `No Period ${periodIndex} exists for this accounting period.`
+        };
+      }
+      const ratio = apDays ? (days / apDays) : 0;
+      const pbtShare = Number(period.profit_before_tax ?? (profitBeforeTax * ratio));
+      const addBackShare = Number(period.add_backs ?? ((userInputs.depreciation + userInputs.disallowableExpenses + userInputs.otherAdjustments) * ratio));
+      const propertyAdjustment = Number(period.property_adjustment ?? ((result.property.propertyProfitAfterLossOffset - userInputs.rentalIncome) * ratio));
+      const aiaClaim = Number(period.aia_claim || 0);
+      const taxableBeforeLoss = Number(period.taxable_before_loss ?? (pbtShare + addBackShare - aiaClaim + propertyAdjustment));
+      const lossUsed = Number(period.loss_used || 0);
+      const taxableProfitPeriod = Number(period.taxable_profit || 0);
+
+      return {
+        formula: `Period ${periodIndex} taxable profit = max(0, taxable before loss - trading loss used)\n` +
+          `taxable before loss = PBT share + add-backs share - AIA claim + property adjustment\n` +
+          `property adjustment = (net property income - rental income) share`,
+        details:
+          `STEP 1: PBT share\n` +
+          `  ${pounds(profitBeforeTax)} x (${days}/${apDays}) = ${pounds(pbtShare)}\n\n` +
+          `STEP 2: Add-backs share\n` +
+          `  (Depreciation + Disallowables + Other adjustments) x (${days}/${apDays})\n` +
+          `  = (${pounds(userInputs.depreciation)} + ${pounds(userInputs.disallowableExpenses)} + ${pounds(userInputs.otherAdjustments)}) x (${days}/${apDays}) = ${pounds(addBackShare)}\n\n` +
+          `STEP 3: Property adjustment share (to avoid double count and apply property losses)\n` +
+          `  (Net property - Rental income) x (${days}/${apDays})\n` +
+          `  = (${pounds(result.property.propertyProfitAfterLossOffset)} - ${pounds(userInputs.rentalIncome)}) x (${days}/${apDays}) = ${pounds(propertyAdjustment)}\n\n` +
+          `STEP 4: Taxable before loss\n` +
+          `  ${pounds(pbtShare)} + ${pounds(addBackShare)} - ${pounds(aiaClaim)} + ${pounds(propertyAdjustment)} = ${pounds(taxableBeforeLoss)}\n\n` +
+          `STEP 5: Trading loss used in period ${periodIndex}\n` +
+          `  ${pounds(lossUsed)}\n\n` +
+          `STEP 6: Period ${periodIndex} taxable profit\n` +
+          `  max(0, ${pounds(taxableBeforeLoss)} - ${pounds(lossUsed)}) = ${pounds(taxableProfitPeriod)}`
+      };
+    }
+
+    function buildPeriodMRDetail(period, periodIndex, slices) {
+      const periodMR = Number(period.marginal_relief || 0);
+      if (!period.days) {
+        return {
+          formula: `Period ${periodIndex} MR = sum of FY-slice MR values`,
+          details: `No Period ${periodIndex} exists for this accounting period.`
+        };
+      }
+      if (!slices.length) {
+        return {
+          formula: `Period ${periodIndex} MR = sum of FY-slice MR values`,
+          details: `No FY slices found inside Period ${periodIndex}.`
+        };
+      }
+
+      let detail = `Period ${periodIndex} marginal relief = sum(MR per FY slice)\n\n`;
+      slices.forEach((slice, idx) => {
+        const lower = Number(slice.thresholds?.small_threshold_for_AP_in_this_FY || 0);
+        const upper = Number(slice.thresholds?.upper_threshold_for_AP_in_this_FY || 0);
+        const tp = Number(slice.taxableProfit || 0);
+        const ap = Number(slice.augmentedProfit || 0);
+        const fyCfgSlice = (corpTaxYears || []).find((fy) => fy.fy_year === slice.fy_year);
+        const mainRateSlice = fyCfgSlice ? ((fyCfgSlice.tiers.find((t) => t.index === 3) || {}).rate || 0.25) : 0.25;
+        const reliefFractionSlice = fyCfgSlice ? ((fyCfgSlice.tiers.find((t) => t.index === 2) || {}).relief_fraction || 0.015) : 0.015;
+        const ratio = ap > 0 ? (tp / ap) : 0;
+        const mrCalc = (ap > lower && ap < upper) ? (reliefFractionSlice * (upper - ap) * ratio) : 0;
+
+        detail += `FY${slice.fy_year} slice ${idx + 1} (${slice.ap_days_in_fy || 0} days)\n`;
+        detail += `  Taxable profit = ${pounds(tp)}\n`;
+        detail += `  Augmented profit = ${pounds(ap)}\n`;
+        detail += `  Thresholds: lower ${pounds(lower)}, upper ${pounds(upper)}\n`;
+        if (ap <= lower) {
+          detail += `  Augmented <= lower: MR = ${pounds(0)}\n\n`;
+        } else if (ap >= upper) {
+          detail += `  Augmented >= upper: MR = ${pounds(0)}\n\n`;
+        } else {
+          detail += `  Main CT = ${pounds(tp)} x ${mainRateSlice.toFixed(2)} = ${pounds(tp * mainRateSlice)}\n`;
+          detail += `  Ratio = ${pounds(tp)} / ${pounds(ap)} = ${ratio.toFixed(6)}\n`;
+          detail += `  MR = ${reliefFractionSlice.toFixed(3)} x (${pounds(upper)} - ${pounds(ap)}) x ${ratio.toFixed(6)}\n`;
+          detail += `     = ${pounds(mrCalc)} (engine: ${pounds(slice.marginalRelief || 0)})\n\n`;
+        }
+      });
+      detail += `Period ${periodIndex} MR total = ${pounds(periodMR)}`;
+
+      return {
+        formula: `For each FY slice in Period ${periodIndex}:\n` +
+          `if augmented <= lower OR augmented >= upper: MR = 0\n` +
+          `else MR = relief_fraction x (upper - augmented) x (taxable / augmented)\n` +
+          `Period ${periodIndex} MR = sum(all slice MR)`,
+        details: detail
+      };
+    }
+
+    setOutNumeric(
+      'outAugmentedProfitsVar',
+      augmentedProfits,
+      'Augmented profits = Taxable Total Profits + dividends',
+      `STEP 1: Taxable trading profit = ${pounds(result.computation.taxableTradingProfit)}\n` +
+      `STEP 2: Add interest income (not double-counted) = ${pounds(userInputs.interestIncome)}\n` +
+      `STEP 3: Add net property income after property losses = ${pounds(result.property.propertyProfitAfterLossOffset)}\n` +
+      `STEP 4: Taxable Total Profits = ${pounds(result.computation.taxableTradingProfit)} + ${pounds(userInputs.interestIncome)} + ${pounds(result.property.propertyProfitAfterLossOffset)} = ${pounds(taxableTotalProfits)}\n` +
+      `STEP 5: Augmented profits = ${pounds(taxableTotalProfits)} + ${pounds(userInputs.dividendIncome)} = ${pounds(augmentedProfits)}`
+    );
+
+    const totalMRDetails = [
+      `Total MR = MR Period 1 + MR Period 2`,
+      `${pounds(p1.marginal_relief || 0)} + ${pounds(p2.marginal_relief || 0)} = ${pounds(marginalRelief)}`,
+      '',
+      'By FY slices:',
+      ...((result.byFY || []).map((x) => `  Period ${x.period_index || 1}, FY${x.fy_year}: MR ${pounds(x.marginalRelief || 0)}`))
+    ].join('\n');
+    setOutNumeric('outTotalMarginalReliefVar', marginalRelief, 'Total MR = sum of MR across all FY slices and AP periods', totalMRDetails);
     setOutNumeric('outTotalAIAClaimedVar', result.computation.capitalAllowances, 'Total AIA claimed = sum of period AIA claims', `${pounds(p1.aia_claim || 0)} + ${pounds(p2.aia_claim || 0)} = ${pounds(result.computation.capitalAllowances)}`);
 
-    setOutNumeric('outP1RevenueShare', p1Revenue, 'Period 1 revenue share = total accounting income × (P1 days / AP days)', `${pounds(totalIncome)} × (${p1.days || 0}/${apDays}) = ${pounds(p1Revenue)}`);
-    setOutNumeric('outP1ProfitBeforeTax', p1.profit_before_tax || 0, 'Period 1 PBT = AP PBT apportioned to period 1', `${pounds(profitBeforeTax)} × (${p1.days || 0}/${apDays}) ≈ ${pounds(p1.profit_before_tax || 0)}`);
-    setOutNumeric('outP1TaxableProfit', p1.taxable_profit || 0, 'Period 1 taxable profit from engine period computation', `${pounds(p1.taxable_profit || 0)}`);
+    setOutNumeric('outP1RevenueShare', p1Revenue, 'Period 1 revenue share = total accounting income x (P1 days / AP days)', `${pounds(totalIncome)} x (${p1.days || 0}/${apDays}) = ${pounds(p1Revenue)}`);
+    setOutNumeric('outP1ProfitBeforeTax', p1.profit_before_tax || 0, 'Period 1 PBT = AP PBT apportioned to period 1', `${pounds(profitBeforeTax)} x (${p1.days || 0}/${apDays}) ~= ${pounds(p1.profit_before_tax || 0)}`);
+    const p1TaxableDetail = buildPeriodTaxableDetail(p1, 1);
+    setOutNumeric('outP1TaxableProfit', p1.taxable_profit || 0, p1TaxableDetail.formula, p1TaxableDetail.details);
     setOutNumeric('outP1AIAClaimed', p1.aia_claim || 0, 'Period 1 AIA claimed from engine period cap/claim logic', `${pounds(p1.aia_claim || 0)}`);
-    setOutNumeric('outP1MarginalRelief', p1.marginal_relief || 0, 'Period 1 MR = sum of FY-slice MR inside period 1', `${pounds(p1.marginal_relief || 0)}`);
+    const p1MrDetail = buildPeriodMRDetail(p1, 1, p1ByFY);
+    setOutNumeric('outP1MarginalRelief', p1.marginal_relief || 0, p1MrDetail.formula, p1MrDetail.details);
 
-    setOutNumeric('outP2RevenueShare', p2Revenue, 'Period 2 revenue share = total accounting income × (P2 days / AP days)', `${pounds(totalIncome)} × (${p2.days || 0}/${apDays}) = ${pounds(p2Revenue)}`);
-    setOutNumeric('outP2ProfitBeforeTax', p2.profit_before_tax || 0, 'Period 2 PBT = AP PBT apportioned to period 2', `${pounds(profitBeforeTax)} × (${p2.days || 0}/${apDays}) ≈ ${pounds(p2.profit_before_tax || 0)}`);
-    setOutNumeric('outP2TaxableProfit', p2.taxable_profit || 0, 'Period 2 taxable profit from engine period computation', `${pounds(p2.taxable_profit || 0)}`);
+    setOutNumeric('outP2RevenueShare', p2Revenue, 'Period 2 revenue share = total accounting income x (P2 days / AP days)', `${pounds(totalIncome)} x (${p2.days || 0}/${apDays}) = ${pounds(p2Revenue)}`);
+    setOutNumeric('outP2ProfitBeforeTax', p2.profit_before_tax || 0, 'Period 2 PBT = AP PBT apportioned to period 2', `${pounds(profitBeforeTax)} x (${p2.days || 0}/${apDays}) ~= ${pounds(p2.profit_before_tax || 0)}`);
+    const p2TaxableDetail = buildPeriodTaxableDetail(p2, 2);
+    setOutNumeric('outP2TaxableProfit', p2.taxable_profit || 0, p2TaxableDetail.formula, p2TaxableDetail.details);
     setOutNumeric('outP2AIAClaimed', p2.aia_claim || 0, 'Period 2 AIA claimed from engine period cap/claim logic', `${pounds(p2.aia_claim || 0)}`);
-    setOutNumeric('outP2MarginalRelief', p2.marginal_relief || 0, 'Period 2 MR = sum of FY-slice MR inside period 2', `${pounds(p2.marginal_relief || 0)}`);
+    const p2MrDetail = buildPeriodMRDetail(p2, 2, p2ByFY);
+    setOutNumeric('outP2MarginalRelief', p2.marginal_relief || 0, p2MrDetail.formula, p2MrDetail.details);
 
     // Log AP split if applicable
     const apDaysMsg = isSplit
       ? `AP SPLIT ACTIVE: ${apDays} days split into Period 1 (${result.metadata.periods[0].days} days) + Period 2 (${result.metadata.periods[1].days} days). Each period has own thresholds, AIA, and tax calculation.`
       : `Standard period (12 months or less): ${apDays} days`;
     console.log(apDaysMsg);
-    console.log('✓ Computed outputs updated (using TaxEngine with HMRC-compliant rules)');
+    console.log('OK Computed outputs updated (using TaxEngine with HMRC-compliant rules)');
     setStatus('Calculation updated.', 'ok');
     } catch(err) {
-      console.error('❌ COMPUTE ERROR:', err.message);
+      console.error('ERROR COMPUTE ERROR:', err.message);
       console.error('Stack:', err.stack);
       const msg = String(err.message || '');
       const isDateError = msg.includes('Invalid accounting period dates') || msg.includes('Accounting period end date must be on/after start date');
@@ -382,15 +498,15 @@
   }
 
   document.addEventListener('DOMContentLoaded', function(){
-    console.log('✓ Page loaded. TaxEngine:', typeof TaxEngine, 'TaxModel:', typeof TaxModel);
+    console.log('OK Page loaded. TaxEngine:', typeof TaxEngine, 'TaxModel:', typeof TaxModel);
     if (typeof TaxEngine === 'undefined') {
-      console.error('❌ TaxEngine not loaded!');
+      console.error('ERROR TaxEngine not loaded!');
       alert('ERROR: TaxEngine library failed to load. Check browser console.');
       return;
     }
     
     $("computeBtn").addEventListener('click', function(){
-      console.log('→ Compute button clicked');
+      console.log('-> Compute button clicked');
       compute({ silent: true });
     });
     $("resetBtn").addEventListener('click', function(){ 
@@ -407,20 +523,20 @@
       input.addEventListener('input', function() {
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
-          console.log('→ Auto-compute triggered by input change to', this.id);
+          console.log('-> Auto-compute triggered by input change to', this.id);
           compute({ silent: true });
         }, 300);
       });
       
       // Also compute on blur (when user leaves the field)
       input.addEventListener('change', function() {
-        console.log('→ Auto-compute triggered by input change to', this.id);
+          console.log('-> Auto-compute triggered by input change to', this.id);
         compute({ silent: true });
       });
     });
 
     // Run initial calculation on page load
-    console.log('→ Running initial calculation on page load');
+    console.log('-> Running initial calculation on page load');
     compute({ silent: true });
 
     // Formula panel elements

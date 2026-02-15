@@ -329,7 +329,7 @@
     result.property.propertyLossCF = Math.max(0, pnl.propertyLossBF - pnl.rentalIncome);
 
     // 3) Allocate profit to each AP split period and calculate tax per period
-    const periodResults = apSplits.map((period) => {
+    const periodResults = apSplits.map((period, periodIndex) => {
       // Build FY overlaps FOR THIS PERIOD ONLY
       const tmpInputs = {
         apStartUTC: period.startUTC,
@@ -343,9 +343,10 @@
 
       // Allocate inputs to this period
       const periodProfitBeforeTax = result.accounts.profitBeforeTax * (period.days / inputs.apDays);
-      const periodPropertyProfit = result.property.propertyProfitAfterLossOffset * (period.days / inputs.apDays);
-      const periodInterestIncome = pnl.interestIncome * (period.days / inputs.apDays);
       const periodDividendIncome = pnl.dividendIncome * (period.days / inputs.apDays);
+      // PBT already includes gross rental income and interest income.
+      // Only adjust rental to net property profit after property loss offset.
+      const periodPropertyAdjustment = (result.property.propertyProfitAfterLossOffset - pnl.rentalIncome) * (period.days / inputs.apDays);
 
       // Add-backs
       const periodAddBacks = TaxModel.roundPounds(
@@ -356,9 +357,10 @@
       const periodAIACapTotal = aiaAlloc.totalCap;
       const periodAIAClaim = Math.min(inputs.capitalAllowances.aiaAdditions * (period.days / inputs.apDays), TaxModel.roundPounds(periodAIACapTotal));
 
-      // Taxable trading profit (includes trading, interest, and property income)
+      // Taxable total profit base:
+      // AP PBT share + tax add-backs - AIA + rental net-off adjustment.
       const periodTaxableBeforeLoss = TaxModel.roundPounds(
-        periodProfitBeforeTax + periodAddBacks - TaxModel.roundPounds(periodAIAClaim) + periodPropertyProfit + periodInterestIncome
+        periodProfitBeforeTax + periodAddBacks - TaxModel.roundPounds(periodAIAClaim) + periodPropertyAdjustment
       );
 
       // Trading loss offset (only applies in first period, then carry to next)
@@ -387,6 +389,8 @@
         });
 
         return {
+          period_index: periodIndex + 1,
+          period_name: period.periodName,
           fy_year: fy.fy_year,
           ap_days_in_fy: fy.ap_days_in_fy,
           thresholds: th || null,
@@ -406,6 +410,9 @@
         taxableProfit: periodTaxableTotal,
         augmentedProfit: periodAugmentedProfit,
         lossUsed: TaxModel.roundPounds(periodLossUsed),
+        propertyAdjustment: TaxModel.roundPounds(periodPropertyAdjustment),
+        taxableBeforeLoss: TaxModel.roundPounds(periodTaxableBeforeLoss),
+        addBacks: TaxModel.roundPounds(periodAddBacks),
         aiaCapTotal: TaxModel.roundPounds(periodAIACapTotal),
         aiaClaimed: TaxModel.roundPounds(periodAIAClaim),
         byFY: periodByFY,
@@ -452,9 +459,14 @@
         profit_before_tax: p.profitBeforeTax,
         taxable_profit: p.taxableProfit,
         augmented_profit: p.augmentedProfit,
+        taxable_before_loss: p.taxableBeforeLoss,
+        property_adjustment: p.propertyAdjustment,
+        add_backs: p.addBacks,
+        loss_used: p.lossUsed,
         aia_claim: p.aiaClaimed,
         marginal_relief: p.marginalRelief,
-        ct_charge: p.ctCharge
+        ct_charge: p.ctCharge,
+        by_fy: p.byFY
       }))
     };
 

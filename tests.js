@@ -208,6 +208,51 @@ function checkTwelveMonthBoundary() {
   );
 }
 
+function checkIncomeNotDoubleCounted() {
+  const input = baseInput({
+    apStart: '2024-04-01',
+    apEnd: '2025-03-31',
+    turnover: 100000,
+    govtGrants: 5000,
+    rentalIncome: 20000,
+    propertyLossBF: 3000,
+    interestIncome: 4000,
+    dividendIncome: 7000,
+    costOfSales: 25000,
+    staffCosts: 15000,
+    depreciation: 2000,
+    otherCharges: 3000,
+    disallowableExpenses: 1000,
+    otherAdjustments: 500,
+    aiaAdditions: 4000,
+    tradingLossBF: 2000
+  });
+
+  const out = run(input);
+  const r = out.result;
+
+  const expectedTotalIncome = input.turnover + input.govtGrants + input.rentalIncome + input.interestIncome;
+  assert(r.accounts.totalIncome === expectedTotalIncome, 'Total income mismatch with source fields.');
+
+  const expectedNetProperty = Math.max(0, input.rentalIncome - input.propertyLossBF);
+  assert(r.property.propertyProfitAfterLossOffset === expectedNetProperty, 'Net property income mismatch.');
+
+  const recomposedTTP =
+    r.computation.taxableTradingProfit +
+    input.interestIncome +
+    r.property.propertyProfitAfterLossOffset;
+
+  assert(
+    r.computation.taxableTotalProfits === recomposedTTP,
+    'Taxable Total Profits is not equal to trading + interest + net property (possible double counting).'
+  );
+
+  assert(
+    r.computation.augmentedProfits === r.computation.taxableTotalProfits + input.dividendIncome,
+    'Augmented profits mismatch in non-trading income scenario.'
+  );
+}
+
 function printSummary(rows) {
   console.log('HMRC v2 test matrix summary');
   console.log('profile | assoc | turnover | dividend | days | split | fy_slices | MR | CT');
@@ -233,6 +278,7 @@ function main() {
   checkCoreRules(rows);
   checkCombinations(rows);
   checkTwelveMonthBoundary();
+  checkIncomeNotDoubleCounted();
   printSummary(rows);
   console.log('\nPASS: all matrix checks passed.');
 }
