@@ -146,6 +146,59 @@ h1{
   padding:7px 9px 4px;
 }
 
+.mainInput{
+  border:1px solid #dbe8df;
+  border-radius:10px;
+  background:#f8fcf9;
+  padding:8px 9px;
+  margin:6px 0;
+}
+
+.mainInput h3{
+  margin:0 0 6px;
+  font-size:12px;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  color:#1a5339;
+}
+
+.mainComputed{
+  border:1px solid #dbe8df;
+  border-radius:10px;
+  background:#f8fcf9;
+  padding:8px 9px;
+}
+
+.calcHeaderRow{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  border:1px solid #dbe8df;
+  border-radius:10px;
+  background:#f8fcf9;
+  padding:8px 10px;
+  margin:6px 0;
+  color:#1a5339;
+  font-weight:600;
+  font-size:13px;
+}
+
+button.calcIcon{
+  border:1px solid #b8d5c3;
+  background:#eef7f1;
+  color:#16513a;
+  padding:4px 8px;
+  border-radius:8px;
+  cursor:pointer;
+  box-shadow:none;
+}
+
+.compactLabel{
+  margin-top:6px;
+  font-size:12px;
+}
+
 #section5Card{
   display:flex;
   flex-direction:column;

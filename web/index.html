@@ -68,30 +68,35 @@
               </div>
             </details>
 
-            <label>Add back: Disallowable expenses
+            <div class="mainInput">
+              <h3>Add back: Disallowable expenses</h3>
               <input type="number" id="disallowableExpenses" step="0.01" value="0" />
-            </label>
-            <label>Other adjustments (add if positive, deduct if negative)
-              <input type="number" id="otherAdjustments" step="0.01" value="0" />
-            </label>
-            <label>Less: AIA (trade)
-              <input type="number" id="aiaTrade" step="0.01" value="0" />
-            </label>
-            <label>Less: Trading losses brought forward
-              <input type="number" id="tradingLossBF" step="0.01" value="0" />
-            </label>
-            <label>Trading losses to use this return
-              <input type="number" id="tradingLossUseRequested" step="0.01" placeholder="Leave blank to auto-use available" />
-            </label>
+            </div>
 
-            <label class="computed">Trading profits [C]
+            <div class="mainInput">
+              <h3>Other adjustments (add if positive, deduct if negative)</h3>
+              <input type="number" id="otherAdjustments" step="0.01" value="0" />
+            </div>
+
+            <div class="mainInput">
+              <h3>Less: AIA (trade)</h3>
+              <input type="number" id="aiaTrade" step="0.01" value="0" />
+            </div>
+
+            <div class="calcHeaderRow">
+              <span>Trading losses brought forward</span>
+              <button type="button" class="calcIcon" data-calc-target="outTradingLossBFAvailable" data-calc-title="Trading losses brought forward">[C]</button>
+            </div>
+            <div class="mainInput">
+              <h3>Trading losses to use this return</h3>
+              <input type="number" id="tradingLossUseRequested" step="0.01" placeholder="Leave blank to auto-use available" />
+            </div>
+
+            <label class="computed mainComputed">Trading profits [C]
               <input type="text" id="outTradingProfits" readonly data-key="outTradingProfits" />
             </label>
-            <label class="computed">Trading profits subjected to corporation tax [C]
+            <label class="computed mainComputed">Trading profits subjected to corporation tax [C]
               <input type="text" id="outTradingProfitsTaxable" readonly data-key="outTradingProfitsTaxable" />
-            </label>
-            <label class="computed">Trading losses used [C]
-              <input type="text" id="outTradingLossUsed" readonly data-key="outTradingLossUsed" />
             </label>
           </section>
         </div>
@@ -99,27 +104,18 @@
         <div class="layoutCol">
           <section class="card" id="section3Card">
             <h2>Section 3</h2>
-            <label>Interest Income
+            <div class="mainInput">
+              <h3>Interest income</h3>
               <input type="number" id="interestIncome" step="0.01" value="0" />
-            </label>
+            </div>
 
-            <details class="dropGroup" open>
-              <summary>
-                <span>Chargeable gains [C]</span>
-                <input type="text" id="outChargeableGainsTotal" readonly data-key="outChargeableGainsTotal" />
-              </summary>
-              <div class="dropBody">
-                <label>Disposal gains (taxable)
-                  <input type="number" id="disposalGains" step="0.01" value="0" />
-                </label>
-                <label>Capital gains source file (Excel/CSV)
-                  <input type="file" id="capitalGainsFile" accept=".xlsx,.xls,.csv,.xlsm" />
-                </label>
-                <label>Capital gains (taxable, from uploaded file)
-                  <input type="number" id="capitalGains" step="0.01" value="0" />
-                </label>
-              </div>
-            </details>
+            <div class="mainInput">
+              <h3>Chargeable gains</h3>
+              <input type="number" id="chargeableGains" step="0.01" value="0" />
+              <label class="compactLabel">Upload attachment for calculation support
+                <input type="file" id="chargeableGainsFile" accept=".xlsx,.xls,.csv,.xlsm" />
+              </label>
+            </div>
 
             <details class="dropGroup" open>
               <summary>
@@ -133,20 +129,23 @@
                 <label>Less: AIA (rental & property)
                   <input type="number" id="aiaNonTrade" step="0.01" value="0" />
                 </label>
-                <label>Less: Rental & property losses brought forward
-                  <input type="number" id="rentalLossBF" step="0.01" value="0" />
-                </label>
               </div>
             </details>
 
-            <label>Dividend income (not subjected to income tax)
-              <input type="number" id="dividendIncome" step="0.01" value="0" />
-            </label>
+            <div class="calcHeaderRow">
+              <span>Rental & property losses brought forward</span>
+              <button type="button" class="calcIcon" data-calc-target="outPropertyLossBFAvailable" data-calc-title="Rental & property losses brought forward">[C]</button>
+            </div>
 
-            <label class="computed">Non-Trading profits [C]
+            <div class="mainInput">
+              <h3>Dividend income (not subjected to income tax)</h3>
+              <input type="number" id="dividendIncome" step="0.01" value="0" />
+            </div>
+
+            <label class="computed mainComputed">Non-Trading profits [C]
               <input type="text" id="outNonTradingProfits" readonly data-key="outNonTradingProfits" />
             </label>
-            <label class="computed">Non-Trading profits subjected to corporation tax [C]
+            <label class="computed mainComputed">Non-Trading profits subjected to corporation tax [C]
               <input type="text" id="outNonTradingProfitsTaxable" readonly data-key="outNonTradingProfitsTaxable" />
             </label>
           </section>
@@ -169,7 +168,7 @@
                 </label>
               </div>
             </details>
-            <label class="computed">Tax payable [C]
+            <label class="computed mainComputed">Tax payable [C]
               <input type="text" id="corpTaxPayable" readonly data-key="corpTaxPayable" />
             </label>
           </section>
@@ -279,6 +278,12 @@
       </div>
 
       <div class="techHidden" aria-hidden="true">
+        <input type="hidden" id="tradingLossBF" value="0" />
+        <input type="hidden" id="rentalLossBF" value="0" />
+        <input type="hidden" id="outTradingLossBFAvailable" data-key="outTradingLossBFAvailable" />
+        <input type="hidden" id="outPropertyLossBFAvailable" data-key="outPropertyLossBFAvailable" />
+        <input type="hidden" id="outChargeableGainsTotal" data-key="outChargeableGainsTotal" />
+        <input type="hidden" id="outTradingLossUsed" data-key="outTradingLossUsed" />
         <input type="hidden" id="totalIncome" data-key="totalIncome" />
         <input type="hidden" id="totalExpenses" data-key="totalExpenses" />
         <input type="hidden" id="tradingProfitBeforeTax" data-key="tradingProfitBeforeTax" />

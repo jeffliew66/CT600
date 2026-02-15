@@ -33,10 +33,13 @@
     }
 
     // Collect all form inputs
-    const capitalFileInput = $("capitalGainsFile");
-    const capitalGainsFileName = (capitalFileInput && capitalFileInput.files && capitalFileInput.files[0])
-      ? capitalFileInput.files[0].name
+    const chargeableFileInput = $("chargeableGainsFile");
+    const capitalGainsFileName = (chargeableFileInput && chargeableFileInput.files && chargeableFileInput.files[0])
+      ? chargeableFileInput.files[0].name
       : '';
+    const chargeableGainsInput = toNum($("chargeableGains").value);
+    const tradingLossBFInput = toNum($("tradingLossBF").value);
+    const propertyLossBFInput = toNum($("rentalLossBF").value);
     const userInputs = {
       apStart: apStartValue,
       apEnd: apEndValue,
@@ -46,8 +49,8 @@
       govtGrants: toNum($("govtGrants").value),
       rentalIncome: toNum($("rentalIncome").value),
       interestIncome: toNum($("interestIncome").value),
-      disposalGains: toNum($("disposalGains").value),
-      capitalGains: toNum($("capitalGains").value),
+      disposalGains: 0,
+      capitalGains: chargeableGainsInput,
       capitalGainsFileName,
       dividendIncome: toNum($("dividendIncome").value),
       // P&L expenses
@@ -62,9 +65,9 @@
       aiaNonTradeAdditions: toNum($("aiaNonTrade").value),
       aiaAdditions: toNum($("aiaTrade").value) + toNum($("aiaNonTrade").value),
       // Loss carry-forward
-      tradingLossBF: toNum($("tradingLossBF").value),
+      tradingLossBF: tradingLossBFInput,
       tradingLossUseRequested: toOptionalNum($("tradingLossUseRequested").value),
-      propertyLossBF: toNum($("rentalLossBF").value)
+      propertyLossBF: propertyLossBFInput
     };
 
     // Call TaxEngine (HMRC-compliant with AP splitting, thresholds, MR)
@@ -128,9 +131,8 @@
     };
 
     // Populate P&L fields
-    const tradeAccountingIncome = userInputs.turnover;
+    const tradeAccountingIncome = userInputs.turnover + userInputs.govtGrants;
     const nonTradeAccountingIncome =
-      userInputs.govtGrants +
       userInputs.interestIncome +
       userInputs.rentalIncome +
       userInputs.disposalGains +
@@ -139,9 +141,9 @@
       "totalIncome",
       roundPounds(totalIncome),
       "Total accounting income = trade income + non-trade income (dividends excluded)",
-      `Trade income = Turnover = ${pounds(tradeAccountingIncome)}\n` +
-      `Non-trade income = Govt grants + Interest + Rental + Disposal gains + Capital gains\n` +
-      `= ${pounds(userInputs.govtGrants)} + ${pounds(userInputs.interestIncome)} + ${pounds(userInputs.rentalIncome)} + ${pounds(userInputs.disposalGains)} + ${pounds(userInputs.capitalGains)} = ${pounds(nonTradeAccountingIncome)}\n` +
+      `Trade income = Turnover + Govt grants = ${pounds(userInputs.turnover)} + ${pounds(userInputs.govtGrants)} = ${pounds(tradeAccountingIncome)}\n` +
+      `Non-trade income = Interest + Rental + Chargeable gains\n` +
+      `= ${pounds(userInputs.interestIncome)} + ${pounds(userInputs.rentalIncome)} + ${pounds(userInputs.disposalGains + userInputs.capitalGains)} = ${pounds(nonTradeAccountingIncome)}\n` +
       `Total accounting income = ${pounds(tradeAccountingIncome)} + ${pounds(nonTradeAccountingIncome)} = ${pounds(totalIncome)}`
     );
     setRawMeta('totalIncome', totalIncome, roundPounds(totalIncome));
@@ -347,6 +349,29 @@
       userInputs.dividendIncome;
 
     setOut(
+      'outTradingLossBFAvailable',
+      roundPounds(userInputs.tradingLossBF),
+      'Trading losses brought forward available at period start',
+      `Opening trading losses brought forward = ${pounds(userInputs.tradingLossBF)}\n` +
+      `Requested usage this return = ${userInputs.tradingLossUseRequested == null ? 'Auto (up to available)' : pounds(userInputs.tradingLossUseRequested)}\n` +
+      `Used this return = ${pounds(result.computation.tradingLossUsed)}\n` +
+      `Carried forward = ${pounds(Math.max(0, userInputs.tradingLossBF - result.computation.tradingLossUsed))}\n\n` +
+      `You can adjust this amount via slider if you are reconciling prior-year schedules.`
+    );
+    setRawMeta('outTradingLossBFAvailable', userInputs.tradingLossBF, roundPounds(userInputs.tradingLossBF));
+
+    setOut(
+      'outPropertyLossBFAvailable',
+      roundPounds(userInputs.propertyLossBF),
+      'Rental & property losses brought forward available at period start',
+      `Opening rental/property losses brought forward = ${pounds(userInputs.propertyLossBF)}\n` +
+      `Used against rental stream this return = ${pounds(Math.max(0, userInputs.rentalIncome - result.property.propertyProfitAfterLossOffset))}\n` +
+      `Carried forward = ${pounds(result.property.propertyLossCF)}\n\n` +
+      `You can adjust this amount via slider if you are reconciling prior-year schedules.`
+    );
+    setRawMeta('outPropertyLossBFAvailable', userInputs.propertyLossBF, roundPounds(userInputs.propertyLossBF));
+
+    setOut(
       'outTradingIncomeTotal',
       roundPounds(tradingIncomeTotal),
       'Trading income = Turnover + Government grants & subsidies',
@@ -381,9 +406,9 @@
     setOut(
       'outChargeableGainsTotal',
       roundPounds(chargeableGainsTotal),
-      'Chargeable gains = Disposal gains + Capital gains',
-      `${pounds(userInputs.disposalGains)} + ${pounds(userInputs.capitalGains)} = ${pounds(chargeableGainsTotal)}\n` +
-      `Capital gains source file: ${userInputs.capitalGainsFileName || 'No file selected'}`
+      'Chargeable gains used in computation',
+      `Chargeable gains amount = ${pounds(chargeableGainsTotal)}\n` +
+      `Attachment: ${userInputs.capitalGainsFileName || 'No file selected'}`
     );
     setRawMeta('outChargeableGainsTotal', chargeableGainsTotal, roundPounds(chargeableGainsTotal));
 
@@ -898,11 +923,11 @@
 
     let activeInput = null;
 
-    function openFormulaPanel(input){
+    function openFormulaPanel(input, titleOverride){
       if(!input) return;
       activeInput = input;
       const label = input.closest('label');
-      const title = label ? (label.textContent || input.id) : input.id;
+      const title = titleOverride || (label ? (label.textContent || input.id) : input.id);
       formulaTitle.textContent = title.trim();
       formulaText.textContent = input.dataset.formula || '';
       formulaDetails.textContent = input.dataset.details || '';
@@ -941,6 +966,13 @@
       if(t && t.tagName === 'INPUT' && t.readOnly && t.dataset && t.dataset.formula){
         openFormulaPanel(t);
       }
+      const iconBtn = t && t.closest ? t.closest('[data-calc-target]') : null;
+      if (iconBtn) {
+        const targetId = iconBtn.getAttribute('data-calc-target');
+        const title = iconBtn.getAttribute('data-calc-title') || targetId || 'Calculation';
+        const targetInput = targetId ? $(targetId) : null;
+        if (targetInput) openFormulaPanel(targetInput, title);
+      }
     });
 
     // also make the whole label.computed clickable
@@ -974,6 +1006,14 @@
       if(activeInput){
         activeInput.value = String(Math.round(val));
         activeInput.dataset.adjusted = '1';
+        if (activeInput.id === 'outTradingLossBFAvailable') {
+          const hidden = $('tradingLossBF');
+          if (hidden) hidden.value = String(Math.round(val));
+        }
+        if (activeInput.id === 'outPropertyLossBFAvailable') {
+          const hidden = $('rentalLossBF');
+          if (hidden) hidden.value = String(Math.round(val));
+        }
         // Re-run compute to propagate slider changes to dependent fields
         compute({ silent: true });
       }
