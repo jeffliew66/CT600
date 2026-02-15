@@ -122,12 +122,13 @@
 
     // AP up to 12 months: no split
     if (apEnd <= period1End) {
+      const isShortPeriod = apEnd < period1End;
       return [{
         periodName: 'Full Period',
         startUTC: apStart,
         endUTC: apEnd,
         days: apDays,
-        isShortPeriod: false
+        isShortPeriod
       }];
     }
 
@@ -210,15 +211,21 @@
 
   function buildThresholdParts(inputs, fyOverlaps) {
     const divisor = (inputs.assocCompanies || 0) + 1;
+    const periodDays = inputs.apDays || 1;
+    const periodFactor = inputs.isShortPeriod ? (periodDays / 365) : 1;
 
     return fyOverlaps.map((fy) => {
       const small = getTier(fy.tiers, 2).threshold;
       const upper = getTier(fy.tiers, 3).threshold;
-      // Short period rule (as requested): pro-rate thresholds by days in the slice,
-      // then apply associates divisor.
-      const dayFraction = (fy.fy_total_days > 0) ? (fy.ap_days_in_fy / fy.fy_total_days) : 0;
-      const smallForAP = (small * dayFraction) / divisor;
-      const upperForAP = (upper * dayFraction) / divisor;
+      // Threshold rule:
+      // - full 12-month period: strict annual thresholds (50k/250k, then associates divisor)
+      // - short period: annual thresholds x (period days / 365), then associates divisor
+      // Slice thresholds are proportional shares of the period-level thresholds.
+      const periodSmall = (small * periodFactor) / divisor;
+      const periodUpper = (upper * periodFactor) / divisor;
+      const sliceShare = periodDays > 0 ? (fy.ap_days_in_fy / periodDays) : 0;
+      const smallForAP = periodSmall * sliceShare;
+      const upperForAP = periodUpper * sliceShare;
 
       return {
         fy_year: fy.fy_year,
@@ -374,7 +381,8 @@
         apStartUTC: period.startUTC,
         apEndUTC: period.endUTC,
         apDays: period.days,
-        assocCompanies: inputs.assocCompanies
+        assocCompanies: inputs.assocCompanies,
+        isShortPeriod: period.isShortPeriod
       };
       const fyOverlaps = buildFYOverlaps(tmpInputs, corpTaxYears);
       const thresholdParts = buildThresholdParts(tmpInputs, fyOverlaps);

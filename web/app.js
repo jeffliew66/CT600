@@ -210,9 +210,11 @@
     verificationDetail += `  Taxable Trading Profit = Profit Before Tax + AddBacks - CapitalAllowances - TradingLossUsed\n`;
     verificationDetail += `  Taxable Total Profits (TTP) = Taxable Trading Profit + Interest + Net Property\n`;
     verificationDetail += `  Augmented Profits = TTP + Dividends\n`;
-    verificationDetail += `  Lower Threshold (slice) = 50,000 x (slice days / FY days) / (Associated Companies + 1)\n`;
-    verificationDetail += `  Upper Threshold (slice) = 250,000 x (slice days / FY days) / (Associated Companies + 1)\n`;
-    verificationDetail += `  Effective Thresholds = sum of slice thresholds within each effective tax-regime slice\n`;
+    verificationDetail += `  Period factor = 1.0 for complete 12-month period, else (period days / 365)\n`;
+    verificationDetail += `  Lower Threshold (period) = 50,000 x Period factor / (Associated Companies + 1)\n`;
+    verificationDetail += `  Upper Threshold (period) = 250,000 x Period factor / (Associated Companies + 1)\n`;
+    verificationDetail += `  Threshold (slice) = Threshold(period) x (slice days / period days)\n`;
+    verificationDetail += `  Effective thresholds = sum of slice thresholds within each effective tax-regime slice\n`;
     verificationDetail += `  If Augmented <= Lower: CT = TTP x 19%\n`;
     verificationDetail += `  If Augmented >= Upper: CT = TTP x 25%\n`;
     verificationDetail += `  If Lower < Augmented < Upper:\n`;

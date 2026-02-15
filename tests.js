@@ -278,6 +278,15 @@ function checkTwelveMonthBoundary() {
     (leapYearTwelveMonths.result.metadata.periods || []).length === 1,
     'Exact 12-month leap-year AP should have one period.'
   );
+  const th = (leapYearTwelveMonths.result.byFY[0] || {}).thresholds || {};
+  assert(
+    Math.abs((th.small_threshold_for_AP_in_this_FY || 0) - 50000) < 1,
+    'Exact 12-month period should use strict 50,000 lower threshold.'
+  );
+  assert(
+    Math.abs((th.upper_threshold_for_AP_in_this_FY || 0) - 250000) < 1,
+    'Exact 12-month period should use strict 250,000 upper threshold.'
+  );
 }
 
 function checkIncomeNotDoubleCounted() {
