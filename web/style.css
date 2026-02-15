@@ -27,10 +27,10 @@ body{
 }
 
 .container{
-  max-width:1220px;
+  max-width:1650px;
   margin:0 auto;
   background:var(--card);
-  padding:24px;
+  padding:20px;
   border:1px solid var(--card-border);
   border-radius:18px;
   box-shadow:var(--shadow);
@@ -44,36 +44,26 @@ h1{
 }
 
 .hint{
-  margin:0 0 14px;
+  margin:0 0 10px;
   color:var(--muted);
   max-width:92ch;
 }
 
 .layoutRow{
   display:grid;
-  gap:14px;
-  margin-bottom:14px;
+  gap:10px;
+  margin-bottom:10px;
 }
 
-.rowTop{
-  grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);
-  align-items:start;
-}
-
-.rowSecond{
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  align-items:start;
-}
-
-.rowThird{
-  grid-template-columns:1fr;
+.rowMain{
+  grid-template-columns:minmax(0,0.95fr) minmax(0,1.05fr) minmax(0,1.1fr);
   align-items:start;
 }
 
 .layoutCol{
   display:flex;
   flex-direction:column;
-  gap:14px;
+  gap:10px;
   align-self:start;
 }
 
@@ -81,28 +71,50 @@ h1{
   background:linear-gradient(180deg,#fff,#fbfdfb);
   border:1px solid var(--card-border);
   border-radius:14px;
-  padding:14px;
+  padding:12px;
 }
 
 .card h2{
-  margin:0 0 12px;
+  margin:0 0 8px;
   color:#154d35;
-  font-size:17px;
+  font-size:16px;
 }
 
 #section6Card{
-  display:grid;
-  grid-template-columns:repeat(3,minmax(0,1fr));
-  gap:10px 12px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
 }
 
-#section6Card h2{
-  grid-column:1 / -1;
+.varsGroup{
+  border:1px solid #dde8df;
+  background:#f7fbf8;
+  border-radius:10px;
+  padding:8px 10px;
+}
+
+.varsGroup h3{
+  margin:0 0 6px;
+  color:#1a5339;
+  font-size:11px;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+}
+
+.varsGrid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:4px 10px;
+}
+
+#section6Card label{
+  margin:3px 0;
+  font-size:12px;
 }
 
 label{
   display:block;
-  margin:8px 0;
+  margin:6px 0;
   color:#1c3a29;
   font-size:13px;
 }
@@ -112,7 +124,7 @@ input[type=number],
 input[readonly],
 input[type=text]{
   width:100%;
-  padding:9px 10px;
+  padding:8px 9px;
   border:1px solid #ccdbd0;
   border-radius:10px;
   background:#fff;
@@ -164,7 +176,7 @@ button#resetBtn{
 }
 
 .clickable{cursor:pointer}
-hr{border:none;border-top:1px solid #e5ece7}
+hr{border:none;border-top:1px solid #e5ece7;margin:8px 0}
 
 footer{
   color:#496050;
@@ -178,7 +190,7 @@ footer{
   right:0;
   top:0;
   height:100%;
-  width:430px;
+  width:470px;
   background:var(--panel);
   border-left:1px solid #d8e5db;
   transform:translateX(110%);
@@ -227,10 +239,12 @@ footer{
 #sliderControls label{font-size:13px;color:#2f4d3d}
 
 @media(max-width:1000px){
-  .layoutRow{
+  .rowMain{
     grid-template-columns:1fr;
   }
-  #section6Card{grid-template-columns:1fr}
+  .varsGrid{
+    grid-template-columns:1fr;
+  }
   .container{padding:16px}
   body{padding:14px}
   #formulaPanel{width:100%}
