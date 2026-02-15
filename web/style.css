@@ -53,6 +53,9 @@ h1{
   display:grid;
   grid-template-columns:repeat(3,minmax(0,1fr));
   gap:14px;
+  grid-template-areas:
+    "s1 s3 s4"
+    "s2 s3 s5";
 }
 
 .card{
@@ -68,7 +71,11 @@ h1{
   font-size:17px;
 }
 
-.card.wide{grid-column:1 / -1}
+#section1Card{grid-area:s1}
+#section2Card{grid-area:s2}
+#section3Card{grid-area:s3}
+#section4Card{grid-area:s4}
+#section5Card{grid-area:s5}
 
 label{
   display:block;
@@ -106,6 +113,16 @@ input:focus{
   gap:10px;
   margin:18px 0 10px;
 }
+
+.status{
+  min-height:18px;
+  margin:0 2px 6px;
+  font-size:12px;
+  color:#4a6652;
+}
+
+.status[data-type="warn"]{color:#b25b07}
+.status[data-type="error"]{color:#9b1f1f}
 
 button{
   border:none;
@@ -188,7 +205,11 @@ footer{
 #sliderControls label{font-size:13px;color:#2f4d3d}
 
 @media(max-width:1000px){
-  .grid{grid-template-columns:1fr}
+  .grid{
+    grid-template-columns:1fr;
+    grid-template-areas:none;
+  }
+  #section1Card,#section2Card,#section3Card,#section4Card,#section5Card{grid-area:auto}
   .container{padding:16px}
   body{padding:14px}
   #formulaPanel{width:100%}

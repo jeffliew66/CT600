@@ -13,7 +13,7 @@
 
     <form id="dataForm">
       <div class="grid">
-        <section class="card">
+        <section class="card" id="section1Card">
           <h2>Section 1</h2>
           <label>Start date of Accounting Period
             <input type="date" id="apStart" required />
@@ -26,7 +26,7 @@
           </label>
         </section>
 
-        <section class="card">
+        <section class="card" id="section2Card">
           <h2>Section 2</h2>
           <label>Turnover
             <input type="number" id="turnover" step="0.01" value="0" />
@@ -80,7 +80,7 @@
           </label>
         </section>
 
-        <section class="card">
+        <section class="card" id="section3Card">
           <h2>Section 3</h2>
           <label class="computed">Trading Profit / loss before tax [C]
             <input type="text" id="tradingProfitBeforeTax" readonly data-key="tradingProfitBeforeTax" />
@@ -109,7 +109,7 @@
           </label>
         </section>
 
-        <section class="card">
+        <section class="card" id="section4Card">
           <h2>Section 4</h2>
           <label class="computed">Interest income [C]
             <input type="text" id="outInterestIncome" readonly data-key="outInterestIncome" />
@@ -132,7 +132,7 @@
           </label>
         </section>
 
-        <section class="card wide">
+        <section class="card" id="section5Card">
           <h2>Section 5</h2>
           <label class="computed">Profits chargeable to corporation tax [C]
             <input type="text" id="ttProfitsChargeable" readonly data-key="ttProfitsChargeable" />
@@ -147,6 +147,7 @@
         <button type="button" id="computeBtn">Compute</button>
         <button type="button" id="resetBtn">Reset</button>
       </div>
+      <p id="calcStatus" class="status" aria-live="polite"></p>
 
     </form>
 

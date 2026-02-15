@@ -6,14 +6,30 @@
   function $(id){ return document.getElementById(id); }
   function toNum(v){ return Number(v) || 0; }
   function roundPounds(n){ return Math.round((Number(n) || 0)); }
-  function pounds(n){ return `£${roundPounds(n).toLocaleString()}`; }
+  function pounds(n){ return `GBP ${roundPounds(n).toLocaleString()}`; }
+  function isCompleteISODate(v){ return /^\d{4}-\d{2}-\d{2}$/.test(String(v || '')); }
+  function setStatus(msg, type){
+    const el = $('calcStatus');
+    if (!el) return;
+    el.textContent = msg || '';
+    if (type) el.dataset.type = type;
+    else delete el.dataset.type;
+  }
 
-  function compute(){
+  function compute(opts){
+    const options = opts || {};
     try {
+    const apStartValue = $("apStart").value;
+    const apEndValue = $("apEnd").value;
+    if (!isCompleteISODate(apStartValue) || !isCompleteISODate(apEndValue)) {
+      setStatus('Enter complete start and end dates (YYYY-MM-DD) to calculate.', 'warn');
+      return;
+    }
+
     // Collect all form inputs
     const userInputs = {
-      apStart: $("apStart").value,
-      apEnd: $("apEnd").value,
+      apStart: apStartValue,
+      apEnd: apEndValue,
       assocCompanies: toNum($("assocCompanies").value),
       // P&L income
       turnover: toNum($("turnover").value),
@@ -82,7 +98,7 @@
     };
 
     // Populate P&L fields
-    setOut('totalIncome', roundPounds(totalIncome), 'Sum of all income sources', `Turnover + Govt Grants + Interest + Rental + Dividend = £${roundPounds(totalIncome).toLocaleString()}`);
+    setOut("totalIncome", roundPounds(totalIncome), "Sum of accounting income sources (excludes dividends)", `Turnover + Govt Grants + Interest + Rental = ${pounds(totalIncome)}`);
     document.getElementById('totalIncome').dataset.raw = String(totalIncome);
     document.getElementById('totalIncome').dataset.orig = String(roundPounds(totalIncome));
 
@@ -91,7 +107,7 @@
     document.getElementById('totalExpenses').dataset.orig = String(roundPounds(totalExpenses));
 
     // Detailed PBT formula
-    const pbtDetail = `STEP-BY-STEP CALCULATION:\n\nTotal Income\n  = Turnover + Govt Grants + Interest + Rental + Dividend\n  = £${roundPounds(userInputs.turnover).toLocaleString()} + £${roundPounds(userInputs.govtGrants).toLocaleString()} + £${roundPounds(userInputs.interestIncome).toLocaleString()} + £${roundPounds(userInputs.rentalIncome).toLocaleString()} + £${roundPounds(userInputs.dividendIncome).toLocaleString()}\n  = £${roundPounds(totalIncome).toLocaleString()}\n\nTotal Expenses\n  = Raw Materials + Staff + Depreciation + Other\n  = £${roundPounds(userInputs.costOfSales).toLocaleString()} + £${roundPounds(userInputs.staffCosts).toLocaleString()} + £${roundPounds(userInputs.depreciation).toLocaleString()} + £${roundPounds(userInputs.otherCharges).toLocaleString()}\n  = £${roundPounds(totalExpenses).toLocaleString()}\n\nProfit Before Tax\n  = Total Income - Total Expenses\n  = £${roundPounds(totalIncome).toLocaleString()} - £${roundPounds(totalExpenses).toLocaleString()}\n  = £${roundPounds(profitBeforeTax).toLocaleString()}`;
+    const pbtDetail = `STEP-BY-STEP CALCULATION:\n\nTotal Income (accounting, excludes dividends)\n  = Turnover + Govt Grants + Interest + Rental\n  = £${roundPounds(userInputs.turnover).toLocaleString()} + £${roundPounds(userInputs.govtGrants).toLocaleString()} + £${roundPounds(userInputs.interestIncome).toLocaleString()} + £${roundPounds(userInputs.rentalIncome).toLocaleString()}\n  = £${roundPounds(totalIncome).toLocaleString()}\n\nTotal Expenses\n  = Raw Materials + Staff + Depreciation + Other\n  = £${roundPounds(userInputs.costOfSales).toLocaleString()} + £${roundPounds(userInputs.staffCosts).toLocaleString()} + £${roundPounds(userInputs.depreciation).toLocaleString()} + £${roundPounds(userInputs.otherCharges).toLocaleString()}\n  = £${roundPounds(totalExpenses).toLocaleString()}\n\nProfit Before Tax\n  = Total Income - Total Expenses\n  = £${roundPounds(totalIncome).toLocaleString()} - £${roundPounds(totalExpenses).toLocaleString()}\n  = £${roundPounds(profitBeforeTax).toLocaleString()}`;
     setOut('profitBeforeTax', roundPounds(profitBeforeTax), 'Total Income - Total Expenses', pbtDetail);
     document.getElementById('profitBeforeTax').dataset.raw = String(profitBeforeTax);
     document.getElementById('profitBeforeTax').dataset.orig = String(roundPounds(profitBeforeTax));
@@ -160,6 +176,21 @@
     verificationDetail += `Taxable Total Profits: ${pounds(taxableTotalProfits)}\n`;
     verificationDetail += `Dividend Income used for augmented profit: ${pounds(userInputs.dividendIncome)}\n`;
     verificationDetail += `Augmented Profits: ${pounds(augmentedProfits)}\n\n`;
+    verificationDetail += `FORMULA TEMPLATE (SYMBOLIC):\n`;
+    verificationDetail += `  Total Income = Turnover + Govt Grants + Interest + Rental\n`;
+    verificationDetail += `  Profit Before Tax = Total Income - Total Expenses\n`;
+    verificationDetail += `  Taxable Trading Profit = Profit Before Tax + AddBacks - CapitalAllowances - TradingLossUsed\n`;
+    verificationDetail += `  Taxable Total Profits (TTP) = Taxable Trading Profit + Interest + Net Property\n`;
+    verificationDetail += `  Augmented Profits = TTP + Dividends\n`;
+    verificationDetail += `  Lower Threshold = 50,000 / (Associated Companies + 1)\n`;
+    verificationDetail += `  Upper Threshold = 250,000 / (Associated Companies + 1)\n`;
+    verificationDetail += `  If Augmented <= Lower: CT = TTP x 19%\n`;
+    verificationDetail += `  If Augmented >= Upper: CT = TTP x 25%\n`;
+    verificationDetail += `  If Lower < Augmented < Upper:\n`;
+    verificationDetail += `    Main CT = TTP x 25%\n`;
+    verificationDetail += `    MR = 0.015 x (Upper - Augmented) x (TTP / Augmented)\n`;
+    verificationDetail += `    CT = Main CT - MR\n\n`;
+    verificationDetail += `WITH YOUR FIGURES:\n`;
     verificationDetail += `Profit build-up (independently checkable):\n`;
     verificationDetail += `  Accounting income (excludes dividends): ${pounds(totalIncome)}\n`;
     verificationDetail += `  Less accounting expenses: ${pounds(totalExpenses)}\n`;
@@ -274,10 +305,18 @@
       : `Standard period (12 months or less): ${apDays} days`;
     console.log(apDaysMsg);
     console.log('✓ Computed outputs updated (using TaxEngine with HMRC-compliant rules)');
+    setStatus('Calculation updated.', 'ok');
     } catch(err) {
       console.error('❌ COMPUTE ERROR:', err.message);
       console.error('Stack:', err.stack);
-      alert('Error during calculation:\n\n' + err.message);
+      const msg = String(err.message || '');
+      const isDateError = msg.includes('Invalid accounting period dates') || msg.includes('Accounting period end date must be on/after start date');
+      if (isDateError) {
+        setStatus('Dates are invalid. Ensure end date is on or after start date.', 'error');
+        return;
+      }
+      setStatus('Calculation error: ' + msg, 'error');
+      if (!options.silent) alert('Error during calculation:\n\n' + msg);
     }
   }
 
@@ -291,11 +330,11 @@
     
     $("computeBtn").addEventListener('click', function(){
       console.log('→ Compute button clicked');
-      compute();
+      compute({ silent: true });
     });
     $("resetBtn").addEventListener('click', function(){ 
       document.getElementById('dataForm').reset();
-      setTimeout(() => compute(), 100); // Auto-calculate after reset (with small delay)
+      setTimeout(() => compute({ silent: true }), 100); // Auto-calculate after reset (with small delay)
     });
 
     // AUTO-CALCULATE ON INPUT CHANGE (real-time updates)
@@ -308,20 +347,20 @@
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
           console.log('→ Auto-compute triggered by input change to', this.id);
-          compute();
+          compute({ silent: true });
         }, 300);
       });
       
       // Also compute on blur (when user leaves the field)
       input.addEventListener('change', function() {
         console.log('→ Auto-compute triggered by input change to', this.id);
-        compute();
+        compute({ silent: true });
       });
     });
 
     // Run initial calculation on page load
     console.log('→ Running initial calculation on page load');
-    compute();
+    compute({ silent: true });
 
     // Formula panel elements
     const panel = $('formulaPanel');
@@ -414,7 +453,7 @@
         activeInput.value = String(Math.round(val));
         activeInput.dataset.adjusted = '1';
         // Re-run compute to propagate slider changes to dependent fields
-        compute();
+        compute({ silent: true });
       }
     });
   });
