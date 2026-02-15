@@ -342,8 +342,10 @@
       const periodAIACapTotal = aiaAlloc.totalCap;
       const periodAIAClaim = Math.min(inputs.capitalAllowances.aiaAdditions * (period.days / inputs.apDays), TaxModel.roundPounds(periodAIACapTotal));
 
-      // Taxable trading profit
-      const periodTaxableBeforeLoss = TaxModel.roundPounds(periodProfitBeforeTax + periodAddBacks - TaxModel.roundPounds(periodAIAClaim));
+      // Taxable trading profit (includes trading, interest, and property income)
+      const periodTaxableBeforeLoss = TaxModel.roundPounds(
+        periodProfitBeforeTax + periodAddBacks - TaxModel.roundPounds(periodAIAClaim) + periodPropertyProfit + periodInterestIncome
+      );
 
       // Trading loss offset (only applies in first period, then carry to next)
       const periodLossUsed = period === apSplits[0]
@@ -404,15 +406,20 @@
     result.computation.capitalAllowances = TaxModel.roundPounds(periodResults.reduce((s, p) => s + p.aiaClaimed, 0));
     result.computation.deductions = result.computation.capitalAllowances;
     result.computation.tradingLossUsed = TaxModel.roundPounds(periodResults[0].lossUsed);
-    result.computation.taxableTradingProfit = TaxModel.roundPounds(periodResults.reduce((s, p) => s + p.taxableProfit, 0));
     
-    // CRITICAL FIX: Include ALL income types in taxable total profits
-    // Taxable Total = Trading Profit + Interest Income + Property Profit (after loss offset)
+    // taxableTradingProfit is the trading income only (after P&L, before adding interest/property)
+    // This is for reporting/transparency only
+    const tradingBeforeNonTrading = TaxModel.roundPounds(periodResults.reduce((s, p) => s + p.taxableProfit, 0) - pnl.interestIncome - result.property.propertyProfitAfterLossOffset);
+    result.computation.taxableTradingProfit = Math.max(0, tradingBeforeNonTrading);
+    
+    // Total taxable profit = ALL sources (trading, interest, property after loss)
+    // periodResults already includes all of these
+    result.computation.taxableTotalProfits = Math.max(0, periodResults.reduce((s, p) => s + p.taxableProfit, 0));
+    
+    // For reporting: break down the non-trading portion
     const totalInterestIncome = TaxModel.roundPounds(pnl.interestIncome);
     const totalPropertyProfit = TaxModel.roundPounds(result.property.propertyProfitAfterLossOffset);
-    
     result.computation.taxableNonTradingProfits = TaxModel.roundPounds(totalInterestIncome + totalPropertyProfit);
-    result.computation.taxableTotalProfits = Math.max(0, result.computation.taxableTradingProfit + totalInterestIncome + totalPropertyProfit);
     
     // Augmented profit (for rate banding) = Taxable Total + Dividend Income
     result.computation.augmentedProfits = TaxModel.roundPounds(result.computation.taxableTotalProfits + pnl.dividendIncome);
