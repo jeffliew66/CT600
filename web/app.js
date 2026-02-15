@@ -408,12 +408,18 @@
         const tp = Number(slice.taxableProfit || 0);
         const ap = Number(slice.augmentedProfit || 0);
         const fyCfgSlice = (corpTaxYears || []).find((fy) => fy.fy_year === slice.fy_year);
-        const mainRateSlice = fyCfgSlice ? ((fyCfgSlice.tiers.find((t) => t.index === 3) || {}).rate || 0.25) : 0.25;
-        const reliefFractionSlice = fyCfgSlice ? ((fyCfgSlice.tiers.find((t) => t.index === 2) || {}).relief_fraction || 0.015) : 0.015;
+        const mainRateSlice = Number(slice.main_rate ?? (fyCfgSlice ? ((fyCfgSlice.tiers.find((t) => t.index === 3) || {}).rate || 0.25) : 0.25));
+        const reliefFractionSlice = Number(slice.relief_fraction ?? (fyCfgSlice ? ((fyCfgSlice.tiers.find((t) => t.index === 2) || {}).relief_fraction || 0.015) : 0.015));
         const ratio = ap > 0 ? (tp / ap) : 0;
         const mrCalc = (ap > lower && ap < upper) ? (reliefFractionSlice * (upper - ap) * ratio) : 0;
+        const fyLabel = (Array.isArray(slice.fy_years) && slice.fy_years.length > 1)
+          ? `FY${slice.fy_years[0]}-FY${slice.fy_years[slice.fy_years.length - 1]}`
+          : `FY${slice.fy_year}`;
 
-        detail += `FY${slice.fy_year} slice ${idx + 1} (${slice.ap_days_in_fy || 0} days)\n`;
+        detail += `${fyLabel} slice ${idx + 1} (${slice.ap_days_in_fy || 0} days)\n`;
+        if (slice.regime_grouped) {
+          detail += `  Regime unchanged across FY boundary -> calculated as one whole slice\n`;
+        }
         detail += `  Taxable profit = ${pounds(tp)}\n`;
         detail += `  Augmented profit = ${pounds(ap)}\n`;
         detail += `  Thresholds: lower ${pounds(lower)}, upper ${pounds(upper)}\n`;
@@ -431,13 +437,20 @@
       detail += `Period ${periodIndex} MR total = ${pounds(periodMR)}`;
 
       return {
-        formula: `For each FY slice in Period ${periodIndex}:\n` +
+        formula: `For each effective tax-regime slice in Period ${periodIndex}:\n` +
           `if augmented <= lower OR augmented >= upper: MR = 0\n` +
           `else MR = relief_fraction x (upper - augmented) x (taxable / augmented)\n` +
-          `Period ${periodIndex} MR = sum(all slice MR)`,
+          `Period ${periodIndex} MR = sum(all effective-slice MR)`,
         details: detail
       };
     }
+
+    setOutNumeric(
+      'outTTPVar',
+      taxableTotalProfits,
+      'Profits chargeable to corporation tax (TTP) = taxable trading + interest + net property',
+      `${pounds(result.computation.taxableTradingProfit)} + ${pounds(userInputs.interestIncome)} + ${pounds(result.property.propertyProfitAfterLossOffset)} = ${pounds(taxableTotalProfits)}`
+    );
 
     setOutNumeric(
       'outAugmentedProfitsVar',
@@ -454,8 +467,13 @@
       `Total MR = MR Period 1 + MR Period 2`,
       `${pounds(p1.marginal_relief || 0)} + ${pounds(p2.marginal_relief || 0)} = ${pounds(marginalRelief)}`,
       '',
-      'By FY slices:',
-      ...((result.byFY || []).map((x) => `  Period ${x.period_index || 1}, FY${x.fy_year}: MR ${pounds(x.marginalRelief || 0)}`))
+      'By effective tax-regime slices:',
+      ...((result.byFY || []).map((x) => {
+        const fyLabel = (Array.isArray(x.fy_years) && x.fy_years.length > 1)
+          ? `FY${x.fy_years[0]}-FY${x.fy_years[x.fy_years.length - 1]}`
+          : `FY${x.fy_year}`;
+        return `  Period ${x.period_index || 1}, ${fyLabel}: MR ${pounds(x.marginalRelief || 0)}`;
+      }))
     ].join('\n');
     setOutNumeric('outTotalMarginalReliefVar', marginalRelief, 'Total MR = sum of MR across all FY slices and AP periods', totalMRDetails);
     setOutNumeric('outTotalAIAClaimedVar', result.computation.capitalAllowances, 'Total AIA claimed = sum of period AIA claims', `${pounds(p1.aia_claim || 0)} + ${pounds(p2.aia_claim || 0)} = ${pounds(result.computation.capitalAllowances)}`);

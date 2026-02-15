@@ -190,7 +190,7 @@ footer{
   right:0;
   top:0;
   height:100%;
-  width:470px;
+  width:520px;
   background:var(--panel);
   border-left:1px solid #d8e5db;
   transform:translateX(110%);
@@ -219,20 +219,21 @@ footer{
 
 #formulaTitle{
   margin:2px 0 8px;
-  font-size:18px;
+  font-size:20px;
   color:#164f37;
 }
 
 #formulaText,
 #formulaDetails{
-  background:#f4f8f5;
-  border:1px solid #dce9e0;
+  background:#f8fcf9;
+  border:1px solid #d4e4d9;
   border-radius:10px;
-  padding:12px;
+  padding:14px;
   white-space:pre-wrap;
-  font-family:var(--mono);
-  font-size:12.5px;
-  line-height:1.5;
+  font-family:"Aptos","Segoe UI Variable","Segoe UI",sans-serif;
+  font-size:14.5px;
+  line-height:1.65;
+  letter-spacing:.01em;
 }
 
 #formulaSlider{width:100%}

@@ -289,6 +289,48 @@
     };
   }
 
+  function getRegimeSignature(tiers, lowerLimit, upperLimit) {
+    const smallRate = getTier(tiers, 1).rate;
+    const mainRate = getTier(tiers, 3).rate;
+    const reliefFraction = getTier(tiers, 2).relief_fraction;
+    return [
+      String(smallRate),
+      String(mainRate),
+      String(reliefFraction),
+      String(lowerLimit),
+      String(upperLimit)
+    ].join('|');
+  }
+
+  function collapseSlicesByRegime(rawSlices) {
+    const grouped = [];
+    rawSlices.forEach((slice) => {
+      const lower = slice.thresholds ? slice.thresholds.small_threshold_for_AP_in_this_FY : 0;
+      const upper = slice.thresholds ? slice.thresholds.upper_threshold_for_AP_in_this_FY : 0;
+      const signature = getRegimeSignature(slice.tiers, lower, upper);
+      const last = grouped[grouped.length - 1];
+      if (!last || last.signature !== signature) {
+        grouped.push({
+          signature,
+          fy_years: [slice.fy_year],
+          ap_days: slice.ap_days_in_fy,
+          thresholds: slice.thresholds || null,
+          aia_cap_for_fy: slice.aia_cap_for_fy || 0,
+          taxableProfit: slice.taxableProfit || 0,
+          augmentedProfit: slice.augmentedProfit || 0,
+          tiers: slice.tiers
+        });
+        return;
+      }
+      last.fy_years.push(slice.fy_year);
+      last.ap_days += slice.ap_days_in_fy || 0;
+      last.aia_cap_for_fy += slice.aia_cap_for_fy || 0;
+      last.taxableProfit += slice.taxableProfit || 0;
+      last.augmentedProfit += slice.augmentedProfit || 0;
+    });
+    return grouped;
+  }
+
   function run(userInputs, options) {
     const cfg = options || {};
     const corpTaxYears = cfg.corpTaxYears || defaultCorpTaxYears;
@@ -373,20 +415,12 @@
       // Augmented profit includes taxable profit + dividend income (for rate banding)
       const periodAugmentedProfit = TaxModel.roundPounds(periodTaxableTotal + periodDividendIncome);
 
-      // Calculate CT per FY within this period
-      const periodByFY = fyOverlaps.map((fy) => {
+      // Build raw FY slices first, then collapse contiguous slices when tax regime is unchanged.
+      // This enforces whole-period MR logic when rates/thresholds are unchanged across FY boundaries.
+      const rawPeriodByFY = fyOverlaps.map((fy) => {
         const th = thresholdParts.find((t) => t.fy_year === fy.fy_year);
         const tp = periodTaxableTotal * (fy.ap_days_in_fy / period.days);
         const ap = periodAugmentedProfit * (fy.ap_days_in_fy / period.days);
-
-        const computed = computeTaxPerFY({
-          fy_year: fy.fy_year,
-          taxableProfit: tp,
-          augmentedProfit: ap,
-          lowerLimit: th ? th.small_threshold_for_AP_in_this_FY : 0,
-          upperLimit: th ? th.upper_threshold_for_AP_in_this_FY : 0,
-          tiers: fy.tiers
-        });
 
         return {
           period_index: periodIndex + 1,
@@ -395,10 +429,40 @@
           ap_days_in_fy: fy.ap_days_in_fy,
           thresholds: th || null,
           aia_cap_for_fy: aiaAlloc.parts.find((p) => p.fy_year === fy.fy_year)?.aia_cap_for_fy || 0,
+          taxableProfit: tp,
+          augmentedProfit: ap,
+          tiers: fy.tiers
+        };
+      });
+
+      const groupedPeriodByFY = collapseSlicesByRegime(rawPeriodByFY);
+      const periodByFY = groupedPeriodByFY.map((grp) => {
+        const lower = grp.thresholds ? grp.thresholds.small_threshold_for_AP_in_this_FY : 0;
+        const upper = grp.thresholds ? grp.thresholds.upper_threshold_for_AP_in_this_FY : 0;
+        const computed = computeTaxPerFY({
+          fy_year: grp.fy_years[0],
+          taxableProfit: grp.taxableProfit,
+          augmentedProfit: grp.augmentedProfit,
+          lowerLimit: lower,
+          upperLimit: upper,
+          tiers: grp.tiers
+        });
+        return {
+          period_index: periodIndex + 1,
+          period_name: period.periodName,
+          fy_year: grp.fy_years[0],
+          fy_years: grp.fy_years,
+          ap_days_in_fy: grp.ap_days,
+          thresholds: grp.thresholds,
+          aia_cap_for_fy: grp.aia_cap_for_fy,
           taxableProfit: computed.taxableProfit,
           augmentedProfit: computed.augmentedProfit,
           ctCharge: computed.ctCharge,
-          marginalRelief: computed.marginalRelief
+          marginalRelief: computed.marginalRelief,
+          small_rate: getTier(grp.tiers, 1).rate,
+          main_rate: getTier(grp.tiers, 3).rate,
+          relief_fraction: getTier(grp.tiers, 2).relief_fraction,
+          regime_grouped: grp.fy_years.length > 1
         };
       });
 

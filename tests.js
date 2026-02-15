@@ -98,12 +98,12 @@ function checkCoreRules(rows) {
     }
     if (profileName === 'straddle_no_split') {
       assert(result.metadata.ap_split === false, `Unexpected AP split for straddle-no-split: ${keyOf(input)}`);
-      assert(result.byFY.length >= 2, `Expected FY straddle but got one slice: ${keyOf(input)}`);
+      assert(result.byFY.length >= 1, `Expected at least one tax slice: ${keyOf(input)}`);
     }
     if (profileName === 'split_and_straddle') {
       assert(result.metadata.ap_split === true, `Expected AP split for >12 months: ${keyOf(input)}`);
       assert((result.metadata.periods || []).length === 2, `Expected 2 AP periods: ${keyOf(input)}`);
-      assert(result.byFY.length >= 2, `Expected multiple FY slices: ${keyOf(input)}`);
+      assert(result.byFY.length >= 1, `Expected at least one tax slice: ${keyOf(input)}`);
     }
   }
 }
@@ -164,7 +164,7 @@ function checkCombinations(rows) {
   );
   assert(fullCombo, 'Full combination case missing.');
   assert(fullCombo.out.result.metadata.ap_split === true, 'Full combination should split AP.');
-  assert(fullCombo.out.result.byFY.length >= 2, 'Full combination should straddle FYs.');
+  assert(fullCombo.out.result.byFY.length >= 1, 'Full combination should have tax slices.');
   assert(fullCombo.out.result.tax.marginalRelief > 0, 'Full combination should trigger marginal relief.');
 
   const fullComboNoDiv = run(baseInput({
@@ -181,6 +181,22 @@ function checkCombinations(rows) {
   assert(
     fullComboNoDiv.result.tax.corporationTaxCharge !== fullCombo.out.result.tax.corporationTaxCharge,
     'Dividend did not affect CT rate/charge in full combination case.'
+  );
+}
+
+function checkNoChangeRegimeCollapsesStraddle() {
+  const out = run(baseInput({
+    apStart: '2023-07-01',
+    apEnd: '2024-06-29',
+    assocCompanies: 0,
+    turnover: 120000,
+    dividendIncome: 0
+  }));
+
+  assert(out.result.metadata.ap_split === false, 'Expected no AP split for <=12 months.');
+  assert(
+    out.result.byFY.length === 1,
+    'Expected one effective tax slice when regime is unchanged across FY boundary.'
   );
 }
 
@@ -279,6 +295,7 @@ function main() {
   checkCombinations(rows);
   checkTwelveMonthBoundary();
   checkIncomeNotDoubleCounted();
+  checkNoChangeRegimeCollapsesStraddle();
   printSummary(rows);
   console.log('\nPASS: all matrix checks passed.');
 }
