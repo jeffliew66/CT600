@@ -124,19 +124,26 @@
     const apDays = inputs.apDays;
     const isSplit = !!(result.metadata && result.metadata.ap_split);
     const divisor = (userInputs.assocCompanies || 0) + 1;
-    const smallThreshold = 50000 / divisor;
-    const upperThreshold = 250000 / divisor;
+    const annualSmallThreshold = 50000 / divisor;
+    const annualUpperThreshold = 250000 / divisor;
     const fySlices = (result.byFY || []).map((fy, idx) => ({
       idx: idx + 1,
       fyYear: fy.fy_year,
+      fyYears: fy.fy_years || [fy.fy_year],
       days: fy.ap_days_in_fy || 0,
       taxableProfit: fy.taxableProfit || 0,
       augmentedProfit: fy.augmentedProfit || 0,
       ctCharge: fy.ctCharge || 0,
       marginalRelief: fy.marginalRelief || 0,
+      smallRate: Number(fy.small_rate ?? 0.19),
+      mainRate: Number(fy.main_rate ?? 0.25),
+      reliefFraction: Number(fy.relief_fraction ?? 0.015),
+      regimeGrouped: !!fy.regime_grouped,
       lower: fy.thresholds ? fy.thresholds.small_threshold_for_AP_in_this_FY : 0,
       upper: fy.thresholds ? fy.thresholds.upper_threshold_for_AP_in_this_FY : 0
     }));
+    const effectiveLowerThreshold = fySlices.reduce((s, x) => s + (x.lower || 0), 0);
+    const effectiveUpperThreshold = fySlices.reduce((s, x) => s + (x.upper || 0), 0);
     const hasStraddling = fySlices.length > 1;
     const hasMarginalRelief = fySlices.some((s) => s.marginalRelief > 0);
     let taxDetail = ``;
@@ -156,27 +163,40 @@
     taxDetail += `  Augmented Profit (for rate banding): GBP ${roundPounds(augmentedProfits).toLocaleString()}\n\n`;
     
     taxDetail += `THRESHOLDS (with associates divisor ${divisor}):\n`;
-    taxDetail += `  Small profit threshold: GBP 50,000 / ${divisor} = GBP ${roundPounds(smallThreshold).toLocaleString()}\n`;
-    taxDetail += `  Main rate threshold: GBP 250,000 / ${divisor} = GBP ${roundPounds(upperThreshold).toLocaleString()}\n\n`;
+    taxDetail += `  Annual lower threshold (before day proration): GBP 50,000 / ${divisor} = GBP ${roundPounds(annualSmallThreshold).toLocaleString()}\n`;
+    taxDetail += `  Annual upper threshold (before day proration): GBP 250,000 / ${divisor} = GBP ${roundPounds(annualUpperThreshold).toLocaleString()}\n`;
+    taxDetail += `  Effective lower threshold for this period: ${pounds(effectiveLowerThreshold)}\n`;
+    taxDetail += `  Effective upper threshold for this period: ${pounds(effectiveUpperThreshold)}\n\n`;
 
-    if (augmentedProfits <= smallThreshold) {
-      taxDetail += `Augmented profit GBP ${roundPounds(augmentedProfits).toLocaleString()} <= GBP ${roundPounds(smallThreshold).toLocaleString()}\n`;
-      taxDetail += `-> Apply SMALL PROFITS RATE (19%)\n\n`;
-      taxDetail += `CT = GBP ${roundPounds(taxableTotalProfits).toLocaleString()} x 0.19 = GBP ${Math.round(corporationTaxCharge).toLocaleString()}`;
-    } else if (augmentedProfits >= upperThreshold) {
-      taxDetail += `Augmented profit GBP ${roundPounds(augmentedProfits).toLocaleString()} >= GBP ${roundPounds(upperThreshold).toLocaleString()}\n`;
-      taxDetail += `-> Apply MAIN RATE (25%)\n\n`;
-      taxDetail += `CT = GBP ${roundPounds(taxableTotalProfits).toLocaleString()} x 0.25 = GBP ${Math.round(corporationTaxCharge).toLocaleString()}`;
+    if (fySlices.length === 1) {
+      const slice = fySlices[0];
+      const smallRate = slice.smallRate || 0.19;
+      const mainRate = slice.mainRate || 0.25;
+      const reliefFraction = slice.reliefFraction || 0.015;
+
+      if (augmentedProfits <= effectiveLowerThreshold) {
+        taxDetail += `Augmented profit ${pounds(augmentedProfits)} <= ${pounds(effectiveLowerThreshold)}\n`;
+        taxDetail += `-> Apply SMALL PROFITS RATE (${(smallRate * 100).toFixed(2)}%)\n\n`;
+        taxDetail += `CT = ${pounds(taxableTotalProfits)} x ${smallRate.toFixed(2)} = ${pounds(corporationTaxCharge)}`;
+      } else if (augmentedProfits >= effectiveUpperThreshold) {
+        taxDetail += `Augmented profit ${pounds(augmentedProfits)} >= ${pounds(effectiveUpperThreshold)}\n`;
+        taxDetail += `-> Apply MAIN RATE (${(mainRate * 100).toFixed(2)}%)\n\n`;
+        taxDetail += `CT = ${pounds(taxableTotalProfits)} x ${mainRate.toFixed(2)} = ${pounds(corporationTaxCharge)}`;
+      } else {
+        const mainCT = taxableTotalProfits * mainRate;
+        const ratio = augmentedProfits > 0 ? (taxableTotalProfits / augmentedProfits) : 0;
+        taxDetail += `Augmented profit ${pounds(augmentedProfits)} is BETWEEN effective thresholds\n`;
+        taxDetail += `-> Apply MARGINAL RELIEF\n\n`;
+        taxDetail += `Step 1: CT at main rate = ${pounds(taxableTotalProfits)} x ${mainRate.toFixed(2)} = ${pounds(mainCT)}\n`;
+        taxDetail += `Step 2: Relief ratio = ${pounds(taxableTotalProfits)} / ${pounds(augmentedProfits)} = ${ratio.toFixed(6)}\n`;
+        taxDetail += `Step 3: MR = ${reliefFraction.toFixed(3)} x (${pounds(effectiveUpperThreshold)} - ${pounds(augmentedProfits)}) x ${ratio.toFixed(6)}\n`;
+        taxDetail += `       = ${pounds(marginalRelief)}\n`;
+        taxDetail += `Step 4: Final CT = ${pounds(mainCT)} - ${pounds(marginalRelief)} = ${pounds(corporationTaxCharge)}`;
+      }
     } else {
-      const mainCT = taxableTotalProfits * 0.25;
-      const ratio = augmentedProfits > 0 ? (taxableTotalProfits / augmentedProfits) : 0;
-      taxDetail += `Augmented profit GBP ${roundPounds(augmentedProfits).toLocaleString()} is BETWEEN thresholds\n`;
-      taxDetail += `-> Apply MARGINAL RELIEF\n\n`;
-      taxDetail += `Step 1: CT at main rate = GBP ${roundPounds(taxableTotalProfits).toLocaleString()} x 0.25 = GBP ${Math.round(mainCT).toLocaleString()}\n`;
-      taxDetail += `Step 2: Relief ratio = GBP ${roundPounds(taxableTotalProfits).toLocaleString()} / GBP ${roundPounds(augmentedProfits).toLocaleString()} = ${ratio.toFixed(4)}\n`;
-      taxDetail += `Step 3: MR = 1.5% x (GBP ${roundPounds(upperThreshold).toLocaleString()} - GBP ${roundPounds(augmentedProfits).toLocaleString()}) x ${ratio.toFixed(4)}\n`;
-      taxDetail += `       = 0.015 x GBP ${roundPounds(upperThreshold - augmentedProfits).toLocaleString()} x ${ratio.toFixed(4)} = GBP ${Math.round(marginalRelief).toLocaleString()}\n`;
-      taxDetail += `Step 4: Final CT = GBP ${Math.round(mainCT).toLocaleString()} - GBP ${Math.round(marginalRelief).toLocaleString()} = GBP ${Math.round(corporationTaxCharge).toLocaleString()}`;
+      taxDetail += `Multiple effective tax-regime slices apply.\n`;
+      taxDetail += `Final CT and MR are computed slice-by-slice and summed.\n`;
+      taxDetail += `See Detailed Calculation for full slice formulas.\n`;
     }
     let verificationDetail = `FULL VERIFIABLE TAX BREAKDOWN\n\n`;
     verificationDetail += `Accounting period: ${userInputs.apStart} to ${userInputs.apEnd} (${apDays} days)\n`;
@@ -190,8 +210,9 @@
     verificationDetail += `  Taxable Trading Profit = Profit Before Tax + AddBacks - CapitalAllowances - TradingLossUsed\n`;
     verificationDetail += `  Taxable Total Profits (TTP) = Taxable Trading Profit + Interest + Net Property\n`;
     verificationDetail += `  Augmented Profits = TTP + Dividends\n`;
-    verificationDetail += `  Lower Threshold = 50,000 / (Associated Companies + 1)\n`;
-    verificationDetail += `  Upper Threshold = 250,000 / (Associated Companies + 1)\n`;
+    verificationDetail += `  Lower Threshold (slice) = 50,000 x (slice days / FY days) / (Associated Companies + 1)\n`;
+    verificationDetail += `  Upper Threshold (slice) = 250,000 x (slice days / FY days) / (Associated Companies + 1)\n`;
+    verificationDetail += `  Effective Thresholds = sum of slice thresholds within each effective tax-regime slice\n`;
     verificationDetail += `  If Augmented <= Lower: CT = TTP x 19%\n`;
     verificationDetail += `  If Augmented >= Upper: CT = TTP x 25%\n`;
     verificationDetail += `  If Lower < Augmented < Upper:\n`;
@@ -325,6 +346,11 @@
       aia_claim: 0,
       marginal_relief: 0
     };
+    const totalAiaCapFromSlices = (result.byFY || []).reduce((s, x) => s + (x.aia_cap_for_fy || 0), 0);
+    if (typeof p1.aia_cap_total !== 'number') p1.aia_cap_total = totalAiaCapFromSlices;
+    if (typeof p2.aia_cap_total !== 'number') p2.aia_cap_total = 0;
+    if (typeof p1.aia_additions_share !== 'number') p1.aia_additions_share = userInputs.aiaAdditions || 0;
+    if (typeof p2.aia_additions_share !== 'number') p2.aia_additions_share = 0;
 
     const p1Revenue = totalIncome * ((p1.days || 0) / (apDays || 1));
     const p2Revenue = totalIncome * ((p2.days || 0) / (apDays || 1));
@@ -333,14 +359,26 @@
     const fyConfig = (corpTaxYears || []).find((fy) => fy.fy_year === fyYear);
     const lowerRate = fyConfig ? ((fyConfig.tiers.find((t) => t.index === 1) || {}).rate || 0.19) : 0.19;
     const upperRate = fyConfig ? ((fyConfig.tiers.find((t) => t.index === 3) || {}).rate || 0.25) : 0.25;
+    const lowerSliceBreak = (result.byFY || []).map((x) => {
+      const fyLabel = (Array.isArray(x.fy_years) && x.fy_years.length > 1)
+        ? `FY${x.fy_years[0]}-FY${x.fy_years[x.fy_years.length - 1]}`
+        : `FY${x.fy_year}`;
+      return `${fyLabel}: ${pounds(x.thresholds?.small_threshold_for_AP_in_this_FY || 0)}`;
+    }).join(' + ');
+    const upperSliceBreak = (result.byFY || []).map((x) => {
+      const fyLabel = (Array.isArray(x.fy_years) && x.fy_years.length > 1)
+        ? `FY${x.fy_years[0]}-FY${x.fy_years[x.fy_years.length - 1]}`
+        : `FY${x.fy_year}`;
+      return `${fyLabel}: ${pounds(x.thresholds?.upper_threshold_for_AP_in_this_FY || 0)}`;
+    }).join(' + ');
 
     setOutNumeric('outApDays', apDays, 'AP days = (End date - Start date) + 1', `${userInputs.apStart} to ${userInputs.apEnd} = ${apDays} days`);
     setOutNumeric('outAssocDivisor', divisor, 'Associates divisor = associated companies + 1', `${userInputs.assocCompanies} + 1 = ${divisor}`);
-    setOutNumeric('outLowerBracket', smallThreshold, 'Lower bracket = 50,000 / divisor', `50,000 / ${divisor} = ${pounds(smallThreshold)}`);
+    setOutNumeric('outLowerBracket', effectiveLowerThreshold, 'Effective lower bracket = sum of prorated slice lower thresholds', `${lowerSliceBreak || 'No slices'} = ${pounds(effectiveLowerThreshold)}`);
     setOut('outLowerRate', `${pct(lowerRate)}%`, 'Lower rate from FY tier 1', `FY ${fyYear || 'n/a'} lower rate = ${pct(lowerRate)}%`);
     document.getElementById('outLowerRate').dataset.raw = String(lowerRate * 100);
     document.getElementById('outLowerRate').dataset.orig = String(roundPounds(lowerRate * 100));
-    setOutNumeric('outUpperBracket', upperThreshold, 'Upper bracket = 250,000 / divisor', `250,000 / ${divisor} = ${pounds(upperThreshold)}`);
+    setOutNumeric('outUpperBracket', effectiveUpperThreshold, 'Effective upper bracket = sum of prorated slice upper thresholds', `${upperSliceBreak || 'No slices'} = ${pounds(effectiveUpperThreshold)}`);
     setOut('outUpperRate', `${pct(upperRate)}%`, 'Upper rate from FY tier 3', `FY ${fyYear || 'n/a'} upper rate = ${pct(upperRate)}%`);
     document.getElementById('outUpperRate').dataset.raw = String(upperRate * 100);
     document.getElementById('outUpperRate').dataset.orig = String(roundPounds(upperRate * 100));
@@ -476,13 +514,35 @@
       }))
     ].join('\n');
     setOutNumeric('outTotalMarginalReliefVar', marginalRelief, 'Total MR = sum of MR across all FY slices and AP periods', totalMRDetails);
-    setOutNumeric('outTotalAIAClaimedVar', result.computation.capitalAllowances, 'Total AIA claimed = sum of period AIA claims', `${pounds(p1.aia_claim || 0)} + ${pounds(p2.aia_claim || 0)} = ${pounds(result.computation.capitalAllowances)}`);
+    const p1AiaCap = Number(p1.aia_cap_total || 0);
+    const p2AiaCap = Number(p2.aia_cap_total || 0);
+    const p1AiaAdditionsShare = Number(p1.aia_additions_share || 0);
+    const p2AiaAdditionsShare = Number(p2.aia_additions_share || 0);
+    const totalAiaCap = p1AiaCap + p2AiaCap;
+    setOutNumeric(
+      'outTotalAIAClaimedVar',
+      result.computation.capitalAllowances,
+      'Total AIA claimed = sum of period AIA claims',
+      `AIA cap formula per slice: annual AIA limit x (slice days / 365) / (associated companies + 1)\n` +
+      `Associated companies divisor = ${divisor}\n` +
+      `Period 1 cap: ${pounds(p1AiaCap)} | additions share: ${pounds(p1AiaAdditionsShare)} | claim: ${pounds(p1.aia_claim || 0)}\n` +
+      `Period 2 cap: ${pounds(p2AiaCap)} | additions share: ${pounds(p2AiaAdditionsShare)} | claim: ${pounds(p2.aia_claim || 0)}\n` +
+      `Total cap across periods: ${pounds(totalAiaCap)}\n` +
+      `Total claim: ${pounds(p1.aia_claim || 0)} + ${pounds(p2.aia_claim || 0)} = ${pounds(result.computation.capitalAllowances)}`
+    );
 
     setOutNumeric('outP1RevenueShare', p1Revenue, 'Period 1 revenue share = total accounting income x (P1 days / AP days)', `${pounds(totalIncome)} x (${p1.days || 0}/${apDays}) = ${pounds(p1Revenue)}`);
     setOutNumeric('outP1ProfitBeforeTax', p1.profit_before_tax || 0, 'Period 1 PBT = AP PBT apportioned to period 1', `${pounds(profitBeforeTax)} x (${p1.days || 0}/${apDays}) ~= ${pounds(p1.profit_before_tax || 0)}`);
     const p1TaxableDetail = buildPeriodTaxableDetail(p1, 1);
     setOutNumeric('outP1TaxableProfit', p1.taxable_profit || 0, p1TaxableDetail.formula, p1TaxableDetail.details);
-    setOutNumeric('outP1AIAClaimed', p1.aia_claim || 0, 'Period 1 AIA claimed from engine period cap/claim logic', `${pounds(p1.aia_claim || 0)}`);
+    setOutNumeric(
+      'outP1AIAClaimed',
+      p1.aia_claim || 0,
+      'Period 1 AIA claim = min(AIA additions share, period AIA cap)',
+      `AIA cap (P1) = sum over P1 slices of [annual AIA limit x (slice days / 365) / ${divisor}] = ${pounds(p1AiaCap)}\n` +
+      `AIA additions share (P1) = total AIA additions x (P1 days / AP days) = ${pounds(p1AiaAdditionsShare)}\n` +
+      `AIA claim (P1) = min(${pounds(p1AiaAdditionsShare)}, ${pounds(p1AiaCap)}) = ${pounds(p1.aia_claim || 0)}`
+    );
     const p1MrDetail = buildPeriodMRDetail(p1, 1, p1ByFY);
     setOutNumeric('outP1MarginalRelief', p1.marginal_relief || 0, p1MrDetail.formula, p1MrDetail.details);
 
@@ -490,7 +550,14 @@
     setOutNumeric('outP2ProfitBeforeTax', p2.profit_before_tax || 0, 'Period 2 PBT = AP PBT apportioned to period 2', `${pounds(profitBeforeTax)} x (${p2.days || 0}/${apDays}) ~= ${pounds(p2.profit_before_tax || 0)}`);
     const p2TaxableDetail = buildPeriodTaxableDetail(p2, 2);
     setOutNumeric('outP2TaxableProfit', p2.taxable_profit || 0, p2TaxableDetail.formula, p2TaxableDetail.details);
-    setOutNumeric('outP2AIAClaimed', p2.aia_claim || 0, 'Period 2 AIA claimed from engine period cap/claim logic', `${pounds(p2.aia_claim || 0)}`);
+    setOutNumeric(
+      'outP2AIAClaimed',
+      p2.aia_claim || 0,
+      'Period 2 AIA claim = min(AIA additions share, period AIA cap)',
+      `AIA cap (P2) = sum over P2 slices of [annual AIA limit x (slice days / 365) / ${divisor}] = ${pounds(p2AiaCap)}\n` +
+      `AIA additions share (P2) = total AIA additions x (P2 days / AP days) = ${pounds(p2AiaAdditionsShare)}\n` +
+      `AIA claim (P2) = min(${pounds(p2AiaAdditionsShare)}, ${pounds(p2AiaCap)}) = ${pounds(p2.aia_claim || 0)}`
+    );
     const p2MrDetail = buildPeriodMRDetail(p2, 2, p2ByFY);
     setOutNumeric('outP2MarginalRelief', p2.marginal_relief || 0, p2MrDetail.formula, p2MrDetail.details);
 

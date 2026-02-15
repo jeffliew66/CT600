@@ -272,30 +272,21 @@
   }
 
   function buildAIAAllocation(inputs, fyOverlaps, corpTaxYears) {
-    // Use AIA limit from first FY tier (assumed consistent). If you ever change, externalize.
-    const AIA_LIMIT = getTier(corpTaxYears[0].tiers, 1).aia_limit;
-    
     // CRITICAL: Apply associates divisor to AIA cap (same as thresholds)
     const divisor = (inputs.assocCompanies || 0) + 1;
-
-    const hasLeapYear = fyOverlaps.some((fy) => fy.fy_total_days === 366);
-    const yearDays = hasLeapYear ? 366 : 365;
-
-    const apDays = inputs.apDays;
-    // FIX: Apply divisor to AIA cap
-    const totalCap = apDays >= yearDays 
-      ? (AIA_LIMIT / divisor) 
-      : ((AIA_LIMIT / divisor) * (apDays / yearDays));
-
-    const sumDays = fyOverlaps.reduce((s, fy) => s + fy.ap_days_in_fy, 0);
+    // AIA short-period proration rule requested:
+    // cap = annual AIA limit x (days in slice / 365) / divisor
     const parts = fyOverlaps.map((fy) => {
-      const share = sumDays ? (fy.ap_days_in_fy / sumDays) : 0;
+      const annualAiaLimit = getTier(fy.tiers, 1).aia_limit;
+      const sliceCap = (annualAiaLimit * (fy.ap_days_in_fy / 365)) / divisor;
       return {
         fy_year: fy.fy_year,
         ap_days_in_fy: fy.ap_days_in_fy,
-        aia_cap_for_fy: totalCap * share
+        aia_annual_limit: annualAiaLimit,
+        aia_cap_for_fy: sliceCap
       };
     });
+    const totalCap = parts.reduce((s, p) => s + (p.aia_cap_for_fy || 0), 0);
 
     return { totalCap, parts };
   }
@@ -306,16 +297,16 @@
     return fyOverlaps.map((fy) => {
       const small = getTier(fy.tiers, 2).threshold;
       const upper = getTier(fy.tiers, 3).threshold;
-
-      // HMRC RULE: Thresholds are NOT pro-rated by days; they apply in full to the profit
-      // allocated to that FY. Only the profit is pro-rated, not the thresholds.
-      // Associates divisor applies to thresholds (50k/divisor, 250k/divisor).
-      const smallForAP = small / divisor;
-      const upperForAP = upper / divisor;
+      // Short period rule (as requested): pro-rate thresholds by days in the slice,
+      // then apply associates divisor.
+      const dayFraction = (fy.fy_total_days > 0) ? (fy.ap_days_in_fy / fy.fy_total_days) : 0;
+      const smallForAP = (small * dayFraction) / divisor;
+      const upperForAP = (upper * dayFraction) / divisor;
 
       return {
         fy_year: fy.fy_year,
         ap_days_in_fy: fy.ap_days_in_fy,
+        fy_total_days: fy.fy_total_days,
         small_threshold_for_AP_in_this_FY: smallForAP,
         upper_threshold_for_AP_in_this_FY: upperForAP
       };
@@ -372,16 +363,18 @@
     };
   }
 
-  function getRegimeSignature(tiers, lowerLimit, upperLimit) {
+  function getRegimeSignature(tiers) {
     const smallRate = getTier(tiers, 1).rate;
     const mainRate = getTier(tiers, 3).rate;
     const reliefFraction = getTier(tiers, 2).relief_fraction;
+    const smallThresholdBase = getTier(tiers, 2).threshold;
+    const upperThresholdBase = getTier(tiers, 3).threshold;
     return [
       String(smallRate),
       String(mainRate),
       String(reliefFraction),
-      String(lowerLimit),
-      String(upperLimit)
+      String(smallThresholdBase),
+      String(upperThresholdBase)
     ].join('|');
   }
 
@@ -390,7 +383,7 @@
     rawSlices.forEach((slice) => {
       const lower = slice.thresholds ? slice.thresholds.small_threshold_for_AP_in_this_FY : 0;
       const upper = slice.thresholds ? slice.thresholds.upper_threshold_for_AP_in_this_FY : 0;
-      const signature = getRegimeSignature(slice.tiers, lower, upper);
+      const signature = getRegimeSignature(slice.tiers);
       const last = grouped[grouped.length - 1];
       if (!last || last.signature !== signature) {
         grouped.push({
@@ -401,6 +394,8 @@
           aia_cap_for_fy: slice.aia_cap_for_fy || 0,
           taxableProfit: slice.taxableProfit || 0,
           augmentedProfit: slice.augmentedProfit || 0,
+          lower_limit_sum: lower,
+          upper_limit_sum: upper,
           tiers: slice.tiers
         });
         return;
@@ -410,6 +405,8 @@
       last.aia_cap_for_fy += slice.aia_cap_for_fy || 0;
       last.taxableProfit += slice.taxableProfit || 0;
       last.augmentedProfit += slice.augmentedProfit || 0;
+      last.lower_limit_sum += lower;
+      last.upper_limit_sum += upper;
     });
     return grouped;
   }
@@ -480,12 +477,14 @@
 
       // Capital allowances (AIA) - pro-rated cap
       const periodAIACapTotal = aiaAlloc.totalCap;
-      const periodAIAClaim = Math.min(inputs.capitalAllowances.aiaAdditions * (period.days / inputs.apDays), TaxModel.roundPounds(periodAIACapTotal));
+      const periodAIAAdditionsShare = inputs.capitalAllowances.aiaAdditions * (period.days / inputs.apDays);
+      const periodAIAClaimRaw = Math.min(periodAIAAdditionsShare, periodAIACapTotal);
+      const periodAIAClaim = TaxModel.roundPounds(periodAIAClaimRaw);
 
       // Taxable total profit base:
       // AP PBT share + tax add-backs - AIA + rental net-off adjustment.
       const periodTaxableBeforeLoss = TaxModel.roundPounds(
-        periodProfitBeforeTax + periodAddBacks - TaxModel.roundPounds(periodAIAClaim) + periodPropertyAdjustment
+        periodProfitBeforeTax + periodAddBacks - periodAIAClaim + periodPropertyAdjustment
       );
 
       // Trading loss offset (only applies in first period, then carry to next)
@@ -520,8 +519,8 @@
 
       const groupedPeriodByFY = collapseSlicesByRegime(rawPeriodByFY);
       const periodByFY = groupedPeriodByFY.map((grp) => {
-        const lower = grp.thresholds ? grp.thresholds.small_threshold_for_AP_in_this_FY : 0;
-        const upper = grp.thresholds ? grp.thresholds.upper_threshold_for_AP_in_this_FY : 0;
+        const lower = grp.lower_limit_sum || 0;
+        const upper = grp.upper_limit_sum || 0;
         const computed = computeTaxPerFY({
           fy_year: grp.fy_years[0],
           taxableProfit: grp.taxableProfit,
@@ -536,7 +535,10 @@
           fy_year: grp.fy_years[0],
           fy_years: grp.fy_years,
           ap_days_in_fy: grp.ap_days,
-          thresholds: grp.thresholds,
+          thresholds: {
+            small_threshold_for_AP_in_this_FY: lower,
+            upper_threshold_for_AP_in_this_FY: upper
+          },
           aia_cap_for_fy: grp.aia_cap_for_fy,
           taxableProfit: computed.taxableProfit,
           augmentedProfit: computed.augmentedProfit,
@@ -561,6 +563,7 @@
         taxableBeforeLoss: TaxModel.roundPounds(periodTaxableBeforeLoss),
         addBacks: TaxModel.roundPounds(periodAddBacks),
         aiaCapTotal: TaxModel.roundPounds(periodAIACapTotal),
+        aiaAdditionsShare: TaxModel.roundPounds(periodAIAAdditionsShare),
         aiaClaimed: TaxModel.roundPounds(periodAIAClaim),
         byFY: periodByFY,
         ctCharge: TaxModel.roundPounds(periodByFY.reduce((s, x) => s + (x.ctCharge || 0), 0)),
@@ -610,6 +613,8 @@
         property_adjustment: p.propertyAdjustment,
         add_backs: p.addBacks,
         loss_used: p.lossUsed,
+        aia_cap_total: p.aiaCapTotal,
+        aia_additions_share: p.aiaAdditionsShare,
         aia_claim: p.aiaClaimed,
         marginal_relief: p.marginalRelief,
         ct_charge: p.ctCharge,

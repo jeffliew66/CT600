@@ -200,6 +200,62 @@ function checkNoChangeRegimeCollapsesStraddle() {
   );
 }
 
+function checkShortPeriodThresholdProration() {
+  const out = run(baseInput({
+    apStart: '2024-04-01',
+    apEnd: '2024-09-29',
+    assocCompanies: 0,
+    turnover: 120000,
+    dividendIncome: 0
+  }));
+
+  assert(out.result.byFY.length === 1, 'Expected one slice for single-FY short period.');
+  const th = out.result.byFY[0].thresholds || {};
+  const expectedLower = 50000 * (182 / 365);
+  const expectedUpper = 250000 * (182 / 365);
+  const lowerDiff = Math.abs((th.small_threshold_for_AP_in_this_FY || 0) - expectedLower);
+  const upperDiff = Math.abs((th.upper_threshold_for_AP_in_this_FY || 0) - expectedUpper);
+
+  assert(lowerDiff < 1, `Short-period lower threshold not pro-rated correctly. diff=${lowerDiff}`);
+  assert(upperDiff < 1, `Short-period upper threshold not pro-rated correctly. diff=${upperDiff}`);
+
+  const outAssoc = run(baseInput({
+    apStart: '2024-04-01',
+    apEnd: '2024-09-29',
+    assocCompanies: 3,
+    turnover: 120000,
+    dividendIncome: 0
+  }));
+  const thAssoc = outAssoc.result.byFY[0].thresholds || {};
+  const expectedUpperAssoc = expectedUpper / 4;
+  const upperAssocDiff = Math.abs((thAssoc.upper_threshold_for_AP_in_this_FY || 0) - expectedUpperAssoc);
+  assert(upperAssocDiff < 1, `Associated-company divisor not applied to pro-rated upper threshold. diff=${upperAssocDiff}`);
+}
+
+function checkAiaProrationAndAssociates() {
+  const base = baseInput({
+    apStart: '2024-04-01',
+    apEnd: '2024-09-29', // 182 days
+    turnover: 300000,
+    aiaAdditions: 10000000 // force cap to bind
+  });
+
+  const out0 = run({ ...base, assocCompanies: 0 });
+  const expectedCap0 = 1000000 * (182 / 365);
+  const claim0 = out0.result.computation.capitalAllowances;
+  assert(Math.abs(claim0 - Math.round(expectedCap0)) <= 1, `AIA cap/claim mismatch (assoc=0). got=${claim0}`);
+
+  const out3 = run({ ...base, assocCompanies: 3 });
+  const expectedCap3 = expectedCap0 / 4;
+  const claim3 = out3.result.computation.capitalAllowances;
+  assert(Math.abs(claim3 - Math.round(expectedCap3)) <= 1, `AIA cap/claim mismatch (assoc=3). got=${claim3}`);
+
+  const p0 = (out0.result.metadata.periods || [])[0] || {};
+  const p3 = (out3.result.metadata.periods || [])[0] || {};
+  assert(typeof p0.aia_cap_total === 'number', 'Missing period AIA cap metadata for assoc=0.');
+  assert(typeof p3.aia_cap_total === 'number', 'Missing period AIA cap metadata for assoc=3.');
+}
+
 function checkTwelveMonthBoundary() {
   // Exact 12-month AP that is 366 days (leap year) must NOT be split.
   const leapYearTwelveMonths = run(baseInput({
@@ -296,6 +352,8 @@ function main() {
   checkTwelveMonthBoundary();
   checkIncomeNotDoubleCounted();
   checkNoChangeRegimeCollapsesStraddle();
+  checkShortPeriodThresholdProration();
+  checkAiaProrationAndAssociates();
   printSummary(rows);
   console.log('\nPASS: all matrix checks passed.');
 }
