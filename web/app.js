@@ -22,6 +22,294 @@
     else delete el.dataset.type;
   }
 
+  const FIELD_TAXONOMY_MAP = {
+    apStart: {
+      variableName: 'inputs.accountingPeriodStart',
+      ct600Mapping: 'box_30_period_start',
+      taxComputationMapping: '-'
+    },
+    apEnd: {
+      variableName: 'inputs.accountingPeriodEnd',
+      ct600Mapping: 'box_35_period_end',
+      taxComputationMapping: '-'
+    },
+    assocCompanies: {
+      variableName: 'inputs.associatedCompanyCount',
+      ct600Mapping: 'box_326_assoc_companies, box_327_assoc_companies, box_328_assoc_companies',
+      taxComputationMapping: '-'
+    },
+    turnover: {
+      variableName: 'inputs.pnl.tradingTurnover',
+      ct600Mapping: 'box_145_trade_turnover',
+      taxComputationMapping: 'profit_adjustment_schedule.trading_income_components.turnover'
+    },
+    govtGrants: {
+      variableName: 'inputs.pnl.governmentGrants',
+      ct600Mapping: '-',
+      taxComputationMapping: 'profit_adjustment_schedule.trading_income_components.govt_grants'
+    },
+    disposalGains: {
+      variableName: 'inputs.pnl.tradingBalancingCharges',
+      ct600Mapping: '_trading_balancing_charges (custom)',
+      taxComputationMapping: 'profit_adjustment_schedule.trading_income_components.asset_disposal_proceeds_balancing_charges'
+    },
+    rawMaterials: {
+      variableName: 'inputs.pnl.costOfGoodsSold',
+      ct600Mapping: '-',
+      taxComputationMapping: '-'
+    },
+    staffCosts: {
+      variableName: 'inputs.pnl.staffEmploymentCosts',
+      ct600Mapping: '-',
+      taxComputationMapping: '-'
+    },
+    depreciation: {
+      variableName: 'inputs.pnl.depreciationExpense',
+      ct600Mapping: '-',
+      taxComputationMapping: 'profit_adjustment_schedule.add_backs.depreciation_disallowed'
+    },
+    otherCharges: {
+      variableName: 'inputs.pnl.otherOperatingCharges',
+      ct600Mapping: '-',
+      taxComputationMapping: '-'
+    },
+    disallowableExpenses: {
+      variableName: 'inputs.adjustments.disallowableExpenditure',
+      ct600Mapping: '-',
+      taxComputationMapping: 'profit_adjustment_schedule.add_backs.disallowable_expenses'
+    },
+    otherAdjustments: {
+      variableName: 'inputs.adjustments.otherTaxAdjustmentsAddBack',
+      ct600Mapping: '-',
+      taxComputationMapping: 'profit_adjustment_schedule.add_backs.other_adjustments_add_back'
+    },
+    aiaTrade: {
+      variableName: 'inputs.capitalAllowances.annualInvestmentAllowanceTradeAdditions',
+      ct600Mapping: '-',
+      taxComputationMapping: '-'
+    },
+    tradingLossUseRequested: {
+      variableName: 'inputs.losses.tradingLossUsageRequested',
+      ct600Mapping: '-',
+      taxComputationMapping: 'trading_loss_schedule.trading_loss_use_requested'
+    },
+    interestIncome: {
+      variableName: 'inputs.pnl.interestIncome',
+      ct600Mapping: 'box_170_non_trading_loan_relationship_profits (profits heading)',
+      taxComputationMapping: 'profit_adjustment_schedule.other_income.interest_income'
+    },
+    rentalIncome: {
+      variableName: 'inputs.pnl.propertyIncome',
+      ct600Mapping: '- (CT600 uses derived property business income in box_190)',
+      taxComputationMapping: '-'
+    },
+    aiaNonTrade: {
+      variableName: 'inputs.capitalAllowances.annualInvestmentAllowanceNonTradeAdditions',
+      ct600Mapping: '-',
+      taxComputationMapping: '-'
+    },
+    dividendIncome: {
+      variableName: 'inputs.pnl.dividendIncome',
+      ct600Mapping: 'box_620_dividend_income',
+      taxComputationMapping: 'profit_adjustment_schedule.other_income.dividend_income'
+    },
+    outTradingIncomeTotal: {
+      variableName: '<derived: total trading income components>',
+      ct600Mapping: '-',
+      taxComputationMapping: 'profit_adjustment_schedule.trading_income_components.total_trading_income'
+    },
+    outTradingExpenseTotal: {
+      variableName: '<derived: total trading expenses>',
+      ct600Mapping: '-',
+      taxComputationMapping: '-'
+    },
+    outTradingProfits: {
+      variableName: '<derived: accounting trading result>',
+      ct600Mapping: '-',
+      taxComputationMapping: '-'
+    },
+    outTradingProfitsTaxable: {
+      variableName: 'result.computation.taxableTradingProfit',
+      ct600Mapping: 'box_165_net_trading_profits',
+      taxComputationMapping: 'profit_adjustment_schedule.net_trading_profit'
+    },
+    outTradingLossBFAvailable: {
+      variableName: 'inputs.losses.tradingLossBroughtForward',
+      ct600Mapping: '-',
+      taxComputationMapping: 'trading_loss_schedule.trading_loss_bfwd_available'
+    },
+    outPropertyLossBFAvailable: {
+      variableName: 'inputs.pnl.propertyLossBroughtForward',
+      ct600Mapping: 'box_250_prop_losses_bfwd',
+      taxComputationMapping: '-'
+    },
+    outRentalPropertyTotal: {
+      variableName: '<derived: rental/property stream after offsets>',
+      ct600Mapping: '-',
+      taxComputationMapping: 'profit_adjustment_schedule.other_income.rental_income_net'
+    },
+    outNonTradingProfits: {
+      variableName: '<derived: non-trading + dividends display total>',
+      ct600Mapping: '-',
+      taxComputationMapping: '-'
+    },
+    outNonTradingProfitsTaxable: {
+      variableName: 'result.computation.taxableNonTradingProfits',
+      ct600Mapping: 'box_235_profits_subtotal (derived component)',
+      taxComputationMapping: '-'
+    },
+    outTotalProfitsCTTrade: {
+      variableName: 'result.computation.taxableTradingProfit',
+      ct600Mapping: 'box_165_net_trading_profits',
+      taxComputationMapping: 'profit_adjustment_schedule.net_trading_profit'
+    },
+    outTotalProfitsCTNonTrade: {
+      variableName: 'result.computation.taxableNonTradingProfits',
+      ct600Mapping: 'box_235_profits_subtotal (derived component)',
+      taxComputationMapping: '-'
+    },
+    ttProfitsChargeable: {
+      variableName: 'result.computation.taxableTotalProfits',
+      ct600Mapping: 'box_315_taxable_profit',
+      taxComputationMapping: 'summary.taxable_total_profits'
+    },
+    corpTaxPayable: {
+      variableName: 'result.tax.taxPayable',
+      ct600Mapping: 'box_528_total_self_assessment_tax_payable (formula chain dependent)',
+      taxComputationMapping: 'summary.tax_payable'
+    },
+    outApDays: {
+      variableName: 'inputs.accountingPeriodDays',
+      ct600Mapping: '-',
+      taxComputationMapping: 'capital_allowances_schedule.annual_investment_allowance.parts_by_fy[].ap_days_in_fy'
+    },
+    outAssocDivisor: {
+      variableName: '<derived: inputs.associatedCompanyCount + 1>',
+      ct600Mapping: '-',
+      taxComputationMapping: '-'
+    },
+    outLowerBracket: {
+      variableName: '<derived: effective lower threshold>',
+      ct600Mapping: '-',
+      taxComputationMapping: '-'
+    },
+    outLowerRate: {
+      variableName: '<derived: small profits rate>',
+      ct600Mapping: '-',
+      taxComputationMapping: 'tax_calculation_table.computation_by_fy[].main_rate (context dependent)'
+    },
+    outUpperBracket: {
+      variableName: '<derived: effective upper threshold>',
+      ct600Mapping: '-',
+      taxComputationMapping: '-'
+    },
+    outUpperRate: {
+      variableName: '<derived: main rate>',
+      ct600Mapping: '-',
+      taxComputationMapping: 'tax_calculation_table.computation_by_fy[].main_rate'
+    },
+    outP1RevenueShare: {
+      variableName: '<derived: period 1 apportioned accounting income>',
+      ct600Mapping: '-',
+      taxComputationMapping: '-'
+    },
+    outP1ProfitBeforeTax: {
+      variableName: '<derived: period 1 profit before tax>',
+      ct600Mapping: '-',
+      taxComputationMapping: '-'
+    },
+    outP1LowerBracket: {
+      variableName: '<derived: period 1 lower threshold>',
+      ct600Mapping: '-',
+      taxComputationMapping: '-'
+    },
+    outP1UpperBracket: {
+      variableName: '<derived: period 1 upper threshold>',
+      ct600Mapping: '-',
+      taxComputationMapping: '-'
+    },
+    outP1TaxableProfit: {
+      variableName: '<derived: period 1 taxable profit>',
+      ct600Mapping: '-',
+      taxComputationMapping: 'tax_calculation_table.computation_by_fy[].taxable_profit'
+    },
+    outP1AIAClaimed: {
+      variableName: '<derived: period 1 AIA claimed>',
+      ct600Mapping: '-',
+      taxComputationMapping: 'capital_allowances_schedule.annual_investment_allowance.parts_by_fy[].aia_allowance_claimed'
+    },
+    outP1MarginalRelief: {
+      variableName: '<derived: period 1 marginal relief>',
+      ct600Mapping: '-',
+      taxComputationMapping: 'tax_calculation_table.computation_by_fy[].marginal_relief_reduction'
+    },
+    outP2RevenueShare: {
+      variableName: '<derived: period 2 apportioned accounting income>',
+      ct600Mapping: '-',
+      taxComputationMapping: '-'
+    },
+    outP2ProfitBeforeTax: {
+      variableName: '<derived: period 2 profit before tax>',
+      ct600Mapping: '-',
+      taxComputationMapping: '-'
+    },
+    outP2LowerBracket: {
+      variableName: '<derived: period 2 lower threshold>',
+      ct600Mapping: '-',
+      taxComputationMapping: '-'
+    },
+    outP2UpperBracket: {
+      variableName: '<derived: period 2 upper threshold>',
+      ct600Mapping: '-',
+      taxComputationMapping: '-'
+    },
+    outP2TaxableProfit: {
+      variableName: '<derived: period 2 taxable profit>',
+      ct600Mapping: '-',
+      taxComputationMapping: 'tax_calculation_table.computation_by_fy[].taxable_profit'
+    },
+    outP2AIAClaimed: {
+      variableName: '<derived: period 2 AIA claimed>',
+      ct600Mapping: '-',
+      taxComputationMapping: 'capital_allowances_schedule.annual_investment_allowance.parts_by_fy[].aia_allowance_claimed'
+    },
+    outP2MarginalRelief: {
+      variableName: '<derived: period 2 marginal relief>',
+      ct600Mapping: '-',
+      taxComputationMapping: 'tax_calculation_table.computation_by_fy[].marginal_relief_reduction'
+    },
+    outTTPVar: {
+      variableName: 'result.computation.taxableTotalProfits',
+      ct600Mapping: 'box_315_taxable_profit',
+      taxComputationMapping: 'summary.taxable_total_profits'
+    },
+    outAugmentedProfitsVar: {
+      variableName: 'result.computation.augmentedProfits',
+      ct600Mapping: '-',
+      taxComputationMapping: 'summary.augmented_profits'
+    },
+    outTotalAIAClaimedVar: {
+      variableName: 'result.computation.capitalAllowances',
+      ct600Mapping: '-',
+      taxComputationMapping: 'capital_allowances_schedule.total_capital_allowances'
+    },
+    outTotalMarginalReliefVar: {
+      variableName: 'result.tax.marginalRelief',
+      ct600Mapping: 'box_435_marginal_relief',
+      taxComputationMapping: 'summary.marginal_relief_total'
+    }
+  };
+
+  function getFieldTaxonomyInfo(fieldId){
+    const mapped = FIELD_TAXONOMY_MAP[fieldId];
+    if (mapped) return mapped;
+    return {
+      variableName: '-',
+      ct600Mapping: '-',
+      taxComputationMapping: '-'
+    };
+  }
+
   function compute(opts){
     const options = opts || {};
     try {
@@ -892,6 +1180,33 @@
       setTimeout(() => compute({ silent: true }), 100); // Auto-calculate after reset (with small delay)
     });
 
+    function attachTaxonomyIcons() {
+      const fields = document.querySelectorAll('#dataForm input:not([type="hidden"])');
+      fields.forEach((input) => {
+        if (!input.id || input.dataset.taxonomyIconAttached === '1') return;
+        const parent = input.parentNode;
+        if (!parent) return;
+
+        const wrap = document.createElement('div');
+        wrap.className = 'fieldWithInfo';
+        parent.insertBefore(wrap, input);
+        wrap.appendChild(input);
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'mapIcon';
+        btn.textContent = '[i]';
+        btn.dataset.taxonomyTarget = input.id;
+        btn.dataset.taxonomyTitle = input.id;
+        btn.setAttribute('aria-label', `Show taxonomy mapping for ${input.id}`);
+        wrap.appendChild(btn);
+
+        input.dataset.taxonomyIconAttached = '1';
+      });
+    }
+
+    attachTaxonomyIcons();
+
     // AUTO-CALCULATE ON INPUT CHANGE (real-time updates)
     // Add listeners to all form inputs to trigger compute() whenever any value changes
     const formInputs = document.querySelectorAll('#dataForm input[type="text"], #dataForm input[type="number"], #dataForm input[type="date"], #dataForm input[type="file"]');
@@ -961,6 +1276,30 @@
       panel.classList.add('open');
     }
 
+    function openTaxonomyPanel(input, titleOverride){
+      if(!input) return;
+      activeInput = null;
+      const fieldInfo = getFieldTaxonomyInfo(input.id);
+      const label = input.closest('label');
+      const title = titleOverride || (label ? (label.textContent || input.id) : input.id);
+
+      formulaTitle.textContent = `Field Mapping: ${title.trim()}`;
+      formulaText.textContent =
+        `Variable name:\n${fieldInfo.variableName}\n\n` +
+        `CT600 mapping:\n${fieldInfo.ct600Mapping}\n\n` +
+        `Tax computation mapping:\n${fieldInfo.taxComputationMapping}`;
+      formulaDetails.textContent =
+        `Field ID: ${input.id}\n` +
+        `Mapping source: TAXONOMY CROSSWALK`;
+
+      sliderControls.style.display = 'none';
+      enableSlider.checked = false;
+      sliderWrap.style.display = 'none';
+
+      panel.setAttribute('aria-hidden','false');
+      panel.classList.add('open');
+    }
+
     function closeFormulaPanel(){
       if(activeInput && enableSlider && !enableSlider.checked){
         if(activeInput.dataset.orig) activeInput.value = activeInput.dataset.orig;
@@ -973,6 +1312,14 @@
     // click delegation: open panel when clicking a computed readonly input
     document.body.addEventListener('click', function(ev){
       const t = ev.target;
+      const taxonomyBtn = t && t.closest ? t.closest('[data-taxonomy-target]') : null;
+      if (taxonomyBtn) {
+        const targetId = taxonomyBtn.getAttribute('data-taxonomy-target');
+        const title = taxonomyBtn.getAttribute('data-taxonomy-title') || targetId || 'Field';
+        const targetInput = targetId ? $(targetId) : null;
+        if (targetInput) openTaxonomyPanel(targetInput, title);
+        return;
+      }
       if(t && t.tagName === 'INPUT' && t.readOnly && t.dataset && t.dataset.formula){
         openFormulaPanel(t);
       }
@@ -989,7 +1336,7 @@
     document.querySelectorAll('.computed').forEach(function(lbl){
       lbl.style.cursor = 'pointer';
       lbl.addEventListener('click', function(ev){
-        if(ev.target && ev.target.tagName === 'INPUT') return;
+        if(ev.target && (ev.target.tagName === 'INPUT' || (ev.target.closest && ev.target.closest('button')))) return;
         const inp = lbl.querySelector('input[readonly]');
         if(inp) openFormulaPanel(inp);
       });

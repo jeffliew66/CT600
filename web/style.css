@@ -194,6 +194,39 @@ button.calcIcon{
   box-shadow:none;
 }
 
+button.mapIcon{
+  border:1px solid #b8d5c3;
+  background:#fff9ef;
+  color:#7a4a12;
+  padding:4px 8px;
+  border-radius:8px;
+  cursor:pointer;
+  box-shadow:none;
+  font-weight:600;
+}
+
+.fieldWithInfo{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:8px;
+  align-items:center;
+  margin-top:4px;
+}
+
+.fieldWithInfo input{
+  margin:0;
+}
+
+.dropGroup summary .fieldWithInfo{
+  width:220px;
+  margin-top:0;
+}
+
+.dropGroup summary .fieldWithInfo input[readonly]{
+  width:100%;
+  max-width:none;
+}
+
 .compactLabel{
   margin-top:6px;
   font-size:12px;

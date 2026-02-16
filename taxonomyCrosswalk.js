@@ -22,8 +22,8 @@
 // inputs.pnl.tradingTurnover                                     | box_145_trade_turnover                                   | profit_adjustment_schedule.trading_income_components.turnover
 // inputs.pnl.governmentGrants                                    | -                                                        | profit_adjustment_schedule.trading_income_components.govt_grants
 // inputs.pnl.tradingBalancingCharges                             | _trading_balancing_charges (custom)                      | profit_adjustment_schedule.trading_income_components.asset_disposal_proceeds_balancing_charges
-// inputs.pnl.interestIncome                                      | box_170_interest_income                                  | profit_adjustment_schedule.other_income.interest_income
-// inputs.pnl.propertyIncome                                      | box_190_rental_income                                    | -
+// inputs.pnl.interestIncome                                      | box_170_non_trading_loan_relationship_profits (clamped >=0) | profit_adjustment_schedule.other_income.interest_income
+// inputs.pnl.propertyIncome                                      | -                                                        | -
 // inputs.pnl.propertyLossBroughtForward                          | box_250_prop_losses_bfwd                                 | -
 // inputs.pnl.chargeableGains                                     | box_210_chargeable_gains                                 | profit_adjustment_schedule.other_income.capital_gains
 // inputs.pnl.chargeableGainsComputationFileName                  | -                                                        | profit_adjustment_schedule.other_income.capital_gains_source_file
@@ -31,7 +31,7 @@
 // inputs.pnl.turnover (legacy alias)                            | box_145_trade_turnover                                   | profit_adjustment_schedule.trading_income_components.turnover
 // inputs.pnl.govtGrants (legacy alias)                          | -                                                        | profit_adjustment_schedule.trading_income_components.govt_grants
 // inputs.pnl.disposalGains (legacy alias)                       | _trading_balancing_charges (custom)                      | profit_adjustment_schedule.trading_income_components.asset_disposal_proceeds_balancing_charges
-// inputs.pnl.rentalIncome (legacy alias)                        | box_190_rental_income                                    | -
+// inputs.pnl.rentalIncome (legacy alias)                        | -                                                        | -
 // inputs.pnl.propertyLossBF (legacy alias)                      | box_250_prop_losses_bfwd                                 | -
 // inputs.pnl.capitalGains (legacy alias)                        | box_210_chargeable_gains                                 | profit_adjustment_schedule.other_income.capital_gains
 // inputs.pnl.capitalGainsFileName (legacy alias)                | -                                                        | profit_adjustment_schedule.other_income.capital_gains_source_file
@@ -62,13 +62,36 @@
 // inputs.losses.tradingLossBF (legacy alias)                     | -                                                        | trading_loss_schedule.trading_loss_bfwd_available
 // inputs.losses.tradingLossUseRequested (legacy alias)          | -                                                        | trading_loss_schedule.trading_loss_use_requested
 
+// SECTION: CT600 ADDITIONAL INPUTS (OPTIONAL)
+// inputs.ct600.communityInvestmentTaxRelief                      | box_445_community_investment_tax_relief                  | -
+// inputs.ct600.doubleTaxationRelief                              | box_450_double_taxation_relief                           | -
+// inputs.ct600.underlyingRateReliefClaim                         | box_455_underlying_rate_relief_claim (checkbox)          | -
+// inputs.ct600.reliefCarriedBackToEarlierPeriod                  | box_460_relief_carried_back_to_earlier_period (checkbox) | -
+// inputs.ct600.advanceCorporationTax                             | box_465_advance_corporation_tax                          | -
+// inputs.ct600.loansToParticipatorsTax                           | box_480_tax_payable_by_a_close_company                   | -
+// inputs.ct600.controlledForeignCompaniesTax                     | box_500_cfc_bank_levy_surcharge_and_rpdt (component)     | -
+// inputs.ct600.bankLevyPayable                                   | box_500_cfc_bank_levy_surcharge_and_rpdt (component)     | -
+// inputs.ct600.bankSurchargePayable                              | box_500_cfc_bank_levy_surcharge_and_rpdt (component)     | -
+// inputs.ct600.residentialPropertyDeveloperTax                   | box_500_cfc_bank_levy_surcharge_and_rpdt (component)     | -
+// inputs.ct600.eogplPayable                                      | box_501_eogpl_payable                                    | -
+// inputs.ct600.eglPayable                                        | box_502_egl_payable                                      | -
+// inputs.ct600.supplementaryChargePayable                        | box_505_supplementary_charge                             | -
+// inputs.ct600.incomeTaxDeductedFromGrossIncome                  | box_515_income_tax_deducted_from_gross_income            | -
+// inputs.ct600.coronavirusSupportPaymentOverpaymentNowDue        | box_526_coronavirus_support_payment_overpayment_now_due  | -
+// inputs.ct600.restitutionTax                                    | box_527_restitution_tax                                  | -
+
+// SECTION: DECLARATION INPUTS
+// inputs.declaration.name                                        | box_975_name                                             | -
+// inputs.declaration.date                                        | box_980_date                                             | -
+// inputs.declaration.status                                      | box_985_status                                           | -
+
 // SECTION: RESULT ACCOUNTS / PROPERTY
 // result.accounts.totalIncome                                    | -                                                        | -
 // result.accounts.totalExpenses                                  | -                                                        | -
 // result.accounts.profitBeforeTax                                | -                                                        | profit_adjustment_schedule.accounting_profit_before_tax
 // result.property.rentalIncome                                   | -                                                        | -
 // result.property.propertyLossBF                                 | -                                                        | -
-// result.property.propertyProfitAfterLossOffset                  | -                                                        | profit_adjustment_schedule.other_income.rental_income_net
+// result.property.propertyProfitAfterLossOffset                  | box_190_property_business_income (with AIA adjustment via metadata) | profit_adjustment_schedule.other_income.rental_income_net
 // result.property.propertyLossCF                                 | box_250_prop_losses_cfwd                                 | -
 
 // SECTION: RESULT COMPUTATION
@@ -81,30 +104,38 @@
 // result.computation.tradingLossUsed                             | box_160_trading_losses_bfwd                              | -
 // <derived: result.computation.taxableTradingProfit + result.computation.tradingLossUsed> | box_155_trading_profit                 | -
 // result.computation.taxableTradingProfit                        | box_165_net_trading_profits                              | profit_adjustment_schedule.net_trading_profit
-// result.computation.taxableNonTradingProfits                    | (derived inside box_235_profits_subtotal)                | -
+// result.computation.taxableNonTradingProfits                    | -                                                        | -
 // result.computation.taxableTotalProfits                         | box_315_taxable_profit                                   | profit_adjustment_schedule.taxable_total_profits
 // result.computation.taxableTotalProfits                         | box_235_profits_subtotal (derived)                       | summary.taxable_total_profits
 // result.computation.taxableTotalProfits                         | box_300_profits_before_deductions (derived)              | tax_calculation_table.year_summary.total_taxable_profit
-// result.computation.augmentedProfits                            | box_330_augmented_profit                                 | summary.augmented_profits
+// result.computation.augmentedProfits                            | -                                                        | summary.augmented_profits
 // result.computation.augmentedProfits                            | -                                                        | tax_calculation_table.year_summary.total_augmented_profit
 
 // SECTION: RESULT TAX
-// result.tax.corporationTaxCharge                                | box_455_total_ct_calculated                              | summary.corporation_tax_charge
+// result.tax.corporationTaxCharge                                | box_440_corporation_tax_chargeable (derived chain)       | summary.corporation_tax_charge
 // result.tax.corporationTaxCharge                                | -                                                        | tax_calculation_table.year_summary.corporation_tax_charge
-// result.tax.marginalRelief                                      | _marginal_relief_total (custom)                          | summary.marginal_relief_total
+// result.tax.marginalRelief                                      | box_435_marginal_relief                                  | summary.marginal_relief_total
 // result.tax.marginalRelief                                      | -                                                        | tax_calculation_table.year_summary.total_marginal_relief
-// result.tax.taxPayable                                          | box_475_net_ct_liability                                 | summary.tax_payable
+// result.tax.taxPayable                                          | -                                                        | summary.tax_payable
 
 // SECTION: RESULT BY-FY SLICES
-// result.byFY[].fy_year                                          | -                                                        | tax_calculation_table.computation_by_fy[].fy_year
-// result.byFY[].fy_years                                         | -                                                        | tax_calculation_table.computation_by_fy[].fy_years
-// result.byFY[].period_index                                     | -                                                        | tax_calculation_table.computation_by_fy[].period_index
-// result.byFY[].taxableProfit                                    | -                                                        | tax_calculation_table.computation_by_fy[].taxable_profit
-// result.byFY[].augmentedProfit                                  | -                                                        | tax_calculation_table.computation_by_fy[].augmented_profit
-// result.byFY[].main_rate                                        | -                                                        | tax_calculation_table.computation_by_fy[].main_rate
-// result.byFY[].ctCharge                                         | -                                                        | tax_calculation_table.computation_by_fy[].corporation_tax_charged
+// result.byFY[].fy_year                                          | box_330/380_financial_year                               | tax_calculation_table.computation_by_fy[].fy_year
+// result.byFY[].taxableProfit                                    | box_335/350/365/385/400/415_profits_chargeable_at_corresponding_rate | tax_calculation_table.computation_by_fy[].taxable_profit
+// result.byFY[].main_rate or small_rate                          | box_340/355/370/390/405/420_corresponding_rate           | tax_calculation_table.computation_by_fy[].main_rate
+// result.byFY[].ctCharge (+ MR back where applicable)            | box_345/360/375/395/410/425_tax                          | tax_calculation_table.computation_by_fy[].corporation_tax_charged
 // result.byFY[].marginalRelief                                   | -                                                        | tax_calculation_table.computation_by_fy[].marginal_relief_reduction
 // result.byFY[].aia_cap_for_fy                                   | -                                                        | capital_allowances_schedule.annual_investment_allowance.parts_by_fy[].aia_limit_pro_rated
+
+// SECTION: CT600 DERIVED FORMULA BOXES
+// <mapper constant>                                              | box_205_total_trading_and_non_trading_profits = 0       | -
+// <derived: sum of tax boxes 345,360,375,395,410,425>           | box_430_corporation_tax                                  | -
+// <derived: box_430 - box_435>                                   | box_440_corporation_tax_chargeable                       | -
+// <derived: sum of boxes 445,450,465>                            | box_470_total_reliefs_and_deductions                     | -
+// <derived: box_440 - box_470>                                   | box_475_net_ct_liability                                 | -
+// <derived: sum of boxes 475,480,500,501,502,505>               | box_510_total_tax_chargeable                             | -
+// <derived: max(0, box_515 - box_510)>                           | box_520_income_tax_repayable                             | -
+// <derived: max(0, box_510 - box_515)>                           | box_525_self_assessment_tax_payable                      | -
+// <derived: box_525 + box_526 + box_527>                         | box_528_total_self_assessment_tax_payable                | -
 
 // SECTION: DERIVED TAX COMPUTATION TAGS (NO SINGLE INTERNAL FIELD)
 // <derived: AIA requested by slice allocation>                   | -                                                        | capital_allowances_schedule.annual_investment_allowance.parts_by_fy[].aia_claim_requested
@@ -123,19 +154,12 @@
 // <derived: tax at main rate (taxable x main_rate)>              | -                                                        | tax_calculation_table.computation_by_fy[].corporation_tax_at_main_rate
 // <static note>                                                  | -                                                        | tax_calculation_table.year_summary.loss_relief_note
 
-// SECTION: CT600 CONSTANT / POLICY VALUES
-// <mapper policy>                                                | box_205_disposal_gains = 0                               | -
-// <mapper constant>                                              | box_305_donations = 0                                    | -
-// <mapper constant>                                              | box_310_group_relief = 0                                 | -
-// <mapper constant>                                              | box_312_other_deductions = 0                             | -
-
 // SECTION: COMPULSORY FILING FIELDS NOT CURRENTLY MODELLED
-// <required: company UTR>                                        | ct600_header.company_utr                                  | -
-// <required: company name>                                       | ct600_header.company_name                                 | -
-// <required: company registration number>                        | ct600_header.company_registration_number                  | -
-// <required: return type / period indicator>                     | ct600_header.return_type_or_period_indicator              | -
-// <required: declaration / authorised signatory>                 | ct600_declaration.authorised_signatory                    | -
-// <required: iXBRL attachments metadata>                         | ct600_attachments.accounts_and_computation_metadata       | -
+// <required: company UTR>                                        | ct600_header.company_utr                                 | -
+// <required: company name>                                       | ct600_header.company_name                                | -
+// <required: company registration number>                        | ct600_header.company_registration_number                 | -
+// <required: return type / period indicator>                     | ct600_header.return_type_or_period_indicator             | -
+// <required: iXBRL attachments metadata>                         | ct600_attachments.accounts_and_computation_metadata      | -
 // <required: computation basis note>                             | -                                                        | tax_computation.cover.computation_basis_note
 // <required: accounting framework identifier>                    | -                                                        | tax_computation.cover.accounting_framework
 // <required: company identifier in computation>                  | -                                                        | tax_computation.cover.company_identifier

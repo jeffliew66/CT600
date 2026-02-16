@@ -28,6 +28,13 @@
     return Math.round((endUTC - startUTC) / msPerDay) + 1;
   }
 
+  function parseCheckmark(v) {
+    if (v === true) return 'X';
+    const s = String(v ?? '').trim().toLowerCase();
+    if (!s) return '';
+    return (s === 'x' || s === 'true' || s === '1' || s === 'yes') ? 'X' : '';
+  }
+
   function createInputs(userInputs) {
     const ui = userInputs || {};
     const accountingPeriodStart = String(ui.accountingPeriodStart ?? ui.apStart ?? ui.box_30_period_start ?? '');
@@ -102,6 +109,29 @@
             : null;
         })();
 
+    // Optional CT600 non-computation inputs (reliefs / charges / declaration)
+    const declarationName = String(ui.declarationName ?? ui.box_975_name ?? '');
+    const declarationDate = String(ui.declarationDate ?? ui.box_980_date ?? '');
+    const declarationStatus = String(ui.declarationStatus ?? ui.box_985_status ?? '');
+    const ct600 = {
+      communityInvestmentTaxRelief: roundPounds(ui.communityInvestmentTaxRelief ?? ui.box_445_community_investment_tax_relief ?? 0),
+      doubleTaxationRelief: roundPounds(ui.doubleTaxationRelief ?? ui.box_450_double_taxation_relief ?? 0),
+      advanceCorporationTax: roundPounds(ui.advanceCorporationTax ?? ui.box_465_advance_corporation_tax ?? 0),
+      loansToParticipatorsTax: roundPounds(ui.loansToParticipatorsTax ?? ui.box_480_loans_to_participators_tax ?? 0),
+      controlledForeignCompaniesTax: roundPounds(ui.controlledForeignCompaniesTax ?? ui.box_490_controlled_foreign_companies_tax ?? 0),
+      bankLevyPayable: roundPounds(ui.bankLevyPayable ?? ui.box_495_bank_levy_payable ?? 0),
+      bankSurchargePayable: roundPounds(ui.bankSurchargePayable ?? ui.box_496_bank_surcharge_payable ?? 0),
+      residentialPropertyDeveloperTax: roundPounds(ui.residentialPropertyDeveloperTax ?? ui.box_497_residential_property_developer_tax ?? 0),
+      eogplPayable: roundPounds(ui.eogplPayable ?? ui.box_501_energy_oil_and_gas_profits_levy ?? 0),
+      eglPayable: roundPounds(ui.eglPayable ?? ui.box_502_electricity_generator_levy ?? 0),
+      supplementaryChargePayable: roundPounds(ui.supplementaryChargePayable ?? ui.box_505_supplementary_charge_payable ?? 0),
+      incomeTaxDeductedFromGrossIncome: roundPounds(ui.incomeTaxDeductedFromGrossIncome ?? ui.box_515_income_tax_deducted_from_gross_income ?? 0),
+      coronavirusSupportPaymentOverpaymentNowDue: roundPounds(ui.coronavirusSupportPaymentOverpaymentNowDue ?? ui.box_526_coronavirus_support_payment_overpayment_now_due ?? 0),
+      restitutionTax: roundPounds(ui.restitutionTax ?? ui.box_527_restitution_tax ?? 0),
+      underlyingRateReliefClaim: parseCheckmark(ui.underlyingRateReliefClaim ?? ui.box_455_underlying_rate_relief_claim),
+      reliefCarriedBackToEarlierPeriod: parseCheckmark(ui.reliefCarriedBackToEarlierPeriod ?? ui.box_460_relief_carried_back_to_earlier_period)
+    };
+
     return {
       accountingPeriodStart,
       accountingPeriodEnd,
@@ -167,7 +197,15 @@
         // Legacy aliases retained for backward compatibility.
         tradingLossBF: tradingLossBroughtForward,
         tradingLossUseRequested: tradingLossUsageRequested
-      }
+      },
+
+      declaration: {
+        name: declarationName,
+        date: declarationDate,
+        status: declarationStatus
+      },
+
+      ct600
     };
   }
 

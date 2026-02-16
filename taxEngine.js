@@ -559,9 +559,11 @@
       const periodRatio = (period.days / (accountingPeriodDays || 1));
       const periodDividendIncome = dividendIncome * periodRatio;
       const periodInterestIncome = pnl.interestIncome * periodRatio;
-      // disposalGains is treated as trading balancing charges (AIA disposal context),
-      // not non-trading chargeable gains.
-      const periodCapitalGains = chargeableGains * periodRatio;
+      // Chargeable gains are ring-fenced for this income computation:
+      // capital losses must not reduce interest/property income or leak into trading.
+      const rawPeriodCapitalGains = chargeableGains * periodRatio;
+      const periodCapitalGains = Math.max(0, rawPeriodCapitalGains);
+      const periodCapitalGainRingFenceAdjustment = periodCapitalGains - rawPeriodCapitalGains;
       const periodRentalIncomeGross = TaxModel.roundPounds(propertyIncome * periodRatio);
       const periodPropertyLossPool = Math.max(0, remainingPropertyLossPool);
       const periodPropertyLossUsed = Math.min(periodPropertyLossPool, Math.max(0, periodRentalIncomeGross));
@@ -583,7 +585,7 @@
 
       // Taxable total profit base (before losses), then apply AIA to trade/non-trade separately.
       const periodTaxableBeforeAIA = TaxModel.roundPounds(
-        periodProfitBeforeTax + periodAddBacks + periodPropertyAdjustment
+        periodProfitBeforeTax + periodAddBacks + periodPropertyAdjustment + periodCapitalGainRingFenceAdjustment
       );
       const periodNonTradingBeforeAIA = TaxModel.roundPounds(
         periodInterestIncome + periodPropertyProfit + periodCapitalGains
