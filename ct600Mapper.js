@@ -147,7 +147,14 @@
     const chargeableGains = inputs.pnl.chargeableGains ?? inputs.pnl.capitalGains;
     const propertyLossBroughtForward = inputs.pnl.propertyLossBroughtForward ?? inputs.pnl.propertyLossBF;
     const tradingBalancingCharges = inputs.pnl.tradingBalancingCharges ?? inputs.pnl.disposalGains;
-    const tradingProfitBeforeLoss = (result.computation.taxableTradingProfit || 0) + (result.computation.tradingLossUsed || 0);
+    const tradingProfitBeforeLoss = Number(
+      result.computation.grossTradingProfit ??
+      ((result.computation.taxableTradingProfit || 0) + (result.computation.tradingLossUsed || 0))
+    );
+    const profitsSubtotal = Number(
+      result.computation.profitsSubtotal ??
+      ((result.computation.taxableTradingProfit || 0) + (result.computation.taxableNonTradingProfits || 0))
+    );
     const nonTradingLoanRelationshipProfit = Math.max(0, Number(inputs.pnl.interestIncome || 0));
     const propertyBusinessIncome = computePropertyBusinessIncomeForCT600(result);
     const ct600 = inputs.ct600 || {};
@@ -183,14 +190,16 @@
     boxes.box_190_property_business_income = round(propertyBusinessIncome);
     // Box 205 is residual/miscellaneous profits not reported elsewhere.
     // Do not duplicate total profits here.
-    boxes.box_205_total_trading_and_non_trading_profits = 0;
-    boxes.box_210_chargeable_gains = round(chargeableGains || 0);
-    boxes.box_235_profits_subtotal = round(
-      result.computation.taxableTradingProfit + result.computation.taxableNonTradingProfits
+    boxes.box_205_total_trading_and_non_trading_profits = round(
+      result.computation.miscellaneousIncomeNotElsewhere || 0
     );
+    boxes.box_210_chargeable_gains = round(chargeableGains || 0);
+    boxes.box_235_profits_subtotal = round(profitsSubtotal);
     boxes.box_250_prop_losses_bfwd = round(propertyLossBroughtForward);
     boxes.box_250_prop_losses_cfwd = round(result.property.propertyLossCF);
-    boxes.box_300_profits_before_deductions = boxes.box_235_profits_subtotal;
+    boxes.box_300_profits_before_deductions = round(
+      result.computation.profitsSubtotal ?? profitsSubtotal
+    );
     boxes.box_305_donations = 0;
     boxes.box_310_group_relief = 0;
     boxes.box_312_other_deductions = 0;
@@ -198,18 +207,23 @@
     boxes.box_620_dividend_income = round(inputs.pnl.dividendIncome);
 
     // Box 329 indicator
-    boxes.box_329_small_profits_rate_or_marginal_relief_entitlement = (
-      Array.isArray(result.byFY) && result.byFY.some((slice) => {
-        const tp = Number(slice.taxableProfit || 0);
-        if (tp <= 0) return false;
-        const mr = Number(slice.marginalRelief || 0);
-        if (mr > 0) return true;
-        const smallRate = Number(slice.small_rate ?? 0);
-        const mainRate = Number(slice.main_rate ?? 0);
-        const effective = tp > 0 ? (Number(slice.ctCharge || 0) / tp) : 0;
-        return smallRate > 0 && mainRate > smallRate && effective <= (smallRate + 0.002);
-      })
-    ) ? 'X' : '';
+    const box329FromResult = String(result.tax.smallProfitsRateOrMarginalReliefEntitlement || '');
+    if (box329FromResult === 'X') {
+      boxes.box_329_small_profits_rate_or_marginal_relief_entitlement = 'X';
+    } else {
+      boxes.box_329_small_profits_rate_or_marginal_relief_entitlement = (
+        Array.isArray(result.byFY) && result.byFY.some((slice) => {
+          const tp = Number(slice.taxableProfit || 0);
+          if (tp <= 0) return false;
+          const mr = Number(slice.marginalRelief || 0);
+          if (mr > 0) return true;
+          const smallRate = Number(slice.small_rate ?? 0);
+          const mainRate = Number(slice.main_rate ?? 0);
+          const effective = tp > 0 ? (Number(slice.ctCharge || 0) / tp) : 0;
+          return smallRate > 0 && mainRate > smallRate && effective <= (smallRate + 0.002);
+        })
+      ) ? 'X' : '';
+    }
 
     // CT calculation table (boxes 330 to 425)
     fillRateTableBoxes(boxes, result);
@@ -274,6 +288,18 @@
       boxes.box_526_coronavirus_support_payment_overpayment_now_due,
       boxes.box_527_restitution_tax
     ]));
+
+    // Keep explicit internal variables for CT600 formula-chain boxes.
+    result.tax.corporationTaxTableTotal = boxes.box_430_corporation_tax;
+    result.tax.corporationTaxChargeable = boxes.box_440_corporation_tax_chargeable;
+    result.tax.totalReliefsAndDeductions = boxes.box_470_total_reliefs_and_deductions;
+    result.tax.netCTLiability = boxes.box_475_net_ct_liability;
+    result.tax.totalTaxChargeable = boxes.box_510_total_tax_chargeable;
+    result.tax.incomeTaxRepayable = boxes.box_520_income_tax_repayable;
+    result.tax.selfAssessmentTaxPayable = boxes.box_525_self_assessment_tax_payable;
+    result.tax.totalSelfAssessmentTaxPayable = boxes.box_528_total_self_assessment_tax_payable;
+    result.tax.smallProfitsRateOrMarginalReliefEntitlement =
+      boxes.box_329_small_profits_rate_or_marginal_relief_entitlement;
 
     // Declaration
     boxes.box_975_name = String(declaration.name || '');

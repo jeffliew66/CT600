@@ -380,6 +380,20 @@
     }));
   }
 
+  function allocateByWeightForDisplay(total, rows, valueKey, outKey) {
+    let remaining = TaxModel.roundPounds(total);
+    const out = rows.map((row, idx) => {
+      const isLast = idx === rows.length - 1;
+      const weight = rows.length > 0
+        ? (Number(row[valueKey] || 0) / Math.max(1, rows.reduce((s, r) => s + Number(r[valueKey] || 0), 0)))
+        : 0;
+      const allocated = isLast ? remaining : TaxModel.roundPounds(total * weight);
+      remaining -= allocated;
+      return allocated;
+    });
+    return rows.map((row, idx) => ({ ...row, [outKey]: out[idx] }));
+  }
+
   function computeTaxPerFY({ fy_year, taxableProfit, augmentedProfit, lowerLimit, upperLimit, tiers }) {
     // Uses your marginal relief model:
     // if augmented <= lower => small profits rate (19%)
@@ -646,6 +660,8 @@
       const periodByFY = groupedPeriodByFY.map((grp) => {
         const lower = grp.lower_limit_sum || 0;
         const upper = grp.upper_limit_sum || 0;
+        const smallRate = getTier(grp.tiers, 1).rate;
+        const mainRate = getTier(grp.tiers, 3).rate;
         const computed = computeTaxPerFY({
           fy_year: grp.fy_years[0],
           taxableProfit: grp.taxableProfit,
@@ -654,6 +670,9 @@
           upperLimit: upper,
           tiers: grp.tiers
         });
+        const taxableProfitRounded = TaxModel.roundPounds(computed.taxableProfit);
+        const ctChargeRounded = TaxModel.roundPounds(computed.ctCharge);
+        const effectiveTaxRate = taxableProfitRounded > 0 ? (ctChargeRounded / taxableProfitRounded) : 0;
         return {
           period_index: periodIndex + 1,
           period_name: period.periodName,
@@ -669,9 +688,11 @@
           augmentedProfit: computed.augmentedProfit,
           ctCharge: computed.ctCharge,
           marginalRelief: computed.marginalRelief,
-          small_rate: getTier(grp.tiers, 1).rate,
-          main_rate: getTier(grp.tiers, 3).rate,
+          small_rate: smallRate,
+          main_rate: mainRate,
           relief_fraction: getTier(grp.tiers, 2).relief_fraction,
+          effective_tax_rate: effectiveTaxRate,
+          corporation_tax_at_main_rate: TaxModel.roundPounds(taxableProfitRounded * mainRate),
           regime_grouped: grp.fy_years.length > 1
         };
       });
@@ -735,18 +756,95 @@
     result.computation.taxableNonTradingProfits = TaxModel.roundPounds(
       periodResults.reduce((s, p) => s + (p.nonTradingProfitAfterAIA || 0), 0)
     );
+    result.computation.grossTradingProfit = TaxModel.roundPounds(
+      result.computation.taxableTradingProfit + result.computation.tradingLossUsed
+    );
+    result.computation.profitsSubtotal = TaxModel.roundPounds(
+      result.computation.taxableTradingProfit + result.computation.taxableNonTradingProfits
+    );
+    result.computation.subtotalBeforeDeductions = TaxModel.roundPounds(
+      result.accounts.profitBeforeTax + result.computation.addBacks
+    );
+    result.computation.totalTradingIncome = TaxModel.roundPounds(
+      tradingTurnover + governmentGrants + tradingBalancingCharges
+    );
+    result.computation.nonTradingIncomeExcludedFromTradingView = TaxModel.roundPounds(
+      (pnl.interestIncome || 0) + propertyIncome + chargeableGains
+    );
+    result.computation.totalOtherIncome = TaxModel.roundPounds(
+      result.property.propertyProfitAfterLossOffset + (pnl.interestIncome || 0) + chargeableGains + dividendIncome
+    );
+    result.computation.tradingLossCarriedForward = TaxModel.roundPounds(
+      Math.max(0, tradingLossBroughtForward - result.computation.tradingLossUsed)
+    );
+    result.computation.miscellaneousIncomeNotElsewhere = 0;
+    const aiaSliceRows = (Array.isArray(result.byFY) ? result.byFY : []).map((slice) => ({
+      fy_year: slice.fy_year,
+      fy_years: Array.isArray(slice.fy_years) ? slice.fy_years : [slice.fy_year],
+      period_index: slice.period_index || 1,
+      ap_days_in_fy: slice.ap_days_in_fy || 0,
+      aia_limit_pro_rated: Number(slice.aia_cap_for_fy || 0)
+    }));
+    const aiaTotalCap = aiaSliceRows.reduce((s, row) => s + (row.aia_limit_pro_rated || 0), 0);
+    const aiaRequestedTotal = Math.max(
+      0,
+      Number(
+        inputs.capitalAllowances?.annualInvestmentAllowanceTotalAdditions ??
+        inputs.capitalAllowances?.aiaAdditions ??
+        0
+      )
+    );
+    const aiaClaimedTotal = Math.max(0, Number(result.computation.capitalAllowances || 0));
+    const aiaUnrelievedTotal = Math.max(0, aiaRequestedTotal - aiaClaimedTotal);
+    let aiaParts = allocateByWeightForDisplay(aiaRequestedTotal, aiaSliceRows, 'aia_limit_pro_rated', 'aia_claim_requested');
+    aiaParts = allocateByWeightForDisplay(aiaClaimedTotal, aiaParts, 'aia_limit_pro_rated', 'aia_allowance_claimed');
+    aiaParts = allocateByWeightForDisplay(aiaUnrelievedTotal, aiaParts, 'aia_limit_pro_rated', 'aia_unrelieved_bfwd');
+    result.computation.aiaTotalCap = TaxModel.roundPounds(aiaTotalCap);
+    result.computation.aiaRequestedTotal = TaxModel.roundPounds(aiaRequestedTotal);
+    result.computation.aiaUnrelievedBroughtForwardTotal = TaxModel.roundPounds(aiaUnrelievedTotal);
+    result.computation.aiaPartsByFY = aiaParts.map((row) => ({
+      fyYear: Number(row.fy_year || 0),
+      fyYears: Array.isArray(row.fy_years) ? row.fy_years : [Number(row.fy_year || 0)],
+      periodIndex: Number(row.period_index || 1),
+      apDaysInFY: Number(row.ap_days_in_fy || 0),
+      aiaLimitProRated: TaxModel.roundPounds(row.aia_limit_pro_rated || 0),
+      aiaClaimRequested: TaxModel.roundPounds(row.aia_claim_requested || 0),
+      aiaAllowanceClaimed: TaxModel.roundPounds(row.aia_allowance_claimed || 0),
+      aiaUnrelievedBroughtForward: TaxModel.roundPounds(row.aia_unrelieved_bfwd || 0)
+    }));
     
     // Augmented profit (for rate banding) = Taxable Total + Dividend Income
     result.computation.augmentedProfits = TaxModel.roundPounds(result.computation.taxableTotalProfits + dividendIncome);
 
     result.tax.corporationTaxCharge = TaxModel.roundPounds(periodResults.reduce((s, p) => s + p.ctCharge, 0));
     result.tax.marginalRelief = TaxModel.roundPounds(periodResults.reduce((s, p) => s + p.marginalRelief, 0));
+    result.tax.corporationTaxChargeable = result.tax.corporationTaxCharge;
+    result.tax.corporationTaxTableTotal = TaxModel.roundPounds(result.tax.corporationTaxCharge + result.tax.marginalRelief);
+    result.tax.totalReliefsAndDeductions = 0;
+    result.tax.netCTLiability = result.tax.corporationTaxChargeable;
+    result.tax.totalTaxChargeable = result.tax.netCTLiability;
+    result.tax.incomeTaxRepayable = 0;
+    result.tax.selfAssessmentTaxPayable = result.tax.totalTaxChargeable;
+    result.tax.totalSelfAssessmentTaxPayable = result.tax.selfAssessmentTaxPayable;
+    result.tax.smallProfitsRateOrMarginalReliefEntitlement = (
+      Array.isArray(result.byFY) && result.byFY.some((slice) => {
+        const tp = Number(slice.taxableProfit || 0);
+        if (tp <= 0) return false;
+        const mr = Number(slice.marginalRelief || 0);
+        if (mr > 0) return true;
+        const smallRate = Number(slice.small_rate ?? 0);
+        const mainRate = Number(slice.main_rate ?? 0);
+        const effective = tp > 0 ? (Number(slice.ctCharge || 0) / tp) : 0;
+        return smallRate > 0 && mainRate > smallRate && effective <= (smallRate + 0.002);
+      })
+    ) ? 'X' : '';
     result.tax.taxPayable = result.tax.corporationTaxCharge;
 
     // Metadata: note if AP was split
     result.metadata = {
       ap_days: accountingPeriodDays,
       ap_split: hasMultiplePeriods,
+      loss_relief_note: 'Trading losses are applied against taxable trading profits only.',
       trading_loss_bf_available: TaxModel.roundPounds(tradingLossBroughtForward),
       trading_loss_use_requested: TaxModel.roundPounds(requestedLossTotal),
       trading_loss_use_remaining: TaxModel.roundPounds(remainingLossUseRequested),

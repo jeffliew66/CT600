@@ -232,6 +232,18 @@
         deductions: 0,
         capitalAllowances: 0,
         tradingLossUsed: 0,
+        grossTradingProfit: 0,
+        profitsSubtotal: 0,
+        subtotalBeforeDeductions: 0,
+        totalTradingIncome: 0,
+        totalOtherIncome: 0,
+        nonTradingIncomeExcludedFromTradingView: 0,
+        tradingLossCarriedForward: 0,
+        miscellaneousIncomeNotElsewhere: 0,
+        aiaTotalCap: 0,
+        aiaRequestedTotal: 0,
+        aiaUnrelievedBroughtForwardTotal: 0,
+        aiaPartsByFY: [],
 
         taxableTradingProfit: 0,
         taxableNonTradingProfits: 0,
@@ -243,7 +255,16 @@
       // Tax outcome (total across FYs)
       tax: {
         corporationTaxCharge: 0,
+        corporationTaxChargeable: 0,
+        corporationTaxTableTotal: 0,
         marginalRelief: 0,
+        totalReliefsAndDeductions: 0,
+        netCTLiability: 0,
+        totalTaxChargeable: 0,
+        incomeTaxRepayable: 0,
+        selfAssessmentTaxPayable: 0,
+        totalSelfAssessmentTaxPayable: 0,
+        smallProfitsRateOrMarginalReliefEntitlement: '',
         taxPayable: 0
       },
 
