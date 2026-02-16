@@ -475,6 +475,8 @@
 
     const inputs = TaxModel.createInputs(userInputs);
     const result = TaxModel.createEmptyResult();
+    const accountingPeriodDays = inputs.accountingPeriodDays ?? inputs.apDays;
+    const associatedCompanyCount = inputs.associatedCompanyCount ?? inputs.assocCompanies;
 
     // HMRC RULE: Split AP if > 12 months
     const apSplits = buildAccountingPeriodSplits(inputs, corpTaxYears);
@@ -486,37 +488,56 @@
         periodName: period.periodName,
         days: period.days,
         isShortPeriod: period.isShortPeriod,
-        amount: value * (period.days / inputs.apDays)
+        amount: value * (period.days / accountingPeriodDays)
       }));
     };
 
     // 1) Accounts P&L -> PBT (allocate to periods)
     // CRITICAL: Do NOT include dividend in totalIncome - dividend affects rate, not taxable profit
     const pnl = inputs.pnl;
+    const tradingTurnover = pnl.tradingTurnover ?? pnl.turnover;
+    const governmentGrants = pnl.governmentGrants ?? pnl.govtGrants;
+    const propertyIncome = pnl.propertyIncome ?? pnl.rentalIncome;
+    const propertyLossBroughtForward = pnl.propertyLossBroughtForward ?? pnl.propertyLossBF;
+    const tradingBalancingCharges = pnl.tradingBalancingCharges ?? pnl.disposalGains;
+    const chargeableGains = pnl.chargeableGains ?? pnl.capitalGains;
+    const dividendIncome = pnl.dividendIncome;
+    const costOfGoodsSold = pnl.costOfGoodsSold ?? pnl.costOfSales;
+    const staffEmploymentCosts = pnl.staffEmploymentCosts ?? pnl.staffCosts;
+    const depreciationExpense = pnl.depreciationExpense ?? pnl.depreciation;
+    const otherOperatingCharges = pnl.otherOperatingCharges ?? pnl.otherCharges;
+    const disallowableExpenditure = inputs.adjustments.disallowableExpenditure ?? inputs.adjustments.disallowableExpenses;
+    const otherTaxAdjustmentsAddBack = inputs.adjustments.otherTaxAdjustmentsAddBack ?? inputs.adjustments.otherAdjustments;
+    const annualInvestmentAllowanceTradeAdditions =
+      inputs.capitalAllowances.annualInvestmentAllowanceTradeAdditions ?? inputs.capitalAllowances.aiaTradeAdditions;
+    const annualInvestmentAllowanceNonTradeAdditions =
+      inputs.capitalAllowances.annualInvestmentAllowanceNonTradeAdditions ?? inputs.capitalAllowances.aiaNonTradeAdditions;
+    const tradingLossBroughtForward = inputs.losses.tradingLossBroughtForward ?? inputs.losses.tradingLossBF;
+    const tradingLossUsageRequested = inputs.losses.tradingLossUsageRequested ?? inputs.losses.tradingLossUseRequested;
     result.accounts.totalIncome = TaxModel.roundPounds(
-      pnl.turnover + pnl.govtGrants + pnl.rentalIncome + pnl.interestIncome + pnl.disposalGains + pnl.capitalGains
+      tradingTurnover + governmentGrants + propertyIncome + pnl.interestIncome + tradingBalancingCharges + chargeableGains
       // NOTE: pnl.dividendIncome is NOT included here - handled separately for augmented profit
     );
     result.accounts.totalExpenses = TaxModel.roundPounds(
-      pnl.costOfSales + pnl.staffCosts + pnl.depreciation + pnl.otherCharges
+      costOfGoodsSold + staffEmploymentCosts + depreciationExpense + otherOperatingCharges
     );
     result.accounts.profitBeforeTax = TaxModel.roundPounds(result.accounts.totalIncome - result.accounts.totalExpenses);
 
     // 2) Property inputs (property loss b/fwd is applied sequentially per AP below)
-    result.property.rentalIncome = pnl.rentalIncome;
-    result.property.propertyLossBF = pnl.propertyLossBF;
+    result.property.rentalIncome = propertyIncome;
+    result.property.propertyLossBF = propertyLossBroughtForward;
     result.property.propertyProfitAfterLossOffset = 0;
-    result.property.propertyLossCF = Math.max(0, pnl.propertyLossBF);
+    result.property.propertyLossCF = Math.max(0, propertyLossBroughtForward);
 
     // 3) Loss pools available at start of first AP (then carried sequentially).
-    let remainingPropertyLossPool = Math.max(0, Number(pnl.propertyLossBF) || 0);
+    let remainingPropertyLossPool = Math.max(0, Number(propertyLossBroughtForward) || 0);
     // Trading losses b/fwd flow sequentially across APs:
     // opening pool is available to AP1, unused balance carries forward to AP2, etc.
-    let remainingLossPool = Math.max(0, Number(inputs.losses.tradingLossBF) || 0);
+    let remainingLossPool = Math.max(0, Number(tradingLossBroughtForward) || 0);
     const requestedLossTotal =
-      inputs.losses.tradingLossUseRequested == null
+      tradingLossUsageRequested == null
         ? remainingLossPool
-        : Math.min(remainingLossPool, Math.max(0, Number(inputs.losses.tradingLossUseRequested) || 0));
+        : Math.min(remainingLossPool, Math.max(0, Number(tradingLossUsageRequested) || 0));
     let remainingLossUseRequested = requestedLossTotal;
 
     // 4) Allocate profit to each AP split period and calculate tax per period
@@ -526,7 +547,7 @@
         apStartUTC: period.startUTC,
         apEndUTC: period.endUTC,
         apDays: period.days,
-        assocCompanies: inputs.assocCompanies,
+        assocCompanies: associatedCompanyCount,
         isShortPeriod: period.isShortPeriod
       };
       const fyOverlaps = buildFYOverlaps(tmpInputs, corpTaxYears);
@@ -534,14 +555,14 @@
       const aiaAlloc = buildAIAAllocation(tmpInputs, fyOverlaps, corpTaxYears);
 
       // Allocate inputs to this period
-      const periodProfitBeforeTax = result.accounts.profitBeforeTax * (period.days / inputs.apDays);
-      const periodRatio = (period.days / (inputs.apDays || 1));
-      const periodDividendIncome = pnl.dividendIncome * periodRatio;
+      const periodProfitBeforeTax = result.accounts.profitBeforeTax * (period.days / accountingPeriodDays);
+      const periodRatio = (period.days / (accountingPeriodDays || 1));
+      const periodDividendIncome = dividendIncome * periodRatio;
       const periodInterestIncome = pnl.interestIncome * periodRatio;
       // disposalGains is treated as trading balancing charges (AIA disposal context),
       // not non-trading chargeable gains.
-      const periodCapitalGains = pnl.capitalGains * periodRatio;
-      const periodRentalIncomeGross = TaxModel.roundPounds(pnl.rentalIncome * periodRatio);
+      const periodCapitalGains = chargeableGains * periodRatio;
+      const periodRentalIncomeGross = TaxModel.roundPounds(propertyIncome * periodRatio);
       const periodPropertyLossPool = Math.max(0, remainingPropertyLossPool);
       const periodPropertyLossUsed = Math.min(periodPropertyLossPool, Math.max(0, periodRentalIncomeGross));
       remainingPropertyLossPool = Math.max(0, periodPropertyLossPool - periodPropertyLossUsed);
@@ -551,13 +572,13 @@
 
       // Add-backs
       const periodAddBacks = TaxModel.roundPounds(
-        (pnl.depreciation + inputs.adjustments.disallowableExpenses + inputs.adjustments.otherAdjustments) * periodRatio
+        (depreciationExpense + disallowableExpenditure + otherTaxAdjustmentsAddBack) * periodRatio
       );
 
       // Capital allowances (AIA) - separate trade/non-trade buckets and caps
       const periodAIACapTotal = aiaAlloc.totalCap;
-      const periodTradeAIAAdditionsShare = inputs.capitalAllowances.aiaTradeAdditions * periodRatio;
-      const periodNonTradeAIAAdditionsShare = inputs.capitalAllowances.aiaNonTradeAdditions * periodRatio;
+      const periodTradeAIAAdditionsShare = annualInvestmentAllowanceTradeAdditions * periodRatio;
+      const periodNonTradeAIAAdditionsShare = annualInvestmentAllowanceNonTradeAdditions * periodRatio;
       const periodAIAAdditionsShare = periodTradeAIAAdditionsShare + periodNonTradeAIAAdditionsShare;
 
       // Taxable total profit base (before losses), then apply AIA to trade/non-trade separately.
@@ -695,7 +716,7 @@
     result.property.propertyProfitAfterLossOffset = TaxModel.roundPounds(periodResults.reduce((s, p) => s + (p.propertyProfitAfterLoss || 0), 0));
     result.property.propertyLossCF = TaxModel.roundPounds(remainingPropertyLossPool);
     result.byFY = periodResults.flatMap((p) => p.byFY);
-    result.computation.addBacks = TaxModel.roundPounds(periodResults.reduce((s, p) => s + (pnl.depreciation + inputs.adjustments.disallowableExpenses + inputs.adjustments.otherAdjustments) * (p.days / inputs.apDays), 0));
+    result.computation.addBacks = TaxModel.roundPounds(periodResults.reduce((s, p) => s + (depreciationExpense + disallowableExpenditure + otherTaxAdjustmentsAddBack) * (p.days / accountingPeriodDays), 0));
     result.computation.capitalAllowances = TaxModel.roundPounds(periodResults.reduce((s, p) => s + p.aiaClaimed, 0));
     result.computation.deductions = result.computation.capitalAllowances;
     result.computation.tradingLossUsed = TaxModel.roundPounds(periodResults.reduce((s, p) => s + (p.lossUsed || 0), 0));
@@ -714,7 +735,7 @@
     );
     
     // Augmented profit (for rate banding) = Taxable Total + Dividend Income
-    result.computation.augmentedProfits = TaxModel.roundPounds(result.computation.taxableTotalProfits + pnl.dividendIncome);
+    result.computation.augmentedProfits = TaxModel.roundPounds(result.computation.taxableTotalProfits + dividendIncome);
 
     result.tax.corporationTaxCharge = TaxModel.roundPounds(periodResults.reduce((s, p) => s + p.ctCharge, 0));
     result.tax.marginalRelief = TaxModel.roundPounds(periodResults.reduce((s, p) => s + p.marginalRelief, 0));
@@ -722,9 +743,9 @@
 
     // Metadata: note if AP was split
     result.metadata = {
-      ap_days: inputs.apDays,
+      ap_days: accountingPeriodDays,
       ap_split: hasMultiplePeriods,
-      trading_loss_bf_available: TaxModel.roundPounds(inputs.losses.tradingLossBF),
+      trading_loss_bf_available: TaxModel.roundPounds(tradingLossBroughtForward),
       trading_loss_use_requested: TaxModel.roundPounds(requestedLossTotal),
       trading_loss_use_remaining: TaxModel.roundPounds(remainingLossUseRequested),
       periods: periodResults.map((p) => ({

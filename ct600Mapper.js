@@ -20,29 +20,42 @@
     const boxes = {};
 
     // Period + associates
-    boxes.box_30_period_start = inputs.apStart;
-    boxes.box_35_period_end = inputs.apEnd;
-    boxes.box_326_assoc_companies = inputs.assocCompanies;
-    boxes.box_327_assoc_companies = inputs.assocCompanies;
-    boxes.box_328_assoc_companies = inputs.assocCompanies;
+    const accountingPeriodStart = inputs.accountingPeriodStart ?? inputs.apStart;
+    const accountingPeriodEnd = inputs.accountingPeriodEnd ?? inputs.apEnd;
+    const associatedCompanyCount = inputs.associatedCompanyCount ?? inputs.assocCompanies;
+    const tradingTurnover = inputs.pnl.tradingTurnover ?? inputs.pnl.turnover;
+    const propertyIncome = inputs.pnl.propertyIncome ?? inputs.pnl.rentalIncome;
+    const chargeableGains = inputs.pnl.chargeableGains ?? inputs.pnl.capitalGains;
+    const tradingLossBroughtForward = inputs.losses.tradingLossBroughtForward ?? inputs.losses.tradingLossBF;
+    const propertyLossBroughtForward = inputs.pnl.propertyLossBroughtForward ?? inputs.pnl.propertyLossBF;
+    const tradingBalancingCharges = inputs.pnl.tradingBalancingCharges ?? inputs.pnl.disposalGains;
+    const tradingProfitBeforeLoss = (result.computation.taxableTradingProfit || 0) + (result.computation.tradingLossUsed || 0);
+
+    boxes.box_30_period_start = accountingPeriodStart;
+    boxes.box_35_period_end = accountingPeriodEnd;
+    boxes.box_326_assoc_companies = associatedCompanyCount;
+    boxes.box_327_assoc_companies = associatedCompanyCount;
+    boxes.box_328_assoc_companies = associatedCompanyCount;
 
     // P&L-related CT600 boxes you used
-    boxes.box_145_trade_turnover = round(inputs.pnl.turnover);
+    boxes.box_145_trade_turnover = round(tradingTurnover);
     boxes.box_170_interest_income = round(inputs.pnl.interestIncome);
-    boxes.box_190_rental_income = round(inputs.pnl.rentalIncome);
+    boxes.box_190_rental_income = round(propertyIncome);
     // Engine input `disposalGains` is used as trading balancing charges
     // (AIA asset disposal context), not as non-trading chargeable gains.
     boxes.box_205_disposal_gains = 0;
-    boxes.box_210_chargeable_gains = round(inputs.pnl.capitalGains || 0);
+    boxes.box_210_chargeable_gains = round(chargeableGains || 0);
     boxes.box_620_dividend_income = round(inputs.pnl.dividendIncome);
 
     // Trading profit
-    boxes.box_155_trading_profit = round(result.accounts.profitBeforeTax);
-    boxes.box_160_trading_losses_bfwd = round(inputs.losses.tradingLossBF);
+    // HMRC: box 155 is trading profits only (not total PBT including non-trading streams).
+    boxes.box_155_trading_profit = round(tradingProfitBeforeLoss);
+    // HMRC: box 160 is trading losses b/fwd set against trading profits in this AP.
+    boxes.box_160_trading_losses_bfwd = round(result.computation.tradingLossUsed);
     boxes.box_165_net_trading_profits = round(result.computation.taxableTradingProfit);
 
     // Property losses
-    boxes.box_250_prop_losses_bfwd = round(inputs.pnl.propertyLossBF);
+    boxes.box_250_prop_losses_bfwd = round(propertyLossBroughtForward);
     boxes.box_250_prop_losses_cfwd = round(result.property.propertyLossCF);
 
     // Profit subtotal (simplified): taxable trading + taxable non-trading
@@ -73,7 +86,7 @@
 
     // Helpful transparency (not official CT600 boxes, but good for UI/debug)
     boxes._marginal_relief_total = round(result.tax.marginalRelief);
-    boxes._trading_balancing_charges = round(inputs.pnl.disposalGains || 0);
+    boxes._trading_balancing_charges = round(tradingBalancingCharges || 0);
 
     return boxes;
   }

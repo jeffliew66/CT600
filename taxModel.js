@@ -30,11 +30,11 @@
 
   function createInputs(userInputs) {
     const ui = userInputs || {};
-    const apStart = String(ui.apStart || ui.box_30_period_start || '');
-    const apEnd = String(ui.apEnd || ui.box_35_period_end || '');
+    const accountingPeriodStart = String(ui.accountingPeriodStart ?? ui.apStart ?? ui.box_30_period_start ?? '');
+    const accountingPeriodEnd = String(ui.accountingPeriodEnd ?? ui.apEnd ?? ui.box_35_period_end ?? '');
 
-    const apStartUTC = parseISODate(apStart);
-    const apEndUTC = parseISODate(apEnd);
+    const apStartUTC = parseISODate(accountingPeriodStart);
+    const apEndUTC = parseISODate(accountingPeriodEnd);
 
     if (!apStartUTC || !apEndUTC) {
       throw new Error('Invalid accounting period dates (apStart/apEnd). Use YYYY-MM-DD.');
@@ -43,101 +43,130 @@
       throw new Error('Accounting period end date must be on/after start date.');
     }
 
-    const assocCompanies = Math.max(0, Number(ui.assocCompanies ?? ui.box_326_assoc_companies ?? 0) || 0);
+    const associatedCompanyCount = Math.max(0, Number(ui.associatedCompanyCount ?? ui.assocCompanies ?? ui.box_326_assoc_companies ?? 0) || 0);
 
     // P&L / income items
-    const turnover = roundPounds(ui.turnover ?? ui.val_turnover ?? 0);
-    const govtGrants = roundPounds(ui.govtGrants ?? ui.box_325_govt_grants ?? 0);
-    const rentalIncome = roundPounds(ui.rentalIncome ?? ui.box_190_rental_income ?? 0);
-    const propertyLossBF = roundPounds(ui.propertyLossBF ?? ui.box_250_prop_losses_bfwd ?? 0);
+    const tradingTurnover = roundPounds(ui.tradingTurnover ?? ui.turnover ?? ui.val_turnover ?? 0);
+    const governmentGrants = roundPounds(ui.governmentGrants ?? ui.govtGrants ?? ui.box_325_govt_grants ?? 0);
+    const propertyIncome = roundPounds(ui.propertyIncome ?? ui.rentalIncome ?? ui.box_190_rental_income ?? 0);
+    const propertyLossBroughtForward = roundPounds(ui.propertyLossBroughtForward ?? ui.propertyLossBF ?? ui.box_250_prop_losses_bfwd ?? 0);
     const interestIncome = roundPounds(ui.interestIncome ?? ui.box_170_interest_income ?? 0);
     // Backward compatible aliases:
     // - disposalGains (legacy UI label)
     // - balancingChargesTrade / assetDisposalsBalancingCharge (clearer tax meaning)
-    const disposalGains = roundPounds(
+    const tradingBalancingCharges = roundPounds(
+      ui.tradingBalancingCharges ??
       ui.disposalGains ??
       ui.balancingChargesTrade ??
       ui.assetDisposalsBalancingCharge ??
       ui.box_205_disposal_gains ??
       0
     );
-    const capitalGains = roundPounds(ui.capitalGains ?? ui.box_210_chargeable_gains ?? 0);
-    const capitalGainsFileName = String(ui.capitalGainsFileName ?? ui.capital_gains_source_file ?? '');
+    const chargeableGains = roundPounds(ui.chargeableGains ?? ui.capitalGains ?? ui.box_210_chargeable_gains ?? 0);
+    const chargeableGainsComputationFileName = String(ui.chargeableGainsComputationFileName ?? ui.capitalGainsFileName ?? ui.capital_gains_source_file ?? '');
     const dividendIncome = roundPounds(ui.dividendIncome ?? ui.box_620_dividend_income ?? 0);
 
     // Expenses
-    const costOfSales = roundPounds(ui.costOfSales ?? ui.val_cost_of_sales ?? 0);
-    const staffCosts = roundPounds(ui.staffCosts ?? ui.val_staff_costs ?? 0);
-    const depreciation = roundPounds(ui.depreciation ?? ui.val_depreciation_acc ?? 0);
-    const otherCharges = roundPounds(ui.otherCharges ?? ui.val_other_charges ?? 0);
+    const costOfGoodsSold = roundPounds(ui.costOfGoodsSold ?? ui.costOfSales ?? ui.val_cost_of_sales ?? 0);
+    const staffEmploymentCosts = roundPounds(ui.staffEmploymentCosts ?? ui.staffCosts ?? ui.val_staff_costs ?? 0);
+    const depreciationExpense = roundPounds(ui.depreciationExpense ?? ui.depreciation ?? ui.val_depreciation_acc ?? 0);
+    const otherOperatingCharges = roundPounds(ui.otherOperatingCharges ?? ui.otherCharges ?? ui.val_other_charges ?? 0);
 
     // Tax adjustments / allowances (user inputs)
-    const disallowableExpenses = roundPounds(ui.disallowableExpenses ?? ui.val_disallowable_expenses ?? 0);
-    const otherAdjustments = roundPounds(ui.otherAdjustments ?? ui.val_other_adjustments ?? 0);
+    const disallowableExpenditure = roundPounds(ui.disallowableExpenditure ?? ui.disallowableExpenses ?? ui.val_disallowable_expenses ?? 0);
+    const otherTaxAdjustmentsAddBack = roundPounds(ui.otherTaxAdjustmentsAddBack ?? ui.otherAdjustments ?? ui.val_other_adjustments ?? 0);
 
     // Capital allowances (AIA): keep separate trade/non-trade buckets.
-    const aiaTradeAdditions = roundPounds(
+    const annualInvestmentAllowanceTradeAdditions = roundPounds(
+      ui.annualInvestmentAllowanceTradeAdditions ??
       ui.aiaTradeAdditions ?? ui.aiaTrade ?? ui.box_670_aia_trade_additions ?? ui.box_670_aia_additions ?? 0
     );
-    const aiaNonTradeAdditions = roundPounds(
+    const annualInvestmentAllowanceNonTradeAdditions = roundPounds(
+      ui.annualInvestmentAllowanceNonTradeAdditions ??
       ui.aiaNonTradeAdditions ?? ui.aiaNonTrade ?? ui.box_671_aia_non_trade_additions ?? 0
     );
-    const fallbackAiaTotal = roundPounds(ui.aiaAdditions ?? ui.box_670_aia_additions ?? 0);
+    const fallbackAiaTotal = roundPounds(ui.annualInvestmentAllowanceTotalAdditions ?? ui.aiaAdditions ?? ui.box_670_aia_additions ?? 0);
     // Backward compatibility: if only total provided, treat as trade AIA.
-    const resolvedAiaTrade = aiaTradeAdditions || fallbackAiaTotal;
-    const resolvedAiaNonTrade = aiaNonTradeAdditions;
+    const resolvedAiaTrade = annualInvestmentAllowanceTradeAdditions || fallbackAiaTotal;
+    const resolvedAiaNonTrade = annualInvestmentAllowanceNonTradeAdditions;
 
     // Trading losses
-    const tradingLossBF = roundPounds(ui.tradingLossBF ?? ui.box_160_trading_losses_bfwd ?? 0);
-    const tradingLossUseRequestedRaw = ui.tradingLossUseRequested ?? ui.box_161_trading_losses_use_requested;
-    const tradingLossUseRequested = (tradingLossUseRequestedRaw === '' || tradingLossUseRequestedRaw == null)
+    const tradingLossBroughtForward = roundPounds(ui.tradingLossBroughtForward ?? ui.tradingLossBF ?? ui.box_160_trading_losses_bfwd ?? 0);
+    const tradingLossUsageRequestedRaw = ui.tradingLossUsageRequested ?? ui.tradingLossUseRequested ?? ui.box_161_trading_losses_use_requested;
+    const tradingLossUsageRequested = (tradingLossUsageRequestedRaw === '' || tradingLossUsageRequestedRaw == null)
       ? null
       : (() => {
-          const tradingLossUseRequestedNum = Number(tradingLossUseRequestedRaw);
-          return Number.isFinite(tradingLossUseRequestedNum)
-            ? roundPounds(Math.max(0, tradingLossUseRequestedNum))
+          const tradingLossUsageRequestedNum = Number(tradingLossUsageRequestedRaw);
+          return Number.isFinite(tradingLossUsageRequestedNum)
+            ? roundPounds(Math.max(0, tradingLossUsageRequestedNum))
             : null;
         })();
 
     return {
-      apStart,
-      apEnd,
+      accountingPeriodStart,
+      accountingPeriodEnd,
       apStartUTC,
       apEndUTC,
+      accountingPeriodDays: daysInclusive(apStartUTC, apEndUTC),
+      associatedCompanyCount,
+      // Legacy aliases retained for backward compatibility.
+      apStart: accountingPeriodStart,
+      apEnd: accountingPeriodEnd,
       apDays: daysInclusive(apStartUTC, apEndUTC),
-      assocCompanies,
+      assocCompanies: associatedCompanyCount,
 
       pnl: {
-        turnover,
-        govtGrants,
-        rentalIncome,
-        propertyLossBF,
+        tradingTurnover,
+        governmentGrants,
+        propertyIncome,
+        propertyLossBroughtForward,
         interestIncome,
-        disposalGains,
-        capitalGains,
-        capitalGainsFileName,
+        tradingBalancingCharges,
+        chargeableGains,
+        chargeableGainsComputationFileName,
         dividendIncome,
-
-        costOfSales,
-        staffCosts,
-        depreciation,
-        otherCharges
+        costOfGoodsSold,
+        staffEmploymentCosts,
+        depreciationExpense,
+        otherOperatingCharges,
+        // Legacy aliases retained for backward compatibility.
+        turnover: tradingTurnover,
+        govtGrants: governmentGrants,
+        rentalIncome: propertyIncome,
+        propertyLossBF: propertyLossBroughtForward,
+        disposalGains: tradingBalancingCharges,
+        capitalGains: chargeableGains,
+        capitalGainsFileName: chargeableGainsComputationFileName,
+        costOfSales: costOfGoodsSold,
+        staffCosts: staffEmploymentCosts,
+        depreciation: depreciationExpense,
+        otherCharges: otherOperatingCharges
       },
 
       adjustments: {
-        disallowableExpenses,
-        otherAdjustments
+        disallowableExpenditure,
+        otherTaxAdjustmentsAddBack,
+        // Legacy aliases retained for backward compatibility.
+        disallowableExpenses: disallowableExpenditure,
+        otherAdjustments: otherTaxAdjustmentsAddBack
       },
 
       capitalAllowances: {
+        annualInvestmentAllowanceTradeAdditions: resolvedAiaTrade,
+        annualInvestmentAllowanceNonTradeAdditions: resolvedAiaNonTrade,
+        annualInvestmentAllowanceTotalAdditions: resolvedAiaTrade + resolvedAiaNonTrade,
+        // Legacy aliases retained for backward compatibility.
         aiaTradeAdditions: resolvedAiaTrade,
         aiaNonTradeAdditions: resolvedAiaNonTrade,
         aiaAdditions: resolvedAiaTrade + resolvedAiaNonTrade
       },
 
       losses: {
-        tradingLossBF,
-        tradingLossUseRequested
+        tradingLossBroughtForward,
+        tradingLossUsageRequested,
+        // Legacy aliases retained for backward compatibility.
+        tradingLossBF: tradingLossBroughtForward,
+        tradingLossUseRequested: tradingLossUsageRequested
       }
     };
   }

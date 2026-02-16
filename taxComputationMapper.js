@@ -23,15 +23,30 @@
    * Shows step from accounts profit to taxable profit
    */
   function buildProfitAdjustmentSchedule(inputs, result) {
+    const depreciationExpense = inputs.pnl.depreciationExpense ?? inputs.pnl.depreciation;
+    const disallowableExpenditure = inputs.adjustments.disallowableExpenditure ?? inputs.adjustments.disallowableExpenses;
+    const otherTaxAdjustmentsAddBack = inputs.adjustments.otherTaxAdjustmentsAddBack ?? inputs.adjustments.otherAdjustments;
+    const tradingTurnover = inputs.pnl.tradingTurnover ?? inputs.pnl.turnover;
+    const governmentGrants = inputs.pnl.governmentGrants ?? inputs.pnl.govtGrants;
+    const tradingBalancingCharges = inputs.pnl.tradingBalancingCharges ?? inputs.pnl.disposalGains;
+    const chargeableGains = inputs.pnl.chargeableGains ?? inputs.pnl.capitalGains;
+    const chargeableGainsComputationFileName =
+      inputs.pnl.chargeableGainsComputationFileName ?? inputs.pnl.capitalGainsFileName;
+    const nonTradingIncomeClassificationAmount = round(
+      (inputs.pnl.interestIncome || 0) +
+      (inputs.pnl.propertyIncome ?? inputs.pnl.rentalIncome ?? 0) +
+      (chargeableGains || 0)
+    );
+
     return {
       // Starting point: accounts profit before tax (box 155 in final result)
       accounting_profit_before_tax: round(result.accounts.profitBeforeTax),
 
       // Add-backs: non-deductible items
       add_backs: {
-        depreciation_disallowed: round(inputs.pnl.depreciation),
-        disallowable_expenses: round(inputs.adjustments.disallowableExpenses),
-        other_adjustments_add_back: round(inputs.adjustments.otherAdjustments),
+        depreciation_disallowed: round(depreciationExpense),
+        disallowable_expenses: round(disallowableExpenditure),
+        other_adjustments_add_back: round(otherTaxAdjustmentsAddBack),
         total_add_backs: round(result.computation.addBacks)
       },
 
@@ -48,13 +63,13 @@
 
       // Trading income components (disposal proceeds are treated as balancing charges in trade)
       trading_income_components: {
-        turnover: round(inputs.pnl.turnover),
-        govt_grants: round(inputs.pnl.govtGrants),
-        asset_disposal_proceeds_balancing_charges: round(inputs.pnl.disposalGains || 0),
+        turnover: round(tradingTurnover),
+        govt_grants: round(governmentGrants),
+        asset_disposal_proceeds_balancing_charges: round(tradingBalancingCharges || 0),
         total_trading_income: round(
-          (inputs.pnl.turnover || 0) +
-          (inputs.pnl.govtGrants || 0) +
-          (inputs.pnl.disposalGains || 0)
+          (tradingTurnover || 0) +
+          (governmentGrants || 0) +
+          (tradingBalancingCharges || 0)
         )
       },
 
@@ -69,17 +84,23 @@
       // Trading profit after loss
       net_trading_profit: round(result.computation.taxableTradingProfit),
 
+      // Classification-only reconciliation line:
+      // PBT includes non-trading income streams, while net_trading_profit excludes them.
+      classification_adjustments: {
+        non_trading_income_excluded_from_trading_view: nonTradingIncomeClassificationAmount
+      },
+
       // Add: non-trading income items (disposal balancing charges excluded from this bucket)
       other_income: {
         rental_income_net: round(result.property.propertyProfitAfterLossOffset),
         interest_income: round(inputs.pnl.interestIncome),
-        capital_gains: round(inputs.pnl.capitalGains || 0),
-        capital_gains_source_file: String(inputs.pnl.capitalGainsFileName || ''),
+        capital_gains: round(chargeableGains || 0),
+        capital_gains_source_file: String(chargeableGainsComputationFileName || ''),
         dividend_income: round(inputs.pnl.dividendIncome),
         total_other_income: round(
           result.property.propertyProfitAfterLossOffset +
           inputs.pnl.interestIncome +
-          (inputs.pnl.capitalGains || 0) +
+          (chargeableGains || 0) +
           inputs.pnl.dividendIncome
         )
       },
@@ -103,7 +124,14 @@
     }));
 
     const totalCap = sliceRows.reduce((s, row) => s + row.aia_limit_pro_rated, 0);
-    const requested = Math.max(0, Number(inputs.capitalAllowances?.aiaAdditions || 0));
+    const requested = Math.max(
+      0,
+      Number(
+        inputs.capitalAllowances?.annualInvestmentAllowanceTotalAdditions ??
+        inputs.capitalAllowances?.aiaAdditions ??
+        0
+      )
+    );
     const claimed = Math.max(0, Number(result.computation?.capitalAllowances || 0));
     const unrelieved = Math.max(0, requested - claimed);
 
@@ -137,7 +165,10 @@
     }));
 
     return {
-      total_plant_additions: round(inputs.capitalAllowances.aiaAdditions),
+      total_plant_additions: round(
+        inputs.capitalAllowances.annualInvestmentAllowanceTotalAdditions ??
+        inputs.capitalAllowances.aiaAdditions
+      ),
       annual_investment_allowance: {
         parts_by_fy: partsByFY,
         total_aia_cap: round(totalCap),
@@ -209,16 +240,18 @@
    * Builds "Trading Loss Claim" (CT600 Section 2)
    */
   function buildTradingLossSchedule(inputs, result) {
+    const tradingLossBroughtForward = inputs.losses.tradingLossBroughtForward ?? inputs.losses.tradingLossBF;
+    const tradingLossUsageRequested = inputs.losses.tradingLossUsageRequested ?? inputs.losses.tradingLossUseRequested;
     const requested =
-      inputs.losses.tradingLossUseRequested == null
-        ? inputs.losses.tradingLossBF
-        : Math.min(inputs.losses.tradingLossBF, inputs.losses.tradingLossUseRequested);
+      tradingLossUsageRequested == null
+        ? tradingLossBroughtForward
+        : Math.min(tradingLossBroughtForward, tradingLossUsageRequested);
     return {
-      trading_loss_bfwd_available: round(inputs.losses.tradingLossBF),
+      trading_loss_bfwd_available: round(tradingLossBroughtForward),
       trading_loss_use_requested: round(requested),
       trading_loss_bfwd_used_this_period: round(result.computation.tradingLossUsed),
       trading_loss_cfwd: round(
-        inputs.losses.tradingLossBF - result.computation.tradingLossUsed
+        tradingLossBroughtForward - result.computation.tradingLossUsed
       )
     };
   }
