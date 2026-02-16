@@ -131,16 +131,18 @@
 // result.computation.aiaPartsByFY[].aiaAllowanceClaimed          | -                                                        | capital_allowances_schedule.annual_investment_allowance.parts_by_fy[].aia_allowance_claimed
 // result.computation.aiaPartsByFY[].aiaUnrelievedBroughtForward  | -                                                        | capital_allowances_schedule.annual_investment_allowance.parts_by_fy[].aia_unrelieved_bfwd
 // result.computation.aiaTotalCap                                 | -                                                        | capital_allowances_schedule.annual_investment_allowance.total_aia_cap
-//                                                          | -                                                        | capital_allowances_schedule.annual_investment_allowance.allocation_note
+// result.computation.aiaAllocationNote                            | -                                                        | capital_allowances_schedule.annual_investment_allowance.allocation_note
 // result.metadata.loss_relief_note                            | -                                                        | tax_calculation_table.year_summary.loss_relief_note
 
-// SECTION: COMPULSORY FILING ITEMS NOT INTERNALLY MODELED
-//                                                          | ct600_header.company_utr                                 | -
-//                                                          | ct600_header.company_name                                | -
-//                                                          | ct600_header.company_registration_number                 | -
-//                                                          | ct600_header.return_type_or_period_indicator             | -
-//                                                          | ct600_header.company_address                             | -
-//                                                          | ct600_attachments.accounts_and_computation_metadata      | -
-//                                                          | -                                                        | tax_computation.cover.company_identifier
-//                                                          | -                                                        | tax_computation.cover.accounting_framework
-//                                                          | -                                                        | tax_computation.cover.computation_basis_note
+// SECTION: CT600 HEADER INPUTS
+// inputs.company_utr                                         | ct600_header.company_utr                                 | -
+// inputs.company_name                                        | ct600_header.company_name                                | -
+// inputs.company_registration_number                         | ct600_header.company_registration_number                 | -
+// inputs.return_type_or_period_indicator                     | ct600_header.return_type_or_period_indicator             | -
+// inputs.company_address                                     | ct600_header.company_address                             | -
+// inputs.accounts_and_computation_metadata                   | ct600_attachments.accounts_and_computation_metadata      | -
+
+// SECTION: TAX COMPUTATION COVER INPUTS
+// inputs.tax_computation_cover_company_identifier             | -                                                        | cover.company_identifier
+// inputs.tax_computation_cover_accounting_framework           | -                                                        | cover.accounting_framework
+// inputs.tax_computation_cover_computation_basis_note         | -                                                        | cover.computation_basis_note

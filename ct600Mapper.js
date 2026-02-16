@@ -227,18 +227,10 @@
 
     // CT calculation table (boxes 330 to 425)
     fillRateTableBoxes(boxes, result);
-    boxes.box_430_corporation_tax = toMoney(sumNumbers([
-      boxes.box_345_tax,
-      boxes.box_360_tax,
-      boxes.box_375_tax,
-      boxes.box_395_tax,
-      boxes.box_410_tax,
-      boxes.box_425_tax
-    ]));
+    // Use defined result.tax variables directly (no derivation in mapper).
+    boxes.box_430_corporation_tax = round(result.tax.corporationTaxTableTotal || 0);
     boxes.box_435_marginal_relief = toMoney(result.tax.marginalRelief || 0);
-    boxes.box_440_corporation_tax_chargeable = toMoney(
-      Math.max(0, boxes.box_430_corporation_tax - boxes.box_435_marginal_relief)
-    );
+    boxes.box_440_corporation_tax_chargeable = round(result.tax.corporationTaxChargeable || 0);
 
     // Reliefs / deductions
     boxes.box_445_community_investment_tax_relief = communityInvestmentTaxRelief;
@@ -253,9 +245,7 @@
     ]));
 
     // Tax payable chain
-    boxes.box_475_net_ct_liability = toMoney(
-      Math.max(0, boxes.box_440_corporation_tax_chargeable - boxes.box_470_total_reliefs_and_deductions)
-    );
+    boxes.box_475_net_ct_liability = round(result.tax.netCTLiability || 0);
     boxes.box_480_tax_payable_by_a_close_company = loansToParticipatorsTax;
     boxes.box_500_cfc_bank_levy_surcharge_and_rpdt = toMoney(sumNumbers([
       controlledForeignCompaniesTax,
@@ -266,28 +256,15 @@
     boxes.box_501_eogpl_payable = eogplPayable;
     boxes.box_502_egl_payable = eglPayable;
     boxes.box_505_supplementary_charge = supplementaryChargePayable;
-    boxes.box_510_total_tax_chargeable = toMoney(sumNumbers([
-      boxes.box_475_net_ct_liability,
-      boxes.box_480_tax_payable_by_a_close_company,
-      boxes.box_500_cfc_bank_levy_surcharge_and_rpdt,
-      boxes.box_501_eogpl_payable,
-      boxes.box_502_egl_payable,
-      boxes.box_505_supplementary_charge
-    ]));
+    boxes.box_510_total_tax_chargeable = round(result.tax.totalTaxChargeable || 0);
     boxes.box_515_income_tax_deducted_from_gross_income = incomeTaxDeductedFromGrossIncome;
     boxes.box_520_income_tax_repayable = toMoney(
       Math.max(0, boxes.box_515_income_tax_deducted_from_gross_income - boxes.box_510_total_tax_chargeable)
     );
-    boxes.box_525_self_assessment_tax_payable = toMoney(
-      Math.max(0, boxes.box_510_total_tax_chargeable - boxes.box_515_income_tax_deducted_from_gross_income)
-    );
+    boxes.box_525_self_assessment_tax_payable = round(result.tax.selfAssessmentTaxPayable || 0);
     boxes.box_526_coronavirus_support_payment_overpayment_now_due = coronavirusOverpaymentNowDue;
     boxes.box_527_restitution_tax = restitutionTax;
-    boxes.box_528_total_self_assessment_tax_payable = toMoney(sumNumbers([
-      boxes.box_525_self_assessment_tax_payable,
-      boxes.box_526_coronavirus_support_payment_overpayment_now_due,
-      boxes.box_527_restitution_tax
-    ]));
+    boxes.box_528_total_self_assessment_tax_payable = round(result.tax.totalSelfAssessmentTaxPayable || 0);
 
     // Keep explicit internal variables for CT600 formula-chain boxes.
     result.tax.corporationTaxTableTotal = boxes.box_430_corporation_tax;

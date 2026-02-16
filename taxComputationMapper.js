@@ -215,7 +215,10 @@
         parts_by_fy: partsByFY,
         total_aia_cap: round(totalCap),
         total_aia_claimed: round(result.computation.capitalAllowances),
-        allocation_note: 'Per-slice requested/claimed/unrelieved figures are allocated by AIA cap-share for reporting.'
+        allocation_note: String(
+          result.computation.aiaAllocationNote ||
+          'Per-slice requested/claimed/unrelieved figures are allocated by AIA cap-share for reporting.'
+        )
       },
       total_capital_allowances: round(result.computation.capitalAllowances)
     };
@@ -310,6 +313,27 @@
    */
   function map(inputs, result, fyOverlaps) {
     const computation = {};
+
+    // Filing metadata cover (non-calculation fields).
+    computation.cover = {
+      company_identifier: String(
+        inputs.tax_computation_cover_company_identifier ||
+        inputs.taxComputationCoverCompanyIdentifier ||
+        inputs.company_registration_number ||
+        inputs.company_utr ||
+        ''
+      ),
+      accounting_framework: String(
+        inputs.tax_computation_cover_accounting_framework ||
+        inputs.taxComputationCoverAccountingFramework ||
+        ''
+      ),
+      computation_basis_note: String(
+        inputs.tax_computation_cover_computation_basis_note ||
+        inputs.taxComputationCoverComputationBasisNote ||
+        ''
+      )
+    };
 
     // 1) Profit adjustment (how we got to taxable profit)
     computation.profit_adjustment_schedule = buildProfitAdjustmentSchedule(inputs, result);

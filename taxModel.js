@@ -51,6 +51,35 @@
     }
 
     const associatedCompanyCount = Math.max(0, Number(ui.associatedCompanyCount ?? ui.assocCompanies ?? ui.box_326_assoc_companies ?? 0) || 0);
+    const companyUtr = String(ui.company_utr ?? ui.companyUtr ?? '').trim();
+    const companyName = String(ui.company_name ?? ui.companyName ?? '').trim();
+    const companyRegistrationNumber = String(ui.company_registration_number ?? ui.companyRegistrationNumber ?? '').trim();
+    const returnTypeOrPeriodIndicator = String(
+      ui.return_type_or_period_indicator ??
+      ui.returnTypeOrPeriodIndicator ??
+      '0'
+    ).trim() || '0';
+    const companyAddress = String(ui.company_address ?? ui.companyAddress ?? '').trim();
+    const accountsAndComputationMetadata = String(
+      ui.accounts_and_computation_metadata ??
+      ui.accountsAndComputationMetadata ??
+      ''
+    ).trim();
+    const taxComputationCoverCompanyIdentifier = String(
+      ui.tax_computation_cover_company_identifier ??
+      ui.taxComputationCoverCompanyIdentifier ??
+      ''
+    ).trim();
+    const taxComputationCoverAccountingFramework = String(
+      ui.tax_computation_cover_accounting_framework ??
+      ui.taxComputationCoverAccountingFramework ??
+      ''
+    ).trim();
+    const taxComputationCoverComputationBasisNote = String(
+      ui.tax_computation_cover_computation_basis_note ??
+      ui.taxComputationCoverComputationBasisNote ??
+      ''
+    ).trim();
 
     // P&L / income items
     const tradingTurnover = roundPounds(ui.tradingTurnover ?? ui.turnover ?? ui.val_turnover ?? 0);
@@ -144,6 +173,25 @@
       apEnd: accountingPeriodEnd,
       apDays: daysInclusive(apStartUTC, apEndUTC),
       assocCompanies: associatedCompanyCount,
+      company_utr: companyUtr,
+      company_name: companyName,
+      company_registration_number: companyRegistrationNumber,
+      return_type_or_period_indicator: returnTypeOrPeriodIndicator,
+      company_address: companyAddress,
+      accounts_and_computation_metadata: accountsAndComputationMetadata,
+      tax_computation_cover_company_identifier: taxComputationCoverCompanyIdentifier,
+      tax_computation_cover_accounting_framework: taxComputationCoverAccountingFramework,
+      tax_computation_cover_computation_basis_note: taxComputationCoverComputationBasisNote,
+      // Legacy aliases retained for backward compatibility.
+      companyUtr,
+      companyName,
+      companyRegistrationNumber,
+      returnTypeOrPeriodIndicator,
+      companyAddress,
+      accountsAndComputationMetadata,
+      taxComputationCoverCompanyIdentifier,
+      taxComputationCoverAccountingFramework,
+      taxComputationCoverComputationBasisNote,
 
       pnl: {
         tradingTurnover,
@@ -243,6 +291,7 @@
         aiaTotalCap: 0,
         aiaRequestedTotal: 0,
         aiaUnrelievedBroughtForwardTotal: 0,
+        aiaAllocationNote: '',
         aiaPartsByFY: [],
 
         taxableTradingProfit: 0,

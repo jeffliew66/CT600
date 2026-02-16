@@ -802,6 +802,8 @@
     result.computation.aiaTotalCap = TaxModel.roundPounds(aiaTotalCap);
     result.computation.aiaRequestedTotal = TaxModel.roundPounds(aiaRequestedTotal);
     result.computation.aiaUnrelievedBroughtForwardTotal = TaxModel.roundPounds(aiaUnrelievedTotal);
+    result.computation.aiaAllocationNote =
+      'Per-slice requested/claimed/unrelieved figures are allocated by AIA cap-share for reporting.';
     result.computation.aiaPartsByFY = aiaParts.map((row) => ({
       fyYear: Number(row.fy_year || 0),
       fyYears: Array.isArray(row.fy_years) ? row.fy_years : [Number(row.fy_year || 0)],
