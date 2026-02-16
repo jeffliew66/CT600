@@ -207,23 +207,9 @@
     boxes.box_620_dividend_income = round(inputs.pnl.dividendIncome);
 
     // Box 329 indicator
-    const box329FromResult = String(result.tax.smallProfitsRateOrMarginalReliefEntitlement || '');
-    if (box329FromResult === 'X') {
-      boxes.box_329_small_profits_rate_or_marginal_relief_entitlement = 'X';
-    } else {
-      boxes.box_329_small_profits_rate_or_marginal_relief_entitlement = (
-        Array.isArray(result.byFY) && result.byFY.some((slice) => {
-          const tp = Number(slice.taxableProfit || 0);
-          if (tp <= 0) return false;
-          const mr = Number(slice.marginalRelief || 0);
-          if (mr > 0) return true;
-          const smallRate = Number(slice.small_rate ?? 0);
-          const mainRate = Number(slice.main_rate ?? 0);
-          const effective = tp > 0 ? (Number(slice.ctCharge || 0) / tp) : 0;
-          return smallRate > 0 && mainRate > smallRate && effective <= (smallRate + 0.002);
-        })
-      ) ? 'X' : '';
-    }
+    // Logic is fully handled in taxEngine.js.
+    boxes.box_329_small_profits_rate_or_marginal_relief_entitlement =
+      String(result.tax.smallProfitsRateOrMarginalReliefEntitlement || '') === 'X' ? 'X' : '';
 
     // CT calculation table (boxes 330 to 425)
     fillRateTableBoxes(boxes, result);

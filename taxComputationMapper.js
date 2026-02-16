@@ -215,10 +215,7 @@
         parts_by_fy: partsByFY,
         total_aia_cap: round(totalCap),
         total_aia_claimed: round(result.computation.capitalAllowances),
-        allocation_note: String(
-          result.computation.aiaAllocationNote ||
-          'Per-slice requested/claimed/unrelieved figures are allocated by AIA cap-share for reporting.'
-        )
+        allocation_note: String(result.computation.aiaAllocationNote || '')
       },
       total_capital_allowances: round(result.computation.capitalAllowances)
     };
