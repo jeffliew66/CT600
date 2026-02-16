@@ -108,6 +108,7 @@
 // result.tax.marginalRelief                                      | -                                                        | tax_calculation_table.year_summary.total_marginal_relief
 // result.tax.corporationTaxChargeable                            | box_440_corporation_tax_chargeable                       | -
 // result.tax.totalReliefsAndDeductions                           | box_470_total_reliefs_and_deductions                     | -
+// result.tax.totalBox500Charges                                  | box_500_cfc_bank_levy_surcharge_and_rpdt                 | -
 // result.tax.netCTLiability                                      | box_475_net_ct_liability                                 | -
 // result.tax.totalTaxChargeable                                  | box_510_total_tax_chargeable                             | -
 // result.tax.incomeTaxRepayable                                  | box_520_income_tax_repayable                             | -

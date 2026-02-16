@@ -528,6 +528,21 @@
       inputs.capitalAllowances.annualInvestmentAllowanceNonTradeAdditions ?? inputs.capitalAllowances.aiaNonTradeAdditions;
     const tradingLossBroughtForward = inputs.losses.tradingLossBroughtForward ?? inputs.losses.tradingLossBF;
     const tradingLossUsageRequested = inputs.losses.tradingLossUsageRequested ?? inputs.losses.tradingLossUseRequested;
+    const ct600 = inputs.ct600 || {};
+    const communityInvestmentTaxRelief = Number(ct600.communityInvestmentTaxRelief || 0);
+    const doubleTaxationRelief = Number(ct600.doubleTaxationRelief || 0);
+    const advanceCorporationTax = Number(ct600.advanceCorporationTax || 0);
+    const loansToParticipatorsTax = Number(ct600.loansToParticipatorsTax || 0);
+    const controlledForeignCompaniesTax = Number(ct600.controlledForeignCompaniesTax || 0);
+    const bankLevyPayable = Number(ct600.bankLevyPayable || 0);
+    const bankSurchargePayable = Number(ct600.bankSurchargePayable || 0);
+    const residentialPropertyDeveloperTax = Number(ct600.residentialPropertyDeveloperTax || 0);
+    const eogplPayable = Number(ct600.eogplPayable || 0);
+    const eglPayable = Number(ct600.eglPayable || 0);
+    const supplementaryChargePayable = Number(ct600.supplementaryChargePayable || 0);
+    const incomeTaxDeductedFromGrossIncome = Number(ct600.incomeTaxDeductedFromGrossIncome || 0);
+    const coronavirusSupportPaymentOverpaymentNowDue = Number(ct600.coronavirusSupportPaymentOverpaymentNowDue || 0);
+    const restitutionTax = Number(ct600.restitutionTax || 0);
     result.accounts.totalIncome = TaxModel.roundPounds(
       tradingTurnover + governmentGrants + propertyIncome + pnl.interestIncome + tradingBalancingCharges + chargeableGains
       // NOTE: pnl.dividendIncome is NOT included here - handled separately for augmented profit
@@ -822,12 +837,37 @@
     result.tax.marginalRelief = TaxModel.roundPounds(periodResults.reduce((s, p) => s + p.marginalRelief, 0));
     result.tax.corporationTaxChargeable = result.tax.corporationTaxCharge;
     result.tax.corporationTaxTableTotal = TaxModel.roundPounds(result.tax.corporationTaxCharge + result.tax.marginalRelief);
-    result.tax.totalReliefsAndDeductions = 0;
-    result.tax.netCTLiability = result.tax.corporationTaxChargeable;
-    result.tax.totalTaxChargeable = result.tax.netCTLiability;
-    result.tax.incomeTaxRepayable = 0;
-    result.tax.selfAssessmentTaxPayable = result.tax.totalTaxChargeable;
-    result.tax.totalSelfAssessmentTaxPayable = result.tax.selfAssessmentTaxPayable;
+    result.tax.totalReliefsAndDeductions = TaxModel.roundPounds(
+      communityInvestmentTaxRelief + doubleTaxationRelief + advanceCorporationTax
+    );
+    result.tax.totalBox500Charges = TaxModel.roundPounds(
+      controlledForeignCompaniesTax +
+      bankLevyPayable +
+      bankSurchargePayable +
+      residentialPropertyDeveloperTax
+    );
+    result.tax.netCTLiability = TaxModel.roundPounds(
+      Math.max(0, result.tax.corporationTaxChargeable - result.tax.totalReliefsAndDeductions)
+    );
+    result.tax.totalTaxChargeable = TaxModel.roundPounds(
+      result.tax.netCTLiability +
+      loansToParticipatorsTax +
+      result.tax.totalBox500Charges +
+      eogplPayable +
+      eglPayable +
+      supplementaryChargePayable
+    );
+    result.tax.incomeTaxRepayable = TaxModel.roundPounds(
+      Math.max(0, incomeTaxDeductedFromGrossIncome - result.tax.totalTaxChargeable)
+    );
+    result.tax.selfAssessmentTaxPayable = TaxModel.roundPounds(
+      Math.max(0, result.tax.totalTaxChargeable - incomeTaxDeductedFromGrossIncome)
+    );
+    result.tax.totalSelfAssessmentTaxPayable = TaxModel.roundPounds(
+      result.tax.selfAssessmentTaxPayable +
+      coronavirusSupportPaymentOverpaymentNowDue +
+      restitutionTax
+    );
     result.tax.smallProfitsRateOrMarginalReliefEntitlement = (
       Array.isArray(result.byFY) && result.byFY.some((slice) => {
         const tp = Number(slice.taxableProfit || 0);
@@ -840,7 +880,7 @@
         return smallRate > 0 && mainRate > smallRate && effective <= (smallRate + 0.002);
       })
     ) ? 'X' : '';
-    result.tax.taxPayable = result.tax.corporationTaxCharge;
+    result.tax.taxPayable = result.tax.totalSelfAssessmentTaxPayable;
 
     // Metadata: note if AP was split
     result.metadata = {

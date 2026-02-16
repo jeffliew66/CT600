@@ -238,45 +238,22 @@
     boxes.box_455_underlying_rate_relief_claim = toCheckmark(ct600.underlyingRateReliefClaim);
     boxes.box_460_relief_carried_back_to_earlier_period = toCheckmark(ct600.reliefCarriedBackToEarlierPeriod);
     boxes.box_465_advance_corporation_tax = advanceCorporationTax;
-    boxes.box_470_total_reliefs_and_deductions = toMoney(sumNumbers([
-      boxes.box_445_community_investment_tax_relief,
-      boxes.box_450_double_taxation_relief,
-      boxes.box_465_advance_corporation_tax
-    ]));
+    boxes.box_470_total_reliefs_and_deductions = round(result.tax.totalReliefsAndDeductions || 0);
 
     // Tax payable chain
     boxes.box_475_net_ct_liability = round(result.tax.netCTLiability || 0);
     boxes.box_480_tax_payable_by_a_close_company = loansToParticipatorsTax;
-    boxes.box_500_cfc_bank_levy_surcharge_and_rpdt = toMoney(sumNumbers([
-      controlledForeignCompaniesTax,
-      bankLevyPayable,
-      bankSurchargePayable,
-      residentialPropertyDeveloperTax
-    ]));
+    boxes.box_500_cfc_bank_levy_surcharge_and_rpdt = round(result.tax.totalBox500Charges || 0);
     boxes.box_501_eogpl_payable = eogplPayable;
     boxes.box_502_egl_payable = eglPayable;
     boxes.box_505_supplementary_charge = supplementaryChargePayable;
     boxes.box_510_total_tax_chargeable = round(result.tax.totalTaxChargeable || 0);
     boxes.box_515_income_tax_deducted_from_gross_income = incomeTaxDeductedFromGrossIncome;
-    boxes.box_520_income_tax_repayable = toMoney(
-      Math.max(0, boxes.box_515_income_tax_deducted_from_gross_income - boxes.box_510_total_tax_chargeable)
-    );
+    boxes.box_520_income_tax_repayable = round(result.tax.incomeTaxRepayable || 0);
     boxes.box_525_self_assessment_tax_payable = round(result.tax.selfAssessmentTaxPayable || 0);
     boxes.box_526_coronavirus_support_payment_overpayment_now_due = coronavirusOverpaymentNowDue;
     boxes.box_527_restitution_tax = restitutionTax;
     boxes.box_528_total_self_assessment_tax_payable = round(result.tax.totalSelfAssessmentTaxPayable || 0);
-
-    // Keep explicit internal variables for CT600 formula-chain boxes.
-    result.tax.corporationTaxTableTotal = boxes.box_430_corporation_tax;
-    result.tax.corporationTaxChargeable = boxes.box_440_corporation_tax_chargeable;
-    result.tax.totalReliefsAndDeductions = boxes.box_470_total_reliefs_and_deductions;
-    result.tax.netCTLiability = boxes.box_475_net_ct_liability;
-    result.tax.totalTaxChargeable = boxes.box_510_total_tax_chargeable;
-    result.tax.incomeTaxRepayable = boxes.box_520_income_tax_repayable;
-    result.tax.selfAssessmentTaxPayable = boxes.box_525_self_assessment_tax_payable;
-    result.tax.totalSelfAssessmentTaxPayable = boxes.box_528_total_self_assessment_tax_payable;
-    result.tax.smallProfitsRateOrMarginalReliefEntitlement =
-      boxes.box_329_small_profits_rate_or_marginal_relief_entitlement;
 
     // Declaration
     boxes.box_975_name = String(declaration.name || '');

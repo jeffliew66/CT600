@@ -308,6 +308,7 @@
         corporationTaxTableTotal: 0,
         marginalRelief: 0,
         totalReliefsAndDeductions: 0,
+        totalBox500Charges: 0,
         netCTLiability: 0,
         totalTaxChargeable: 0,
         incomeTaxRepayable: 0,

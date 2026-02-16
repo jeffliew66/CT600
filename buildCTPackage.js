@@ -32,6 +32,16 @@
 
     // 1) CT600 boxes (classic output)
     const ct600Boxes = CT600Mapper.map(inputs, result);
+    const ct600_header = {
+      company_utr: String(inputs.company_utr || ''),
+      company_name: String(inputs.company_name || ''),
+      company_registration_number: String(inputs.company_registration_number || ''),
+      return_type_or_period_indicator: String(inputs.return_type_or_period_indicator || ''),
+      company_address: String(inputs.company_address || '')
+    };
+    const ct600_attachments = {
+      accounts_and_computation_metadata: String(inputs.accounts_and_computation_metadata || '')
+    };
 
     // 2) Tax Computation Schedule (detailed audit trail of CT charge)
     const taxComputation = TaxComputationMapper.map(inputs, result, fyOverlaps);
@@ -50,6 +60,8 @@
       inputs,
       taxModel: result,
       ct600Boxes,
+      ct600_header,
+      ct600_attachments,
       taxComputation,
       frs105Statements,
       metadata: {
