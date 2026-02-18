@@ -872,7 +872,7 @@
       (pnl.interestIncome || 0) + propertyIncome + chargeableGains
     );
     result.computation.totalOtherIncome = TaxModel.roundPounds(
-      result.property.propertyProfitAfterLossOffset + (pnl.interestIncome || 0) + chargeableGains + dividendIncome
+      result.property.propertyBusinessIncomeForCT600 + (pnl.interestIncome || 0) + chargeableGains + dividendIncome
     );
     result.computation.tradingLossCarriedForward = TaxModel.roundPounds(
       Math.max(0, tradingLossBroughtForward - result.computation.tradingLossUsed)

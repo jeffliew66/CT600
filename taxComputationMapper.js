@@ -61,10 +61,13 @@
       result.property.propertyProfitAfterLossOffset
     );
     const totalOtherIncome = round(
-      rentalIncomeNet +
-      inputs.pnl.interestIncome +
-      (chargeableGains || 0) +
-      inputs.pnl.dividendIncome
+      result.computation.totalOtherIncome ??
+      (
+        rentalIncomeNet +
+        inputs.pnl.interestIncome +
+        (chargeableGains || 0) +
+        inputs.pnl.dividendIncome
+      )
     );
 
     return {
