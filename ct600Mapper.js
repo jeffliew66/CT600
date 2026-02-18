@@ -159,6 +159,11 @@
       result.computation.profitsSubtotal ??
       ((result.computation.taxableTradingProfit || 0) + (result.computation.taxableNonTradingProfits || 0))
     );
+    const propertyLossUsed = Number(result.property.propertyLossUsed || 0);
+    const profitsBeforeDeductions = Number(
+      result.computation.taxableTotalProfits ??
+      (profitsSubtotal - propertyLossUsed)
+    );
     const nonTradingLoanRelationshipProfit = Math.max(0, Number(inputs.pnl.interestIncome || 0));
     const propertyBusinessIncome = computePropertyBusinessIncomeForCT600(result);
     const ct600 = inputs.ct600 || {};
@@ -216,14 +221,14 @@
     );
     boxes.box_210_chargeable_gains = roundNonNegative(chargeableGains || 0);
     boxes.box_235_profits_subtotal = roundNonNegative(profitsSubtotal);
-    boxes.box_250_property_business_losses_used = round(result.property.propertyLossUsed || 0);
-    boxes.box_300_profits_before_deductions = roundNonNegative(
-      result.computation.profitsSubtotal ?? profitsSubtotal
-    );
+    boxes.box_250_property_business_losses_used = round(propertyLossUsed);
+    boxes.box_300_profits_before_deductions = roundNonNegative(profitsBeforeDeductions);
     boxes.box_305_donations = 0;
     boxes.box_310_group_relief = 0;
     boxes.box_312_other_deductions = 0;
-    boxes.box_315_taxable_profit = roundNonNegative(result.computation.taxableTotalProfits);
+    boxes.box_315_taxable_profit = roundNonNegative(
+      result.computation.taxableTotalProfits ?? profitsBeforeDeductions
+    );
     boxes.box_620_franked_investment_income_exempt_abgh = roundNonNegative(inputs.pnl.dividendIncome);
 
     // Box 329 indicator

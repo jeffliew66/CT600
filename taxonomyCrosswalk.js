@@ -42,7 +42,7 @@
 // inputs.losses.tradingLossBroughtForward                        | -                                                        | trading_loss_schedule.trading_loss_bfwd_available
 // inputs.losses.tradingLossUsageRequested                        | -                                                        | trading_loss_schedule.trading_loss_use_requested
 // inputs.losses.tradingLossBroughtForward                        | _trading_losses_bfwd (custom transparency)               | -
-// inputs.losses.propertyLossUsageRequested                       | box_250_property_business_losses_used (used amount after engine caps; claimed against total profits) | -
+// inputs.losses.propertyLossUsageRequested                       | box_250_property_business_losses_used (driver/request only; filed used amount is result.property.propertyLossUsed after engine caps) | -
 
 // SECTION: CT600 ADDITIONAL INPUTS (OPTIONAL)
 // inputs.ct600.communityInvestmentTaxRelief                      | box_445_community_investment_tax_relief                  | -
@@ -93,7 +93,7 @@
 // result.computation.taxableTradingProfit                        | box_165_net_trading_profits                              | profit_adjustment_schedule.net_trading_profit
 // result.computation.taxableNonTradingProfits                    | box_235_profits_subtotal (component)                     | -
 // result.computation.profitsSubtotal                             | box_235_profits_subtotal                                 | -
-// result.computation.profitsSubtotal                             | box_300_profits_before_deductions                        | -
+// result.computation.taxableTotalProfits                         | box_300_profits_before_deductions                        | -
 // result.computation.miscellaneousIncomeNotElsewhere             | box_205_income_not_elsewhere                             | -
 // result.computation.subtotalBeforeDeductions                    | -                                                        | profit_adjustment_schedule.subtotal_before_deductions
 // result.computation.nonTradingIncomeExcludedFromTradingView     | -                                                        | profit_adjustment_schedule.classification_adjustments.non_trading_income_excluded_from_trading_view
