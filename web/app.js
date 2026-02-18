@@ -374,16 +374,42 @@
       propertyLossUseRequested: toOptionalNum($("propertyLossUseRequested").value),
       propertyLossBF: propertyLossBFInput
     };
+    const engineInputs = {
+      accountingPeriodStart: userInputs.apStart,
+      accountingPeriodEnd: userInputs.apEnd,
+      associatedCompanyCount: userInputs.assocCompanies,
+      tradingTurnover: userInputs.turnover,
+      governmentGrants: userInputs.govtGrants,
+      propertyIncome: userInputs.rentalIncome,
+      propertyLossBroughtForward: userInputs.propertyLossBF,
+      propertyLossUsageRequested: userInputs.propertyLossUseRequested,
+      interestIncome: userInputs.interestIncome,
+      tradingBalancingCharges: userInputs.disposalGains,
+      chargeableGains: userInputs.capitalGains,
+      chargeableGainsComputationFileName: userInputs.capitalGainsFileName,
+      dividendIncome: userInputs.dividendIncome,
+      costOfGoodsSold: userInputs.costOfSales,
+      staffEmploymentCosts: userInputs.staffCosts,
+      depreciationExpense: userInputs.depreciation,
+      otherOperatingCharges: userInputs.otherCharges,
+      disallowableExpenditure: userInputs.disallowableExpenses,
+      otherTaxAdjustmentsAddBack: userInputs.otherAdjustments,
+      annualInvestmentAllowanceTradeAdditions: userInputs.aiaTradeAdditions,
+      annualInvestmentAllowanceNonTradeAdditions: userInputs.aiaNonTradeAdditions,
+      annualInvestmentAllowanceTotalAdditions: userInputs.aiaAdditions,
+      tradingLossBroughtForward: userInputs.tradingLossBF,
+      tradingLossUsageRequested: userInputs.tradingLossUseRequested
+    };
 
     // Call TaxEngine (HMRC-compliant with AP splitting, thresholds, MR)
-    const { inputs, result, corpTaxYears } = TaxEngine.run(userInputs, {});
+    const { inputs, result, corpTaxYears } = TaxEngine.run(engineInputs, {});
     
     // DEBUG: Full calculation output
     console.log('----------------------------------------------------------------');
     console.log('TAX CALCULATION DEBUG OUTPUT');
     console.log('----------------------------------------------------------------');
     console.log('AP:', userInputs.apStart, 'to', userInputs.apEnd);
-    console.log('AP Days:', inputs.apDays, '| Associates:', userInputs.assocCompanies, '| Divisor:', (userInputs.assocCompanies || 0) + 1);
+    console.log('AP Days:', inputs.accountingPeriodDays, '| Associates:', userInputs.assocCompanies, '| Divisor:', (userInputs.assocCompanies || 0) + 1);
     console.log('Turnover:', userInputs.turnover, '| Expenses:', userInputs.costOfSales + userInputs.staffCosts + userInputs.depreciation + userInputs.otherCharges);
     console.log('');
     console.log('PERIODS:');
@@ -467,7 +493,7 @@
     setRawMeta('profitBeforeTax', profitBeforeTax, roundPounds(profitBeforeTax));
 
     // Tax calculation with AP split info
-    const apDays = inputs.apDays;
+    const apDays = inputs.accountingPeriodDays;
     const isSplit = !!(result.metadata && result.metadata.ap_split);
     const divisor = (userInputs.assocCompanies || 0) + 1;
     const annualSmallThreshold = 50000 / divisor;

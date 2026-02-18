@@ -47,8 +47,8 @@
   }
 
   function buildCTPackage(userInputs, options) {
-    const startStr = String(userInputs?.accountingPeriodStart ?? userInputs?.apStart ?? '');
-    const endStr = String(userInputs?.accountingPeriodEnd ?? userInputs?.apEnd ?? '');
+    const startStr = String(userInputs?.accountingPeriodStart || '');
+    const endStr = String(userInputs?.accountingPeriodEnd || '');
     const startUTC = parseUTCDateStrict(startStr, 'accountingPeriodStart');
     const endUTC = parseUTCDateStrict(endStr, 'accountingPeriodEnd');
 

@@ -146,14 +146,14 @@
     const boxes = {};
 
     // Period + associates
-    const accountingPeriodStart = inputs.accountingPeriodStart ?? inputs.apStart;
-    const accountingPeriodEnd = inputs.accountingPeriodEnd ?? inputs.apEnd;
-    const associatedCompanyCount = inputs.associatedCompanyCount ?? inputs.assocCompanies;
-    const tradingLossBroughtForward = inputs.losses?.tradingLossBroughtForward ?? inputs.losses?.tradingLossBF ?? 0;
-    const tradingTurnover = inputs.pnl.tradingTurnover ?? inputs.pnl.turnover;
-    const chargeableGains = inputs.pnl.chargeableGains ?? inputs.pnl.capitalGains;
-    const propertyLossBroughtForward = inputs.pnl.propertyLossBroughtForward ?? inputs.pnl.propertyLossBF;
-    const tradingBalancingCharges = inputs.pnl.tradingBalancingCharges ?? inputs.pnl.disposalGains;
+    const accountingPeriodStart = inputs.accountingPeriodStart;
+    const accountingPeriodEnd = inputs.accountingPeriodEnd;
+    const associatedCompanyCount = inputs.associatedCompanyCount;
+    const tradingLossBroughtForward = inputs.losses?.tradingLossBroughtForward || 0;
+    const tradingTurnover = inputs.pnl.tradingTurnover;
+    const chargeableGains = inputs.pnl.chargeableGains;
+    const propertyLossBroughtForward = inputs.pnl.propertyLossBroughtForward;
+    const tradingBalancingCharges = inputs.pnl.tradingBalancingCharges;
     const tradingProfitBeforeLoss = Number(
       result.computation.grossTradingProfit ??
       ((result.computation.taxableTradingProfit || 0) + (result.computation.tradingLossUsed || 0))
@@ -208,8 +208,6 @@
     boxes.box_155_trading_profit = roundNonNegative(tradingProfitBeforeLoss);
     // Box 160 is "trading losses brought forward used" (used amount, not opening balance).
     boxes.box_160_trading_losses_bfwd_used = round(result.computation.tradingLossUsed);
-    // Backward-compatible alias; prefer `box_160_trading_losses_bfwd_used`.
-    boxes.box_160_trading_losses_bfwd = boxes.box_160_trading_losses_bfwd_used;
     boxes.box_165_net_trading_profits = roundNonNegative(result.computation.taxableTradingProfit);
     // Box 170 is a disclosure heading (gross NTLR profits), not a net taxable-interest box.
     boxes.box_170_non_trading_loan_relationship_profits = roundNonNegative(nonTradingLoanRelationshipProfit);

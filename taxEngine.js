@@ -195,7 +195,7 @@
   function buildAccountingPeriodSplits(inputs, corpTaxYears) {
     // HMRC RULE: Accounting periods longer than 12 months must be split at 12-month mark.
     // Do not use a fixed 365-day cutoff because exact 12-month periods can be 366 days.
-    const apDays = inputs.apDays;
+    const apDays = inputs.accountingPeriodDays;
     const apStart = inputs.apStartUTC;
     const apEnd = inputs.apEndUTC;
     const msPerDay = 24 * 60 * 60 * 1000;
@@ -273,8 +273,8 @@
 
   function buildAIAAllocation(inputs, fyOverlaps, corpTaxYears) {
     // CRITICAL: Apply associates divisor to AIA cap (same as thresholds)
-    const divisor = (inputs.assocCompanies || 0) + 1;
-    const periodDays = inputs.apDays || 1;
+    const divisor = (inputs.associatedCompanyCount || 0) + 1;
+    const periodDays = inputs.accountingPeriodDays || 1;
     // AIA master cap is shared across trade/non-trade.
     // Short-period rule: pro-rate by days in the relevant FY slice (365/366 as applicable).
     // Full 12-month period rule: use strict annual cap then apportion by slice share.
@@ -337,8 +337,8 @@
   }
 
   function buildThresholdParts(inputs, fyOverlaps) {
-    const divisor = (inputs.assocCompanies || 0) + 1;
-    const periodDays = inputs.apDays || 1;
+    const divisor = (inputs.associatedCompanyCount || 0) + 1;
+    const periodDays = inputs.accountingPeriodDays || 1;
 
     return fyOverlaps.map((fy) => {
       const small = getTier(fy.tiers, 2).threshold;
@@ -372,7 +372,7 @@
   }
 
   function prorateByFY(value, inputs, fyOverlaps) {
-    const totalDays = inputs.apDays || 1;
+    const totalDays = inputs.accountingPeriodDays || 1;
     return fyOverlaps.map((fy) => ({
       fy_year: fy.fy_year,
       amount: value * (fy.ap_days_in_fy / totalDays),
@@ -489,8 +489,8 @@
 
     const inputs = TaxModel.createInputs(userInputs);
     const result = TaxModel.createEmptyResult();
-    const accountingPeriodDays = inputs.accountingPeriodDays ?? inputs.apDays;
-    const associatedCompanyCount = inputs.associatedCompanyCount ?? inputs.assocCompanies;
+    const accountingPeriodDays = inputs.accountingPeriodDays;
+    const associatedCompanyCount = inputs.associatedCompanyCount;
 
     // HMRC RULE: Split AP if > 12 months
     const apSplits = buildAccountingPeriodSplits(inputs, corpTaxYears);
@@ -509,26 +509,24 @@
     // 1) Accounts P&L -> PBT (allocate to periods)
     // CRITICAL: Do NOT include dividend in totalIncome - dividend affects rate, not taxable profit
     const pnl = inputs.pnl;
-    const tradingTurnover = pnl.tradingTurnover ?? pnl.turnover;
-    const governmentGrants = pnl.governmentGrants ?? pnl.govtGrants;
-    const propertyIncome = pnl.propertyIncome ?? pnl.rentalIncome;
-    const propertyLossBroughtForward = pnl.propertyLossBroughtForward ?? pnl.propertyLossBF;
-    const tradingBalancingCharges = pnl.tradingBalancingCharges ?? pnl.disposalGains;
-    const chargeableGains = pnl.chargeableGains ?? pnl.capitalGains;
+    const tradingTurnover = pnl.tradingTurnover;
+    const governmentGrants = pnl.governmentGrants;
+    const propertyIncome = pnl.propertyIncome;
+    const propertyLossBroughtForward = pnl.propertyLossBroughtForward;
+    const tradingBalancingCharges = pnl.tradingBalancingCharges;
+    const chargeableGains = pnl.chargeableGains;
     const dividendIncome = pnl.dividendIncome;
-    const costOfGoodsSold = pnl.costOfGoodsSold ?? pnl.costOfSales;
-    const staffEmploymentCosts = pnl.staffEmploymentCosts ?? pnl.staffCosts;
-    const depreciationExpense = pnl.depreciationExpense ?? pnl.depreciation;
-    const otherOperatingCharges = pnl.otherOperatingCharges ?? pnl.otherCharges;
-    const disallowableExpenditure = inputs.adjustments.disallowableExpenditure ?? inputs.adjustments.disallowableExpenses;
-    const otherTaxAdjustmentsAddBack = inputs.adjustments.otherTaxAdjustmentsAddBack ?? inputs.adjustments.otherAdjustments;
-    const annualInvestmentAllowanceTradeAdditions =
-      inputs.capitalAllowances.annualInvestmentAllowanceTradeAdditions ?? inputs.capitalAllowances.aiaTradeAdditions;
-    const annualInvestmentAllowanceNonTradeAdditions =
-      inputs.capitalAllowances.annualInvestmentAllowanceNonTradeAdditions ?? inputs.capitalAllowances.aiaNonTradeAdditions;
-    const tradingLossBroughtForward = inputs.losses.tradingLossBroughtForward ?? inputs.losses.tradingLossBF;
-    const tradingLossUsageRequested = inputs.losses.tradingLossUsageRequested ?? inputs.losses.tradingLossUseRequested;
-    const propertyLossUsageRequested = inputs.losses.propertyLossUsageRequested ?? inputs.losses.propertyLossUseRequested;
+    const costOfGoodsSold = pnl.costOfGoodsSold;
+    const staffEmploymentCosts = pnl.staffEmploymentCosts;
+    const depreciationExpense = pnl.depreciationExpense;
+    const otherOperatingCharges = pnl.otherOperatingCharges;
+    const disallowableExpenditure = inputs.adjustments.disallowableExpenditure;
+    const otherTaxAdjustmentsAddBack = inputs.adjustments.otherTaxAdjustmentsAddBack;
+    const annualInvestmentAllowanceTradeAdditions = inputs.capitalAllowances.annualInvestmentAllowanceTradeAdditions;
+    const annualInvestmentAllowanceNonTradeAdditions = inputs.capitalAllowances.annualInvestmentAllowanceNonTradeAdditions;
+    const tradingLossBroughtForward = inputs.losses.tradingLossBroughtForward;
+    const tradingLossUsageRequested = inputs.losses.tradingLossUsageRequested;
+    const propertyLossUsageRequested = inputs.losses.propertyLossUsageRequested;
     const ct600 = inputs.ct600 || {};
     const communityInvestmentTaxRelief = Number(ct600.communityInvestmentTaxRelief || 0);
     const doubleTaxationRelief = Number(ct600.doubleTaxationRelief || 0);
@@ -583,8 +581,8 @@
       const tmpInputs = {
         apStartUTC: period.startUTC,
         apEndUTC: period.endUTC,
-        apDays: period.days,
-        assocCompanies: associatedCompanyCount,
+        accountingPeriodDays: period.days,
+        associatedCompanyCount,
         isShortPeriod: period.isShortPeriod
       };
       const fyOverlaps = buildFYOverlaps(tmpInputs, corpTaxYears);
@@ -624,7 +622,7 @@
         periodInterestIncome + periodPropertyProfitBeforeLoss + periodCapitalGains
       );
       // Trading bucket is computed residually from total taxable base, so it includes
-      // disposal balancing charges (pnl.disposalGains) by design.
+      // disposal balancing charges (inputs.pnl.tradingBalancingCharges) by design.
       const periodTradingBeforeAIA = TaxModel.roundPounds(periodTaxableBeforeAIA - periodNonTradingBeforeAIA);
       // AIA claim is driven by qualifying additions (subject to shared cap),
       // and can create/increase a loss. Do not cap claim by current-period profit.
@@ -855,9 +853,7 @@
     const aiaRequestedTotal = Math.max(
       0,
       Number(
-        inputs.capitalAllowances?.annualInvestmentAllowanceTotalAdditions ??
-        inputs.capitalAllowances?.aiaAdditions ??
-        0
+        inputs.capitalAllowances?.annualInvestmentAllowanceTotalAdditions || 0
       )
     );
     const aiaClaimedTotal = Math.max(0, Number(result.computation.capitalAllowances || 0));

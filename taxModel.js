@@ -37,67 +37,52 @@
 
   function createInputs(userInputs) {
     const ui = userInputs || {};
-    const accountingPeriodStart = String(ui.accountingPeriodStart ?? ui.apStart ?? ui.box_30_period_start ?? '');
-    const accountingPeriodEnd = String(ui.accountingPeriodEnd ?? ui.apEnd ?? ui.box_35_period_end ?? '');
+    const accountingPeriodStart = String(ui.accountingPeriodStart || '');
+    const accountingPeriodEnd = String(ui.accountingPeriodEnd || '');
 
     const apStartUTC = parseISODate(accountingPeriodStart);
     const apEndUTC = parseISODate(accountingPeriodEnd);
 
     if (!apStartUTC || !apEndUTC) {
-      throw new Error('Invalid accounting period dates (apStart/apEnd). Use YYYY-MM-DD.');
+      throw new Error('Invalid accounting period dates (accountingPeriodStart/accountingPeriodEnd). Use YYYY-MM-DD.');
     }
     if (apEndUTC < apStartUTC) {
       throw new Error('Accounting period end date must be on/after start date.');
     }
+    const accountingPeriodDays = daysInclusive(apStartUTC, apEndUTC);
 
-    const associatedCompanyCount = Math.max(0, Number(ui.associatedCompanyCount ?? ui.assocCompanies ?? ui.box_326_assoc_companies ?? 0) || 0);
-    const companyUtr = String(ui.company_utr ?? ui.companyUtr ?? '').trim();
-    const companyName = String(ui.company_name ?? ui.companyName ?? '').trim();
-    const companyRegistrationNumber = String(ui.company_registration_number ?? ui.companyRegistrationNumber ?? '').trim();
+    const associatedCompanyCount = Math.max(0, Number(ui.associatedCompanyCount || 0) || 0);
+    const companyUtr = String(ui.company_utr || '').trim();
+    const companyName = String(ui.company_name || '').trim();
+    const companyRegistrationNumber = String(ui.company_registration_number || '').trim();
     const returnTypeOrPeriodIndicator = String(
-      ui.return_type_or_period_indicator ??
-      ui.returnTypeOrPeriodIndicator ??
+      ui.return_type_or_period_indicator ||
       '0'
     ).trim() || '0';
-    const companyAddress = String(ui.company_address ?? ui.companyAddress ?? '').trim();
+    const companyAddress = String(ui.company_address || '').trim();
     const accountsAndComputationMetadata = String(
-      ui.accounts_and_computation_metadata ??
-      ui.accountsAndComputationMetadata ??
+      ui.accounts_and_computation_metadata ||
       ''
     ).trim();
     const taxComputationCoverCompanyIdentifier = String(
-      ui.tax_computation_cover_company_identifier ??
-      ui.taxComputationCoverCompanyIdentifier ??
+      ui.tax_computation_cover_company_identifier ||
       ''
     ).trim();
     const taxComputationCoverAccountingFramework = String(
-      ui.tax_computation_cover_accounting_framework ??
-      ui.taxComputationCoverAccountingFramework ??
+      ui.tax_computation_cover_accounting_framework ||
       ''
     ).trim();
     const taxComputationCoverComputationBasisNote = String(
-      ui.tax_computation_cover_computation_basis_note ??
-      ui.taxComputationCoverComputationBasisNote ??
+      ui.tax_computation_cover_computation_basis_note ||
       ''
     ).trim();
 
     // P&L / income items
-    const tradingTurnover = roundPounds(ui.tradingTurnover ?? ui.turnover ?? ui.val_turnover ?? 0);
-    const governmentGrants = roundPounds(ui.governmentGrants ?? ui.govtGrants ?? ui.box_325_govt_grants ?? 0);
-    const propertyIncome = roundPounds(ui.propertyIncome ?? ui.rentalIncome ?? ui.box_190_rental_income ?? 0);
-    const propertyLossBroughtForward = roundPounds(
-      ui.propertyLossBroughtForward ??
-      ui.propertyLossBF ??
-      ui._property_losses_bfwd ??
-      ui._property_losses_available ??
-      ui._property_losses_cfwd ??
-      ui.box_250_prop_losses_bfwd ??
-      0
-    );
-    const propertyLossUsageRequestedRaw =
-      ui.propertyLossUsageRequested ??
-      ui.propertyLossUseRequested ??
-      ui.box_250_property_business_losses_used;
+    const tradingTurnover = roundPounds(ui.tradingTurnover || 0);
+    const governmentGrants = roundPounds(ui.governmentGrants || 0);
+    const propertyIncome = roundPounds(ui.propertyIncome || 0);
+    const propertyLossBroughtForward = roundPounds(ui.propertyLossBroughtForward || 0);
+    const propertyLossUsageRequestedRaw = ui.propertyLossUsageRequested;
     const propertyLossUsageRequested = (propertyLossUsageRequestedRaw === '' || propertyLossUsageRequestedRaw == null)
       ? null
       : (() => {
@@ -106,61 +91,33 @@
             ? roundPounds(Math.max(0, propertyLossUsageRequestedNum))
             : null;
         })();
-    const interestIncome = roundPounds(ui.interestIncome ?? ui.box_170_interest_income ?? 0);
-    // Backward compatible aliases:
-    // - disposalGains (legacy UI label)
-    // - balancingChargesTrade / assetDisposalsBalancingCharge (clearer tax meaning)
-    const tradingBalancingCharges = roundPounds(
-      ui.tradingBalancingCharges ??
-      ui.disposalGains ??
-      ui.balancingChargesTrade ??
-      ui.assetDisposalsBalancingCharge ??
-      ui.box_205_disposal_gains ??
-      0
-    );
-    const chargeableGains = roundPounds(ui.chargeableGains ?? ui.capitalGains ?? ui.box_210_chargeable_gains ?? 0);
-    const chargeableGainsComputationFileName = String(ui.chargeableGainsComputationFileName ?? ui.capitalGainsFileName ?? ui.capital_gains_source_file ?? '');
-    const dividendIncome = roundPounds(
-      ui.dividendIncome ??
-      ui.box_620_franked_investment_income_exempt_abgh ??
-      ui.box_620_dividend_income ??
-      0
-    );
+    const interestIncome = roundPounds(ui.interestIncome || 0);
+    const tradingBalancingCharges = roundPounds(ui.tradingBalancingCharges || 0);
+    const chargeableGains = roundPounds(ui.chargeableGains || 0);
+    const chargeableGainsComputationFileName = String(ui.chargeableGainsComputationFileName || '');
+    const dividendIncome = roundPounds(ui.dividendIncome || 0);
 
     // Expenses
-    const costOfGoodsSold = roundPounds(ui.costOfGoodsSold ?? ui.costOfSales ?? ui.val_cost_of_sales ?? 0);
-    const staffEmploymentCosts = roundPounds(ui.staffEmploymentCosts ?? ui.staffCosts ?? ui.val_staff_costs ?? 0);
-    const depreciationExpense = roundPounds(ui.depreciationExpense ?? ui.depreciation ?? ui.val_depreciation_acc ?? 0);
-    const otherOperatingCharges = roundPounds(ui.otherOperatingCharges ?? ui.otherCharges ?? ui.val_other_charges ?? 0);
+    const costOfGoodsSold = roundPounds(ui.costOfGoodsSold || 0);
+    const staffEmploymentCosts = roundPounds(ui.staffEmploymentCosts || 0);
+    const depreciationExpense = roundPounds(ui.depreciationExpense || 0);
+    const otherOperatingCharges = roundPounds(ui.otherOperatingCharges || 0);
 
     // Tax adjustments / allowances (user inputs)
-    const disallowableExpenditure = roundPounds(ui.disallowableExpenditure ?? ui.disallowableExpenses ?? ui.val_disallowable_expenses ?? 0);
-    const otherTaxAdjustmentsAddBack = roundPounds(ui.otherTaxAdjustmentsAddBack ?? ui.otherAdjustments ?? ui.val_other_adjustments ?? 0);
+    const disallowableExpenditure = roundPounds(ui.disallowableExpenditure || 0);
+    const otherTaxAdjustmentsAddBack = roundPounds(ui.otherTaxAdjustmentsAddBack || 0);
 
     // Capital allowances (AIA): keep separate trade/non-trade buckets.
-    const annualInvestmentAllowanceTradeAdditions = roundPounds(
-      ui.annualInvestmentAllowanceTradeAdditions ??
-      ui.aiaTradeAdditions ?? ui.aiaTrade ?? ui.box_670_aia_trade_additions ?? ui.box_670_aia_additions ?? 0
-    );
-    const annualInvestmentAllowanceNonTradeAdditions = roundPounds(
-      ui.annualInvestmentAllowanceNonTradeAdditions ??
-      ui.aiaNonTradeAdditions ?? ui.aiaNonTrade ?? ui.box_671_aia_non_trade_additions ?? 0
-    );
-    const fallbackAiaTotal = roundPounds(ui.annualInvestmentAllowanceTotalAdditions ?? ui.aiaAdditions ?? ui.box_670_aia_additions ?? 0);
-    // Backward compatibility: if only total provided, treat as trade AIA.
-    const resolvedAiaTrade = annualInvestmentAllowanceTradeAdditions || fallbackAiaTotal;
-    const resolvedAiaNonTrade = annualInvestmentAllowanceNonTradeAdditions;
+    const annualInvestmentAllowanceTradeAdditions = roundPounds(ui.annualInvestmentAllowanceTradeAdditions || 0);
+    const annualInvestmentAllowanceNonTradeAdditions = roundPounds(ui.annualInvestmentAllowanceNonTradeAdditions || 0);
+    const annualInvestmentAllowanceTotalAdditionsRaw = Number(ui.annualInvestmentAllowanceTotalAdditions);
+    const annualInvestmentAllowanceTotalAdditions = Number.isFinite(annualInvestmentAllowanceTotalAdditionsRaw)
+      ? roundPounds(annualInvestmentAllowanceTotalAdditionsRaw)
+      : roundPounds(annualInvestmentAllowanceTradeAdditions + annualInvestmentAllowanceNonTradeAdditions);
 
     // Trading losses
-    const tradingLossBroughtForward = roundPounds(
-      ui.tradingLossBroughtForward ??
-      ui.tradingLossBF ??
-      ui._trading_losses_bfwd ??
-      ui._trading_losses_available ??
-      ui.box_160_trading_losses_bfwd ??
-      0
-    );
-    const tradingLossUsageRequestedRaw = ui.tradingLossUsageRequested ?? ui.tradingLossUseRequested ?? ui.box_161_trading_losses_use_requested;
+    const tradingLossBroughtForward = roundPounds(ui.tradingLossBroughtForward || 0);
+    const tradingLossUsageRequestedRaw = ui.tradingLossUsageRequested;
     const tradingLossUsageRequested = (tradingLossUsageRequestedRaw === '' || tradingLossUsageRequestedRaw == null)
       ? null
       : (() => {
@@ -171,26 +128,26 @@
         })();
 
     // Optional CT600 non-computation inputs (reliefs / charges / declaration)
-    const declarationName = String(ui.declarationName ?? ui.box_975_name ?? '');
-    const declarationDate = String(ui.declarationDate ?? ui.box_980_date ?? '');
-    const declarationStatus = String(ui.declarationStatus ?? ui.box_985_status ?? '');
+    const declarationName = String(ui.declarationName || '');
+    const declarationDate = String(ui.declarationDate || '');
+    const declarationStatus = String(ui.declarationStatus || '');
     const ct600 = {
-      communityInvestmentTaxRelief: roundPounds(ui.communityInvestmentTaxRelief ?? ui.box_445_community_investment_tax_relief ?? 0),
-      doubleTaxationRelief: roundPounds(ui.doubleTaxationRelief ?? ui.box_450_double_taxation_relief ?? 0),
-      advanceCorporationTax: roundPounds(ui.advanceCorporationTax ?? ui.box_465_advance_corporation_tax ?? 0),
-      loansToParticipatorsTax: roundPounds(ui.loansToParticipatorsTax ?? ui.box_480_loans_to_participators_tax ?? 0),
-      controlledForeignCompaniesTax: roundPounds(ui.controlledForeignCompaniesTax ?? ui.box_490_controlled_foreign_companies_tax ?? 0),
-      bankLevyPayable: roundPounds(ui.bankLevyPayable ?? ui.box_495_bank_levy_payable ?? 0),
-      bankSurchargePayable: roundPounds(ui.bankSurchargePayable ?? ui.box_496_bank_surcharge_payable ?? 0),
-      residentialPropertyDeveloperTax: roundPounds(ui.residentialPropertyDeveloperTax ?? ui.box_497_residential_property_developer_tax ?? 0),
-      eogplPayable: roundPounds(ui.eogplPayable ?? ui.box_501_energy_oil_and_gas_profits_levy ?? 0),
-      eglPayable: roundPounds(ui.eglPayable ?? ui.box_502_electricity_generator_levy ?? 0),
-      supplementaryChargePayable: roundPounds(ui.supplementaryChargePayable ?? ui.box_505_supplementary_charge_payable ?? 0),
-      incomeTaxDeductedFromGrossIncome: roundPounds(ui.incomeTaxDeductedFromGrossIncome ?? ui.box_515_income_tax_deducted_from_gross_income ?? 0),
-      coronavirusSupportPaymentOverpaymentNowDue: roundPounds(ui.coronavirusSupportPaymentOverpaymentNowDue ?? ui.box_526_coronavirus_support_payment_overpayment_now_due ?? 0),
-      restitutionTax: roundPounds(ui.restitutionTax ?? ui.box_527_restitution_tax ?? 0),
-      underlyingRateReliefClaim: parseCheckmark(ui.underlyingRateReliefClaim ?? ui.box_455_underlying_rate_relief_claim),
-      reliefCarriedBackToEarlierPeriod: parseCheckmark(ui.reliefCarriedBackToEarlierPeriod ?? ui.box_460_relief_carried_back_to_earlier_period)
+      communityInvestmentTaxRelief: roundPounds(ui.communityInvestmentTaxRelief || 0),
+      doubleTaxationRelief: roundPounds(ui.doubleTaxationRelief || 0),
+      advanceCorporationTax: roundPounds(ui.advanceCorporationTax || 0),
+      loansToParticipatorsTax: roundPounds(ui.loansToParticipatorsTax || 0),
+      controlledForeignCompaniesTax: roundPounds(ui.controlledForeignCompaniesTax || 0),
+      bankLevyPayable: roundPounds(ui.bankLevyPayable || 0),
+      bankSurchargePayable: roundPounds(ui.bankSurchargePayable || 0),
+      residentialPropertyDeveloperTax: roundPounds(ui.residentialPropertyDeveloperTax || 0),
+      eogplPayable: roundPounds(ui.eogplPayable || 0),
+      eglPayable: roundPounds(ui.eglPayable || 0),
+      supplementaryChargePayable: roundPounds(ui.supplementaryChargePayable || 0),
+      incomeTaxDeductedFromGrossIncome: roundPounds(ui.incomeTaxDeductedFromGrossIncome || 0),
+      coronavirusSupportPaymentOverpaymentNowDue: roundPounds(ui.coronavirusSupportPaymentOverpaymentNowDue || 0),
+      restitutionTax: roundPounds(ui.restitutionTax || 0),
+      underlyingRateReliefClaim: parseCheckmark(ui.underlyingRateReliefClaim),
+      reliefCarriedBackToEarlierPeriod: parseCheckmark(ui.reliefCarriedBackToEarlierPeriod)
     };
 
     return {
@@ -198,13 +155,8 @@
       accountingPeriodEnd,
       apStartUTC,
       apEndUTC,
-      accountingPeriodDays: daysInclusive(apStartUTC, apEndUTC),
+      accountingPeriodDays,
       associatedCompanyCount,
-      // Legacy aliases retained for backward compatibility.
-      apStart: accountingPeriodStart,
-      apEnd: accountingPeriodEnd,
-      apDays: daysInclusive(apStartUTC, apEndUTC),
-      assocCompanies: associatedCompanyCount,
       company_utr: companyUtr,
       company_name: companyName,
       company_registration_number: companyRegistrationNumber,
@@ -214,16 +166,6 @@
       tax_computation_cover_company_identifier: taxComputationCoverCompanyIdentifier,
       tax_computation_cover_accounting_framework: taxComputationCoverAccountingFramework,
       tax_computation_cover_computation_basis_note: taxComputationCoverComputationBasisNote,
-      // Legacy aliases retained for backward compatibility.
-      companyUtr,
-      companyName,
-      companyRegistrationNumber,
-      returnTypeOrPeriodIndicator,
-      companyAddress,
-      accountsAndComputationMetadata,
-      taxComputationCoverCompanyIdentifier,
-      taxComputationCoverAccountingFramework,
-      taxComputationCoverComputationBasisNote,
 
       pnl: {
         tradingTurnover,
@@ -238,47 +180,24 @@
         costOfGoodsSold,
         staffEmploymentCosts,
         depreciationExpense,
-        otherOperatingCharges,
-        // Legacy aliases retained for backward compatibility.
-        turnover: tradingTurnover,
-        govtGrants: governmentGrants,
-        rentalIncome: propertyIncome,
-        propertyLossBF: propertyLossBroughtForward,
-        disposalGains: tradingBalancingCharges,
-        capitalGains: chargeableGains,
-        capitalGainsFileName: chargeableGainsComputationFileName,
-        costOfSales: costOfGoodsSold,
-        staffCosts: staffEmploymentCosts,
-        depreciation: depreciationExpense,
-        otherCharges: otherOperatingCharges
+        otherOperatingCharges
       },
 
       adjustments: {
         disallowableExpenditure,
-        otherTaxAdjustmentsAddBack,
-        // Legacy aliases retained for backward compatibility.
-        disallowableExpenses: disallowableExpenditure,
-        otherAdjustments: otherTaxAdjustmentsAddBack
+        otherTaxAdjustmentsAddBack
       },
 
       capitalAllowances: {
-        annualInvestmentAllowanceTradeAdditions: resolvedAiaTrade,
-        annualInvestmentAllowanceNonTradeAdditions: resolvedAiaNonTrade,
-        annualInvestmentAllowanceTotalAdditions: resolvedAiaTrade + resolvedAiaNonTrade,
-        // Legacy aliases retained for backward compatibility.
-        aiaTradeAdditions: resolvedAiaTrade,
-        aiaNonTradeAdditions: resolvedAiaNonTrade,
-        aiaAdditions: resolvedAiaTrade + resolvedAiaNonTrade
+        annualInvestmentAllowanceTradeAdditions,
+        annualInvestmentAllowanceNonTradeAdditions,
+        annualInvestmentAllowanceTotalAdditions
       },
 
       losses: {
         tradingLossBroughtForward,
         tradingLossUsageRequested,
-        propertyLossUsageRequested,
-        // Legacy aliases retained for backward compatibility.
-        tradingLossBF: tradingLossBroughtForward,
-        tradingLossUseRequested: tradingLossUsageRequested,
-        propertyLossUseRequested: propertyLossUsageRequested
+        propertyLossUsageRequested
       },
 
       declaration: {

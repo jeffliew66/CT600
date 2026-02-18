@@ -34,21 +34,21 @@
     // P&L items from tax engine (all amounts in pounds, pre-rounded)
     const stmtCompIncome = {
       // Trading revenue
-      revenue_turnover: round(inputs.pnl.turnover),
+      revenue_turnover: round(inputs.pnl.tradingTurnover),
 
       // Cost of sales
-      cost_of_sales: round(inputs.pnl.costOfSales),
+      cost_of_sales: round(inputs.pnl.costOfGoodsSold),
 
       // Gross profit
-      gross_profit_loss: round(inputs.pnl.turnover - inputs.pnl.costOfSales),
+      gross_profit_loss: round(inputs.pnl.tradingTurnover - inputs.pnl.costOfGoodsSold),
 
       // Operating/administrative expenses
       administrative_expenses: {
-        staff_costs: round(inputs.pnl.staffCosts),
-        depreciation_charge: round(inputs.pnl.depreciation),
-        other_operating_charges: round(inputs.pnl.otherCharges),
+        staff_costs: round(inputs.pnl.staffEmploymentCosts),
+        depreciation_charge: round(inputs.pnl.depreciationExpense),
+        other_operating_charges: round(inputs.pnl.otherOperatingCharges),
         total_administrative_expenses: round(
-          inputs.pnl.staffCosts + inputs.pnl.depreciation + inputs.pnl.otherCharges
+          inputs.pnl.staffEmploymentCosts + inputs.pnl.depreciationExpense + inputs.pnl.otherOperatingCharges
         )
       },
 
@@ -56,10 +56,10 @@
       // FIXED: Correctly calculated as Gross Profit - Admin Expenses
       // = (Turnover - COS) - (Staff + Depreciation + Other)
       operating_profit: round(
-        (inputs.pnl.turnover - inputs.pnl.costOfSales) 
-        - inputs.pnl.staffCosts 
-        - inputs.pnl.depreciation 
-        - inputs.pnl.otherCharges
+        (inputs.pnl.tradingTurnover - inputs.pnl.costOfGoodsSold) 
+        - inputs.pnl.staffEmploymentCosts 
+        - inputs.pnl.depreciationExpense 
+        - inputs.pnl.otherOperatingCharges
       ),
 
       // Finance income / costs
@@ -68,11 +68,11 @@
 
       // Non-operating income
       non_operating_income: {
-        rental_income: round(inputs.pnl.rentalIncome),
+        rental_income: round(inputs.pnl.propertyIncome),
         dividend_income: round(inputs.pnl.dividendIncome),
-        govt_grants_and_subsidies: round(inputs.pnl.govtGrants),
+        govt_grants_and_subsidies: round(inputs.pnl.governmentGrants),
         total_non_operating: round(
-          inputs.pnl.rentalIncome + inputs.pnl.dividendIncome + inputs.pnl.govtGrants
+          inputs.pnl.propertyIncome + inputs.pnl.dividendIncome + inputs.pnl.governmentGrants
         )
       },
 
@@ -224,7 +224,7 @@
    */
   function buildMandatoryDisclosures(inputs, result, taxComputationData, options) {
     const opt = options || {};
-    const includeOptional = opt.include_optional_disclosures !== false; // Default: true (backward compatible)
+    const includeOptional = opt.include_optional_disclosures !== false; // Default: true
     
     // Determine dynamic tax rate (not hardcoded 25%)
     let dynamicTaxRate = 0.25;
@@ -240,15 +240,15 @@
       accounting_policies: {
         basis_of_preparation: 'Small company regime applicable per Companies Act 2006, Schedule 1A. Accounts prepared under FRS 105.',
         measurement_basis: 'Historical cost',
-        accounting_period_start: inputs.apStart,
-        accounting_period_end: inputs.apEnd,
-        accounting_period_length_days: inputs.apDays
+        accounting_period_start: inputs.accountingPeriodStart,
+        accounting_period_end: inputs.accountingPeriodEnd,
+        accounting_period_length_days: inputs.accountingPeriodDays
       },
 
       // 2. Critical Accounting Judgments & Estimates (mandatory)
       judgments_and_estimates: {
         depreciation_policy: 'Straight-line depreciation applied per management policy',
-        depreciation_charge_this_period: round(inputs.pnl.depreciation),
+        depreciation_charge_this_period: round(inputs.pnl.depreciationExpense),
         useful_lives_reviewed: 'Yes' // Placeholder
       },
 
@@ -266,8 +266,8 @@
           standard_corporation_tax_rate: dynamicTaxRate,
           tax_at_standard_rate: round(result.accounts.profitBeforeTax * dynamicTaxRate),
           adjustments: {
-            disallowable_expenses_net: round(inputs.adjustments.disallowableExpenses),
-            relief_on_disallowables: round(inputs.adjustments.disallowableExpenses * dynamicTaxRate),
+            disallowable_expenses_net: round(inputs.adjustments.disallowableExpenditure),
+            relief_on_disallowables: round(inputs.adjustments.disallowableExpenditure * dynamicTaxRate),
             other_timing_differences: round(0)
           },
           total_tax_expense: round(result.tax.corporationTaxCharge),

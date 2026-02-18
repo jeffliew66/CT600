@@ -23,20 +23,19 @@
    * Shows step from accounts profit to taxable profit
    */
   function buildProfitAdjustmentSchedule(inputs, result) {
-    const depreciationExpense = inputs.pnl.depreciationExpense ?? inputs.pnl.depreciation;
-    const disallowableExpenditure = inputs.adjustments.disallowableExpenditure ?? inputs.adjustments.disallowableExpenses;
-    const otherTaxAdjustmentsAddBack = inputs.adjustments.otherTaxAdjustmentsAddBack ?? inputs.adjustments.otherAdjustments;
-    const tradingTurnover = inputs.pnl.tradingTurnover ?? inputs.pnl.turnover;
-    const governmentGrants = inputs.pnl.governmentGrants ?? inputs.pnl.govtGrants;
-    const tradingBalancingCharges = inputs.pnl.tradingBalancingCharges ?? inputs.pnl.disposalGains;
-    const chargeableGains = inputs.pnl.chargeableGains ?? inputs.pnl.capitalGains;
-    const chargeableGainsComputationFileName =
-      inputs.pnl.chargeableGainsComputationFileName ?? inputs.pnl.capitalGainsFileName;
+    const depreciationExpense = inputs.pnl.depreciationExpense;
+    const disallowableExpenditure = inputs.adjustments.disallowableExpenditure;
+    const otherTaxAdjustmentsAddBack = inputs.adjustments.otherTaxAdjustmentsAddBack;
+    const tradingTurnover = inputs.pnl.tradingTurnover;
+    const governmentGrants = inputs.pnl.governmentGrants;
+    const tradingBalancingCharges = inputs.pnl.tradingBalancingCharges;
+    const chargeableGains = inputs.pnl.chargeableGains;
+    const chargeableGainsComputationFileName = inputs.pnl.chargeableGainsComputationFileName;
     const nonTradingIncomeClassificationAmount = round(
       result.computation.nonTradingIncomeExcludedFromTradingView ??
       (
         (inputs.pnl.interestIncome || 0) +
-        (inputs.pnl.propertyIncome ?? inputs.pnl.rentalIncome ?? 0) +
+        (inputs.pnl.propertyIncome || 0) +
         (chargeableGains || 0)
       )
     );
@@ -67,7 +66,7 @@
     );
 
     return {
-      // Starting point: accounts profit before tax (box 155 in final result)
+      // Starting point: accounts profit before tax
       accounting_profit_before_tax: round(result.accounts.profitBeforeTax),
 
       // Add-backs: non-deductible items
@@ -147,7 +146,6 @@
       Number(
         result.computation?.aiaRequestedTotal ??
         inputs.capitalAllowances?.annualInvestmentAllowanceTotalAdditions ??
-        inputs.capitalAllowances?.aiaAdditions ??
         0
       )
     );
@@ -177,7 +175,7 @@
         aia_unrelieved_bfwd: round(row.aiaUnrelievedBroughtForward)
       }));
     } else {
-      // Backward-compatible fallback if engine has not precomputed AIA display rows.
+      // Fallback if engine has not precomputed AIA display rows.
       function allocateByWeight(total, rows, valueKey, outKey) {
         let remaining = round(total);
         const out = rows.map((row, idx) => {
@@ -208,8 +206,7 @@
 
     return {
       total_plant_additions: round(
-        inputs.capitalAllowances.annualInvestmentAllowanceTotalAdditions ??
-        inputs.capitalAllowances.aiaAdditions
+        inputs.capitalAllowances.annualInvestmentAllowanceTotalAdditions
       ),
       annual_investment_allowance: {
         parts_by_fy: partsByFY,
@@ -288,8 +285,8 @@
    * Builds "Trading Loss Claim" (CT600 Section 2)
    */
   function buildTradingLossSchedule(inputs, result) {
-    const tradingLossBroughtForward = inputs.losses.tradingLossBroughtForward ?? inputs.losses.tradingLossBF;
-    const tradingLossUsageRequested = inputs.losses.tradingLossUsageRequested ?? inputs.losses.tradingLossUseRequested;
+    const tradingLossBroughtForward = inputs.losses.tradingLossBroughtForward;
+    const tradingLossUsageRequested = inputs.losses.tradingLossUsageRequested;
     const requested =
       tradingLossUsageRequested == null
         ? tradingLossBroughtForward
@@ -315,19 +312,16 @@
     computation.cover = {
       company_identifier: String(
         inputs.tax_computation_cover_company_identifier ||
-        inputs.taxComputationCoverCompanyIdentifier ||
         inputs.company_registration_number ||
         inputs.company_utr ||
         ''
       ),
       accounting_framework: String(
         inputs.tax_computation_cover_accounting_framework ||
-        inputs.taxComputationCoverAccountingFramework ||
         ''
       ),
       computation_basis_note: String(
         inputs.tax_computation_cover_computation_basis_note ||
-        inputs.taxComputationCoverComputationBasisNote ||
         ''
       )
     };
