@@ -774,6 +774,7 @@
         propertyLossUseRequestedRemaining: TaxModel.roundPounds(remainingPropertyLossUseRequested),
         propertyLossCarriedForward: TaxModel.roundPounds(remainingPropertyLossPool),
         propertyProfitAfterLoss: TaxModel.roundPounds(periodPropertyProfit),
+        propertyProfitAfterAIA: TaxModel.roundPounds(periodPropertyAfterAIA),
         propertyAdjustment: TaxModel.roundPounds(periodPropertyAdjustmentDisplay),
         taxableBeforeLoss: TaxModel.roundPounds(periodTaxableBeforeLoss),
         addBacks: TaxModel.roundPounds(periodAddBacks),
@@ -796,6 +797,9 @@
 
     // Aggregate results across all periods
     result.property.propertyProfitAfterLossOffset = TaxModel.roundPounds(periodResults.reduce((s, p) => s + (p.propertyProfitAfterLoss || 0), 0));
+    result.property.propertyBusinessIncomeForCT600 = TaxModel.roundPounds(
+      Math.max(0, periodResults.reduce((s, p) => s + Number(p.propertyProfitAfterAIA || 0), 0))
+    );
     result.property.propertyLossUsed = TaxModel.roundPounds(periodResults.reduce((s, p) => s + (p.propertyLossUsed || 0), 0));
     result.property.propertyLossAvailable = TaxModel.roundPounds(remainingPropertyLossPool);
     result.property.propertyLossCF = TaxModel.roundPounds(remainingPropertyLossPool);
@@ -965,6 +969,7 @@
         property_loss_use_requested_remaining: p.propertyLossUseRequestedRemaining,
         property_loss_cf: p.propertyLossCarriedForward,
         property_profit_after_loss: p.propertyProfitAfterLoss,
+        property_profit_after_aia: p.propertyProfitAfterAIA,
         trade_aia_cap_total: p.tradeAIACapTotal,
         non_trade_aia_cap_total: p.nonTradeAIACapTotal,
         aia_cap_total: p.aiaCapTotal,

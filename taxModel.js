@@ -305,6 +305,7 @@
         rentalIncome: 0,
         propertyLossBF: 0,
         propertyProfitAfterLossOffset: 0,
+        propertyBusinessIncomeForCT600: 0,
         propertyLossUsed: 0,
         propertyLossAvailable: 0,
         propertyLossCF: 0

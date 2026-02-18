@@ -13,6 +13,7 @@
   if (!TaxModel) throw new Error('TaxModel not loaded. Load taxModel.js first.');
 
   function round(n) { return TaxModel.roundPounds(n); }
+  function roundNonNegative(n) { return Math.max(0, round(n)); }
   function toMoney(n) {
     const x = Number(n || 0);
     if (!Number.isFinite(x)) return 0;
@@ -28,6 +29,9 @@
   }
 
   function computePropertyBusinessIncomeForCT600(result) {
+    const direct = Number(result?.property?.propertyBusinessIncomeForCT600);
+    if (Number.isFinite(direct)) return Math.max(0, direct);
+
     const periods = result?.metadata?.periods;
     if (!Array.isArray(periods) || !periods.length) {
       return Math.max(0, Number(result?.property?.propertyProfitAfterLossOffset || 0));
@@ -198,29 +202,28 @@
     boxes.box_328_assoc_companies = hasAssocFy3 ? associatedCompanyCount : '';
 
     // Income headings
-    boxes.box_145_trade_turnover = round(tradingTurnover);
-    boxes.box_155_trading_profit = Math.max(0, round(tradingProfitBeforeLoss));
+    boxes.box_145_trade_turnover = roundNonNegative(tradingTurnover);
+    boxes.box_155_trading_profit = roundNonNegative(tradingProfitBeforeLoss);
     boxes.box_160_trading_losses_bfwd = round(result.computation.tradingLossUsed);
-    boxes.box_165_net_trading_profits = Math.max(0, round(result.computation.taxableTradingProfit));
-    boxes.box_170_non_trading_loan_relationship_profits = round(nonTradingLoanRelationshipProfit);
-    boxes.box_190_property_business_income = round(propertyBusinessIncome);
+    boxes.box_165_net_trading_profits = roundNonNegative(result.computation.taxableTradingProfit);
+    boxes.box_170_non_trading_loan_relationship_profits = roundNonNegative(nonTradingLoanRelationshipProfit);
+    boxes.box_190_property_business_income = roundNonNegative(propertyBusinessIncome);
     // Box 205 is residual/miscellaneous profits not reported elsewhere.
     // Do not duplicate total profits here.
-    boxes.box_205_income_not_elsewhere = round(
+    boxes.box_205_income_not_elsewhere = roundNonNegative(
       result.computation.miscellaneousIncomeNotElsewhere || 0
     );
-    boxes.box_210_chargeable_gains = round(chargeableGains || 0);
-    boxes.box_235_profits_subtotal = Math.max(0, round(profitsSubtotal));
+    boxes.box_210_chargeable_gains = roundNonNegative(chargeableGains || 0);
+    boxes.box_235_profits_subtotal = roundNonNegative(profitsSubtotal);
     boxes.box_250_property_business_losses_used = round(result.property.propertyLossUsed || 0);
-    boxes.box_300_profits_before_deductions = Math.max(
-      0,
-      round(result.computation.profitsSubtotal ?? profitsSubtotal)
+    boxes.box_300_profits_before_deductions = roundNonNegative(
+      result.computation.profitsSubtotal ?? profitsSubtotal
     );
     boxes.box_305_donations = 0;
     boxes.box_310_group_relief = 0;
     boxes.box_312_other_deductions = 0;
-    boxes.box_315_taxable_profit = round(result.computation.taxableTotalProfits);
-    boxes.box_620_franked_investment_income_exempt_abgh = round(inputs.pnl.dividendIncome);
+    boxes.box_315_taxable_profit = roundNonNegative(result.computation.taxableTotalProfits);
+    boxes.box_620_franked_investment_income_exempt_abgh = roundNonNegative(inputs.pnl.dividendIncome);
 
     // Box 329 indicator
     // Logic is fully handled in taxEngine.js.
