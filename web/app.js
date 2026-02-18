@@ -105,7 +105,7 @@
     },
     interestIncome: {
       variableName: 'inputs.pnl.interestIncome',
-      ct600Mapping: 'box_170_non_trading_loan_relationship_profits (profits heading)',
+      ct600Mapping: 'box_170_non_trading_loan_relationship_profits (disclosure heading; not net taxable-interest)',
       taxComputationMapping: 'profit_adjustment_schedule.other_income.interest_income'
     },
     rentalIncome: {

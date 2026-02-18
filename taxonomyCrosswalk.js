@@ -20,7 +20,7 @@
 // inputs.pnl.governmentGrants                                    | box_155_trading_profit (component; not box_145)          | profit_adjustment_schedule.trading_income_components.govt_grants
 // inputs.pnl.tradingBalancingCharges                             | box_155_trading_profit (component; not box_145 turnover) | profit_adjustment_schedule.trading_income_components.asset_disposal_proceeds_balancing_charges
 // inputs.pnl.tradingBalancingCharges                             | _trading_balancing_charges (custom transparency)         | -
-// inputs.pnl.interestIncome                                      | box_170_non_trading_loan_relationship_profits (profits heading) | profit_adjustment_schedule.other_income.interest_income
+// inputs.pnl.interestIncome                                      | box_170_non_trading_loan_relationship_profits (disclosure heading; not net taxable-interest) | profit_adjustment_schedule.other_income.interest_income
 // inputs.pnl.propertyIncome                                      | -                                                        | -
 // inputs.pnl.propertyLossBroughtForward                          | _property_losses_bfwd (custom transparency)              | -
 // inputs.pnl.chargeableGains                                     | box_210_chargeable_gains                                 | profit_adjustment_schedule.other_income.capital_gains
@@ -86,7 +86,7 @@
 // result.computation.capitalAllowances                           | -                                                        | capital_allowances_schedule.annual_investment_allowance.total_aia_claimed
 // result.computation.totalTradingIncome                          | -                                                        | profit_adjustment_schedule.trading_income_components.total_trading_income
 // result.computation.grossTradingProfit                          | box_155_trading_profit                                   | profit_adjustment_schedule.net_trading_profit_before_loss
-// result.computation.tradingLossUsed                             | box_160_trading_losses_bfwd                              | profit_adjustment_schedule.trading_loss_bfwd_applied
+// result.computation.tradingLossUsed                             | box_160_trading_losses_bfwd_used (preferred; alias: box_160_trading_losses_bfwd) | profit_adjustment_schedule.trading_loss_bfwd_applied
 // result.computation.tradingLossUsed                             | -                                                        | trading_loss_schedule.trading_loss_bfwd_used_this_period
 // result.computation.tradingLossAvailable                        | _trading_losses_available (custom transparency)          | -
 // result.computation.taxableTradingProfit                        | box_165_net_trading_profits                              | profit_adjustment_schedule.net_trading_profit

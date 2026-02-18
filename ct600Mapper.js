@@ -66,6 +66,8 @@
       rate = mainRate;
       taxBeforeRelief = taxableProfit * mainRate;
     } else {
+      // For tiny split slices, effective rates can be slightly noisy due to rounding.
+      // This only affects presentation; filing values remain consistent.
       const effective = ctCharge / taxableProfit;
       if (smallRate > 0 && mainRate > smallRate && effective <= (smallRate + 0.002)) {
         rate = smallRate;
@@ -204,8 +206,12 @@
     // Income headings
     boxes.box_145_trade_turnover = roundNonNegative(tradingTurnover);
     boxes.box_155_trading_profit = roundNonNegative(tradingProfitBeforeLoss);
-    boxes.box_160_trading_losses_bfwd = round(result.computation.tradingLossUsed);
+    // Box 160 is "trading losses brought forward used" (used amount, not opening balance).
+    boxes.box_160_trading_losses_bfwd_used = round(result.computation.tradingLossUsed);
+    // Backward-compatible alias; prefer `box_160_trading_losses_bfwd_used`.
+    boxes.box_160_trading_losses_bfwd = boxes.box_160_trading_losses_bfwd_used;
     boxes.box_165_net_trading_profits = roundNonNegative(result.computation.taxableTradingProfit);
+    // Box 170 is a disclosure heading (gross NTLR profits), not a net taxable-interest box.
     boxes.box_170_non_trading_loan_relationship_profits = roundNonNegative(nonTradingLoanRelationshipProfit);
     boxes.box_190_property_business_income = roundNonNegative(propertyBusinessIncome);
     // Box 205 is residual/miscellaneous profits not reported elsewhere.
@@ -276,6 +282,12 @@
     boxes._property_losses_available = round(result.property.propertyLossAvailable || 0);
     boxes._property_losses_cfwd = round(result.property.propertyLossCF || 0);
     boxes._engine_corporation_tax_charge = round(result.tax.corporationTaxCharge);
+    // Internal consistency diagnostic: expected relationship is 430 - 435 = 440.
+    const box430Minus435 = Number(boxes.box_430_corporation_tax || 0) - Number(boxes.box_435_marginal_relief || 0);
+    const box440 = Number(boxes.box_440_corporation_tax_chargeable || 0);
+    const integrityDelta = toMoney(box430Minus435 - box440);
+    boxes._integrity_box_430_minus_435_equals_440 = Math.abs(integrityDelta) < 0.01 ? 'X' : '';
+    boxes._integrity_box_430_435_440_delta = integrityDelta;
 
     return boxes;
   }
