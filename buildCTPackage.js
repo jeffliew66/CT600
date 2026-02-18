@@ -20,7 +20,50 @@
   if (!TaxComputationMapper) throw new Error('TaxComputationMapper not loaded. Load taxComputationMapper.js first.');
   if (!FRS105StatementMapper) throw new Error('FRS105StatementMapper not loaded. Load frs105StatementMapper.js first.');
 
+  function parseUTCDateStrict(iso, label) {
+    const s = String(iso || '').trim();
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+    if (!m) throw new Error(`Invalid ${label}. Use YYYY-MM-DD.`);
+    const y = Number(m[1]);
+    const mo = Number(m[2]);
+    const d = Number(m[3]);
+    const dt = new Date(Date.UTC(y, mo - 1, d));
+    if (dt.getUTCFullYear() !== y || (dt.getUTCMonth() + 1) !== mo || dt.getUTCDate() !== d) {
+      throw new Error(`Invalid ${label}. Use a real calendar date.`);
+    }
+    return dt;
+  }
+
+  function addMonthsUTC(dateUTC, months) {
+    const year = dateUTC.getUTCFullYear();
+    const month = dateUTC.getUTCMonth();
+    const day = dateUTC.getUTCDate();
+    const targetMonthIndex = month + months;
+    const targetYear = year + Math.floor(targetMonthIndex / 12);
+    const targetMonth = ((targetMonthIndex % 12) + 12) % 12;
+    const daysInTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+    const safeDay = Math.min(day, daysInTargetMonth);
+    return new Date(Date.UTC(targetYear, targetMonth, safeDay));
+  }
+
   function buildCTPackage(userInputs, options) {
+    const startStr = String(userInputs?.accountingPeriodStart ?? userInputs?.apStart ?? '');
+    const endStr = String(userInputs?.accountingPeriodEnd ?? userInputs?.apEnd ?? '');
+    const startUTC = parseUTCDateStrict(startStr, 'accountingPeriodStart');
+    const endUTC = parseUTCDateStrict(endStr, 'accountingPeriodEnd');
+
+    if (endUTC < startUTC) {
+      throw new Error('Accounting period end date must be on/after start date.');
+    }
+
+    // HMRC CT600/AP rule: do not build a single submission package for periods > 12 months.
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const twelveMonthsLater = addMonthsUTC(startUTC, 12);
+    const period1End = new Date(twelveMonthsLater.getTime() - msPerDay);
+    if (endUTC > period1End) {
+      throw new Error('HMRC Submission Error: Accounting Period exceeds 12 months. Split into two separate submissions.');
+    }
+
     const cfg = options || {};
     const runRes = TaxEngine.run(userInputs, cfg);
     

@@ -637,6 +637,7 @@
       const periodTradingAfterAIA = TaxModel.roundPounds(periodTradingBeforeAIA - periodTradeAIAClaim);
       // Rental/property AIA offsets the rental/property stream only (not interest).
       const periodPropertyAfterAIA = TaxModel.roundPounds(periodPropertyProfitBeforeLoss - periodNonTradeAIAClaim);
+      const periodCurrentPropertyLossIncurred = Math.max(0, TaxModel.roundPounds(-periodPropertyAfterAIA));
       const periodNonTradingAfterAIA = TaxModel.roundPounds(
         periodInterestIncome + periodPropertyAfterAIA + periodCapitalGains
       );
@@ -659,6 +660,23 @@
       );
       remainingPropertyLossPool = Math.max(0, periodPropertyLossPool - periodPropertyLossUsed);
       remainingPropertyLossUseRequested = Math.max(0, remainingPropertyLossUseRequested - periodPropertyLossUsed);
+      // Any current-year property loss not absorbed in-period is carried forward.
+      const periodProfitAvailableForCurrentPropertyLoss = Math.max(
+        0,
+        TaxModel.roundPounds(periodTradingAfterLoss + periodInterestIncome + periodCapitalGains)
+      );
+      const periodCurrentPropertyLossUsed = Math.min(
+        periodCurrentPropertyLossIncurred,
+        periodProfitAvailableForCurrentPropertyLoss
+      );
+      const periodCurrentPropertyLossUnrelieved = Math.max(
+        0,
+        periodCurrentPropertyLossIncurred - periodCurrentPropertyLossUsed
+      );
+      remainingPropertyLossPool = Math.max(
+        0,
+        TaxModel.roundPounds(remainingPropertyLossPool + periodCurrentPropertyLossUnrelieved)
+      );
       // Keep a property-stream view for disclosures/transparency.
       const periodPropertyLossUsedAgainstProperty = Math.min(
         periodPropertyLossUsed,
@@ -749,6 +767,9 @@
         propertyRentalGross: TaxModel.roundPounds(periodRentalIncomeGross),
         propertyLossPool: TaxModel.roundPounds(periodPropertyLossPool),
         propertyLossUsed: TaxModel.roundPounds(periodPropertyLossUsed),
+        propertyLossIncurredCurrentPeriod: TaxModel.roundPounds(periodCurrentPropertyLossIncurred),
+        propertyLossUsedCurrentPeriod: TaxModel.roundPounds(periodCurrentPropertyLossUsed),
+        propertyLossUnrelievedCurrentPeriod: TaxModel.roundPounds(periodCurrentPropertyLossUnrelieved),
         propertyLossUsedAgainstProperty: TaxModel.roundPounds(periodPropertyLossUsedAgainstProperty),
         propertyLossUseRequestedRemaining: TaxModel.roundPounds(remainingPropertyLossUseRequested),
         propertyLossCarriedForward: TaxModel.roundPounds(remainingPropertyLossPool),
@@ -937,6 +958,9 @@
         rental_income_gross: p.propertyRentalGross,
         property_loss_pool: p.propertyLossPool,
         property_loss_used: p.propertyLossUsed,
+        property_loss_incurred_current_period: p.propertyLossIncurredCurrentPeriod,
+        property_loss_used_current_period: p.propertyLossUsedCurrentPeriod,
+        property_loss_unrelieved_current_period: p.propertyLossUnrelievedCurrentPeriod,
         property_loss_used_against_property_stream: p.propertyLossUsedAgainstProperty,
         property_loss_use_requested_remaining: p.propertyLossUseRequestedRemaining,
         property_loss_cf: p.propertyLossCarriedForward,
