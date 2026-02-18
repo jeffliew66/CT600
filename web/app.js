@@ -35,7 +35,7 @@
     },
     assocCompanies: {
       variableName: 'inputs.associatedCompanyCount',
-      ct600Mapping: 'box_326_assoc_companies, box_327_assoc_companies, box_328_assoc_companies',
+      ct600Mapping: 'box_326_assoc_companies, box_327_assoc_companies, box_328_assoc_companies (as applicable by FY overlap)',
       taxComputationMapping: '-'
     },
     turnover: {
@@ -93,6 +93,16 @@
       ct600Mapping: '-',
       taxComputationMapping: 'trading_loss_schedule.trading_loss_use_requested'
     },
+    outTradingLossAvailableRemaining: {
+      variableName: 'result.computation.tradingLossAvailable',
+      ct600Mapping: '- (internal display only)',
+      taxComputationMapping: '-'
+    },
+    propertyLossUseRequested: {
+      variableName: 'inputs.losses.propertyLossUsageRequested',
+      ct600Mapping: 'box_250_property_business_losses_used (used figure after engine caps; claimed against total profits)',
+      taxComputationMapping: '-'
+    },
     interestIncome: {
       variableName: 'inputs.pnl.interestIncome',
       ct600Mapping: 'box_170_non_trading_loan_relationship_profits (profits heading)',
@@ -110,7 +120,7 @@
     },
     dividendIncome: {
       variableName: 'inputs.pnl.dividendIncome',
-      ct600Mapping: 'box_620_dividend_income',
+      ct600Mapping: 'box_620_franked_investment_income_exempt_abgh',
       taxComputationMapping: 'profit_adjustment_schedule.other_income.dividend_income'
     },
     outTradingIncomeTotal: {
@@ -140,7 +150,12 @@
     },
     outPropertyLossBFAvailable: {
       variableName: 'inputs.pnl.propertyLossBroughtForward',
-      ct600Mapping: 'box_250_prop_losses_bfwd',
+      ct600Mapping: '-',
+      taxComputationMapping: '-'
+    },
+    outPropertyLossAvailableRemaining: {
+      variableName: 'result.property.propertyLossAvailable',
+      ct600Mapping: '- (internal display only)',
       taxComputationMapping: '-'
     },
     outRentalPropertyTotal: {
@@ -356,6 +371,7 @@
       // Loss carry-forward
       tradingLossBF: tradingLossBFInput,
       tradingLossUseRequested: toOptionalNum($("tradingLossUseRequested").value),
+      propertyLossUseRequested: toOptionalNum($("propertyLossUseRequested").value),
       propertyLossBF: propertyLossBFInput
     };
 
@@ -538,8 +554,8 @@
     verificationDetail += `  Total Income = Turnover + Govt Grants + Asset disposal proceeds + Interest + Rental + Capital gains\n`;
     verificationDetail += `  Profit Before Tax = Total Income - Total Expenses\n`;
     verificationDetail += `  Taxable Trading Profit = trading component after trade AIA and trading loss relief\n`;
-    verificationDetail += `  Taxable Total Profits (TTP) = max(0, Taxable Trading Profit + Taxable Non-Trading Income)\n`;
-    verificationDetail += `  Taxable Non-Trading Income = Interest + Capital gains + (Rental/Property after property loss BF and rental/property AIA)\n`;
+    verificationDetail += `  Taxable Total Profits (TTP) = max(0, Taxable Trading Profit + Taxable Non-Trading Income - Property losses used)\n`;
+    verificationDetail += `  Taxable Non-Trading Income = Interest + Capital gains + (Rental/Property after rental/property AIA)\n`;
     verificationDetail += `  Augmented Profits = TTP + Dividends\n`;
     verificationDetail += `  For a complete 12-month period:\n`;
     verificationDetail += `    Threshold(slice) = (Annual threshold / (Associated Companies + 1)) x (slice days / period days)\n`;
@@ -567,9 +583,14 @@
     verificationDetail += `  Trading losses available b/f: ${pounds(userInputs.tradingLossBF)}\n`;
     verificationDetail += `  Trading losses requested to use: ${userInputs.tradingLossUseRequested == null ? 'Auto (up to available)' : pounds(userInputs.tradingLossUseRequested)}\n`;
     verificationDetail += `  Less trading losses used: ${pounds(result.computation.tradingLossUsed)}\n`;
+    verificationDetail += `  Property losses available b/f: ${pounds(userInputs.propertyLossBF)}\n`;
+    verificationDetail += `  Property losses requested to use: ${userInputs.propertyLossUseRequested == null ? 'Auto (up to available)' : pounds(userInputs.propertyLossUseRequested)}\n`;
+    verificationDetail += `  Less property losses used: ${pounds(result.property.propertyLossUsed)}\n`;
+    verificationDetail += `  Trading losses still available (internal, not CT600) = ${pounds(result.computation.tradingLossAvailable)}\n`;
+    verificationDetail += `  Property losses still available (internal, not CT600) = ${pounds(result.property.propertyLossAvailable)}\n`;
     verificationDetail += `  Taxable trading profit: ${pounds(taxableTradingProfit)}\n`;
     verificationDetail += `  Taxable non-trading income (interest + capital gains + rental/property after rental/property AIA): ${pounds(taxableNonTradeIncome)}\n`;
-    verificationDetail += `  Taxable Total Profits = max(0, ${pounds(taxableTradingProfit)} + ${pounds(taxableNonTradeIncome)}) = ${pounds(taxableTotalProfits)}\n`;
+    verificationDetail += `  Taxable Total Profits = max(0, ${pounds(taxableTradingProfit)} + ${pounds(taxableNonTradeIncome)} - ${pounds(result.property.propertyLossUsed)}) = ${pounds(taxableTotalProfits)}\n`;
     verificationDetail += `  Augmented Profits = TTP + dividends = ${pounds(taxableTotalProfits)} + ${pounds(userInputs.dividendIncome)} = ${pounds(augmentedProfits)}\n\n`;
 
     if (isSplit) {
@@ -645,21 +666,42 @@
       `Opening trading losses brought forward = ${pounds(userInputs.tradingLossBF)}\n` +
       `Requested usage this return = ${userInputs.tradingLossUseRequested == null ? 'Auto (up to available)' : pounds(userInputs.tradingLossUseRequested)}\n` +
       `Used this return = ${pounds(result.computation.tradingLossUsed)}\n` +
-      `Carried forward = ${pounds(Math.max(0, userInputs.tradingLossBF - result.computation.tradingLossUsed))}\n\n` +
+      `Still available = ${pounds(result.computation.tradingLossAvailable)}\n\n` +
       `You can adjust this amount via slider if you are reconciling prior-year schedules.`
     );
     setRawMeta('outTradingLossBFAvailable', userInputs.tradingLossBF, roundPounds(userInputs.tradingLossBF));
+    setOut(
+      'outTradingLossAvailableRemaining',
+      roundPounds(result.computation.tradingLossAvailable),
+      'Trading losses still available after this return (internal display only)',
+      `Opening trading losses brought forward = ${pounds(userInputs.tradingLossBF)}\n` +
+      `Less trading losses used this return = ${pounds(result.computation.tradingLossUsed)}\n` +
+      `Trading losses still available = ${pounds(result.computation.tradingLossAvailable)}\n\n` +
+      `This value is for internal display only and is not submitted as a CT600 box.`
+    );
+    setRawMeta('outTradingLossAvailableRemaining', result.computation.tradingLossAvailable, roundPounds(result.computation.tradingLossAvailable));
 
     setOut(
       'outPropertyLossBFAvailable',
       roundPounds(userInputs.propertyLossBF),
       'Rental & property losses brought forward available at period start',
       `Opening rental/property losses brought forward = ${pounds(userInputs.propertyLossBF)}\n` +
-      `Used against rental stream this return = ${pounds(Math.max(0, userInputs.rentalIncome - result.property.propertyProfitAfterLossOffset))}\n` +
-      `Carried forward = ${pounds(result.property.propertyLossCF)}\n\n` +
+      `Requested usage this return = ${userInputs.propertyLossUseRequested == null ? 'Auto (up to available)' : pounds(userInputs.propertyLossUseRequested)}\n` +
+      `Used this return (claimed against total profits) = ${pounds(result.property.propertyLossUsed)}\n` +
+      `Still available = ${pounds(result.property.propertyLossAvailable)}\n\n` +
       `You can adjust this amount via slider if you are reconciling prior-year schedules.`
     );
     setRawMeta('outPropertyLossBFAvailable', userInputs.propertyLossBF, roundPounds(userInputs.propertyLossBF));
+    setOut(
+      'outPropertyLossAvailableRemaining',
+      roundPounds(result.property.propertyLossAvailable),
+      'Rental/property losses still available after this return (internal display only)',
+      `Opening rental/property losses brought forward = ${pounds(userInputs.propertyLossBF)}\n` +
+      `Less rental/property losses used this return (claimed against total profits) = ${pounds(result.property.propertyLossUsed)}\n` +
+      `Rental/property losses still available = ${pounds(result.property.propertyLossAvailable)}\n\n` +
+      `This value is for internal display only and is not submitted as a CT600 box.`
+    );
+    setRawMeta('outPropertyLossAvailableRemaining', result.property.propertyLossAvailable, roundPounds(result.property.propertyLossAvailable));
 
     setOut(
       'outTradingIncomeTotal',
@@ -761,7 +803,7 @@
       `Losses available (BF): ${pounds(userInputs.tradingLossBF)}\n` +
       `Losses requested to use: ${userInputs.tradingLossUseRequested == null ? 'Auto (up to available)' : pounds(userInputs.tradingLossUseRequested)}\n` +
       `Losses used this return: ${pounds(result.computation.tradingLossUsed)}\n` +
-      `Losses carried forward: ${pounds(Math.max(0, userInputs.tradingLossBF - result.computation.tradingLossUsed))}`
+      `Losses still available: ${pounds(result.computation.tradingLossAvailable)}`
     );
     setRawMeta('outTradingLossUsed', result.computation.tradingLossUsed, roundPounds(result.computation.tradingLossUsed));
 
@@ -807,10 +849,11 @@
     setOut(
       'ttProfitsChargeable',
       roundPounds(taxableTotalProfits),
-      'Total taxable income = max(0, taxable trade income + taxable non-trade income)',
+      'Total taxable income = max(0, taxable trade income + taxable non-trade income - property losses used)',
       `Taxable trade income = ${pounds(taxableTradingProfit)}\n` +
       `Taxable non-trade income = ${pounds(taxableNonTradeIncome)}\n` +
-      `Total taxable income = max(0, ${pounds(taxableTradingProfit)} + ${pounds(taxableNonTradeIncome)}) = ${pounds(taxableTotalProfits)}`
+      `Property losses used = ${pounds(result.property.propertyLossUsed)}\n` +
+      `Total taxable income = max(0, ${pounds(taxableTradingProfit)} + ${pounds(taxableNonTradeIncome)} - ${pounds(result.property.propertyLossUsed)}) = ${pounds(taxableTotalProfits)}`
     );
     setRawMeta('ttProfitsChargeable', taxableTotalProfits, roundPounds(taxableTotalProfits));
 
@@ -912,7 +955,7 @@
       const days = Number(period.days || 0);
       if (!days) {
         return {
-          formula: `Period ${periodIndex} taxable profit = max(0, taxable before loss - trading loss used)`,
+          formula: `Period ${periodIndex} taxable profit = max(0, taxable before losses - trading loss used - property loss used)`,
           details: `No Period ${periodIndex} exists for this accounting period.`
         };
       }
@@ -921,38 +964,48 @@
       const addBackShare = Number(period.add_backs ?? ((userInputs.depreciation + userInputs.disallowableExpenses + userInputs.otherAdjustments) * ratio));
       const periodRentalGross = Number(period.rental_income_gross ?? (userInputs.rentalIncome * ratio));
       const periodPropertyLossPool = Number(period.property_loss_pool ?? 0);
-      const periodPropertyLossUsed = Number(period.property_loss_used ?? Math.min(Math.max(0, periodPropertyLossPool), Math.max(0, periodRentalGross)));
-      const periodPropertyProfitAfterLoss = Number(period.property_profit_after_loss ?? Math.max(0, periodRentalGross - periodPropertyLossUsed));
-      const periodPropertyLossCF = Number(period.property_loss_cf ?? Math.max(0, periodPropertyLossPool - periodPropertyLossUsed));
+      const periodPropertyLossUsedAgainstProperty = Number(
+        period.property_loss_used_against_property_stream ?? Math.min(Math.max(0, periodPropertyLossPool), Math.max(0, periodRentalGross))
+      );
+      const periodPropertyProfitAfterLoss = Number(period.property_profit_after_loss ?? Math.max(0, periodRentalGross - periodPropertyLossUsedAgainstProperty));
       const propertyAdjustment = Number(period.property_adjustment ?? (periodPropertyProfitAfterLoss - periodRentalGross));
       const aiaClaim = Number(period.aia_claim || 0);
-      const taxableBeforeLoss = Number(period.taxable_before_loss ?? (pbtShare + addBackShare - aiaClaim + propertyAdjustment));
+      const taxableBeforeLoss = Number(period.taxable_before_loss ?? (pbtShare + addBackShare - aiaClaim));
       const lossUsed = Number(period.loss_used || 0);
+      const taxableAfterTradingLoss = Number(taxableBeforeLoss - lossUsed);
+      const periodPropertyLossUsed = Number(
+        period.property_loss_used ?? Math.min(Math.max(0, periodPropertyLossPool), Math.max(0, taxableAfterTradingLoss))
+      );
+      const periodPropertyLossCF = Number(period.property_loss_cf ?? Math.max(0, periodPropertyLossPool - periodPropertyLossUsed));
       const taxableProfitPeriod = Number(period.taxable_profit || 0);
 
       return {
-        formula: `Period ${periodIndex} taxable profit = max(0, taxable before loss - trading loss used)\n` +
-          `taxable before loss = PBT share + add-backs share - AIA claim + property adjustment\n` +
-          `property adjustment (period) = net property income after property loss b/fwd (period) - gross rental income (period)`,
+        formula: `Period ${periodIndex} taxable profit = max(0, taxable before losses - trading loss used - property loss used)\n` +
+          `taxable before losses = PBT share + add-backs share - AIA claim`,
         details:
           `STEP 1: PBT share\n` +
           `  ${pounds(profitBeforeTax)} x (${days}/${apDays}) = ${pounds(pbtShare)}\n\n` +
           `STEP 2: Add-backs share\n` +
           `  (Depreciation + Disallowables + Other adjustments) x (${days}/${apDays})\n` +
           `  = (${pounds(userInputs.depreciation)} + ${pounds(userInputs.disallowableExpenses)} + ${pounds(userInputs.otherAdjustments)}) x (${days}/${apDays}) = ${pounds(addBackShare)}\n\n` +
-          `STEP 3: Property adjustment for period ${periodIndex} (sequential property loss offset)\n` +
+          `STEP 3: Property stream disclosure for period ${periodIndex}\n` +
           `  Gross rental income (period) = ${pounds(periodRentalGross)}\n` +
           `  Property loss pool opening = ${pounds(periodPropertyLossPool)}\n` +
-          `  Property loss used = min(${pounds(periodPropertyLossPool)}, positive gross rental) = ${pounds(periodPropertyLossUsed)}\n` +
+          `  Property loss used against property stream = ${pounds(periodPropertyLossUsedAgainstProperty)}\n` +
+          `  Property loss requested remaining before this period = ${pounds(Number(period.property_loss_use_requested_remaining || 0) + periodPropertyLossUsed)}\n` +
+          `  Property loss used for total-profits claim = ${pounds(periodPropertyLossUsed)}\n` +
+          `  Property loss requested remaining after this period = ${pounds(period.property_loss_use_requested_remaining || 0)}\n` +
           `  Property loss c/f = ${pounds(periodPropertyLossCF)}\n` +
           `  Net property profit after loss = ${pounds(periodPropertyProfitAfterLoss)}\n` +
           `  Property adjustment = ${pounds(periodPropertyProfitAfterLoss)} - ${pounds(periodRentalGross)} = ${pounds(propertyAdjustment)}\n\n` +
-          `STEP 4: Taxable before loss\n` +
-          `  ${pounds(pbtShare)} + ${pounds(addBackShare)} - ${pounds(aiaClaim)} + ${pounds(propertyAdjustment)} = ${pounds(taxableBeforeLoss)}\n\n` +
+          `STEP 4: Taxable before losses\n` +
+          `  ${pounds(pbtShare)} + ${pounds(addBackShare)} - ${pounds(aiaClaim)} = ${pounds(taxableBeforeLoss)}\n\n` +
           `STEP 5: Trading loss used in period ${periodIndex}\n` +
           `  ${pounds(lossUsed)}\n\n` +
-          `STEP 6: Period ${periodIndex} taxable profit\n` +
-          `  max(0, ${pounds(taxableBeforeLoss)} - ${pounds(lossUsed)}) = ${pounds(taxableProfitPeriod)}`
+          `STEP 6: Property loss used in period ${periodIndex} (claimed against total profits)\n` +
+          `  min(${pounds(periodPropertyLossPool)}, requested remaining, positive taxable after trading loss) = ${pounds(periodPropertyLossUsed)}\n\n` +
+          `STEP 7: Period ${periodIndex} taxable profit\n` +
+          `  max(0, ${pounds(taxableBeforeLoss)} - ${pounds(lossUsed)} - ${pounds(periodPropertyLossUsed)}) = ${pounds(taxableProfitPeriod)}`
       };
     }
 
@@ -1018,10 +1071,11 @@
     setOutNumeric(
       'outTTPVar',
       taxableTotalProfits,
-      'Profits chargeable to corporation tax (TTP) = max(0, taxable trading + taxable non-trading)',
+      'Profits chargeable to corporation tax (TTP) = max(0, taxable trading + taxable non-trading - property losses used)',
       `Taxable trading = ${pounds(result.computation.taxableTradingProfit)}\n` +
       `Taxable non-trading (interest + capital gains + rental/property after rental/property AIA) = ${pounds(taxableNonTradeIncome)}\n` +
-      `TTP = max(0, ${pounds(result.computation.taxableTradingProfit)} + ${pounds(taxableNonTradeIncome)}) = ${pounds(taxableTotalProfits)}`
+      `Property losses used = ${pounds(result.property.propertyLossUsed)}\n` +
+      `TTP = max(0, ${pounds(result.computation.taxableTradingProfit)} + ${pounds(taxableNonTradeIncome)} - ${pounds(result.property.propertyLossUsed)}) = ${pounds(taxableTotalProfits)}`
     );
 
     setOutNumeric(
@@ -1030,7 +1084,7 @@
       'Augmented profits = Taxable Total Profits + dividends',
       `STEP 1: Taxable trading profit = ${pounds(result.computation.taxableTradingProfit)}\n` +
       `STEP 2: Taxable non-trading income (interest + capital gains + rental/property after rental/property AIA) = ${pounds(taxableNonTradeIncome)}\n` +
-      `STEP 3: Taxable Total Profits = max(0, ${pounds(result.computation.taxableTradingProfit)} + ${pounds(taxableNonTradeIncome)}) = ${pounds(taxableTotalProfits)}\n` +
+      `STEP 3: Taxable Total Profits = max(0, ${pounds(result.computation.taxableTradingProfit)} + ${pounds(taxableNonTradeIncome)} - ${pounds(result.property.propertyLossUsed)}) = ${pounds(taxableTotalProfits)}\n` +
       `STEP 4: Augmented profits = ${pounds(taxableTotalProfits)} + ${pounds(userInputs.dividendIncome)} = ${pounds(augmentedProfits)}`
     );
 

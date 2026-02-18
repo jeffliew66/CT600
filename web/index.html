@@ -94,6 +94,9 @@
               <h3>Trading losses to use this return</h3>
               <input type="number" id="tradingLossUseRequested" step="0.01" placeholder="Leave blank to auto-use available" />
             </div>
+            <label class="computed mainComputed">Trading losses still available [C]
+              <input type="text" id="outTradingLossAvailableRemaining" readonly data-key="outTradingLossAvailableRemaining" />
+            </label>
 
             <label class="computed mainComputed">Trading profits [C]
               <input type="text" id="outTradingProfits" readonly data-key="outTradingProfits" />
@@ -131,9 +134,16 @@
               <span>Rental & property losses brought forward</span>
               <button type="button" class="calcIcon" data-calc-target="outPropertyLossBFAvailable" data-calc-title="Rental & property losses brought forward">[C]</button>
             </div>
+            <div class="mainInput">
+              <h3>Rental & property losses to use this return</h3>
+              <input type="number" id="propertyLossUseRequested" step="0.01" placeholder="Leave blank to auto-use available" />
+            </div>
+            <label class="computed mainComputed">Rental/property losses still available [C]
+              <input type="text" id="outPropertyLossAvailableRemaining" readonly data-key="outPropertyLossAvailableRemaining" />
+            </label>
 
             <div class="mainInput">
-              <h3>Dividend income (not subjected to income tax)</h3>
+              <h3>Dividend income (not subject to corporation tax)</h3>
               <input type="number" id="dividendIncome" step="0.01" value="0" />
             </div>
 

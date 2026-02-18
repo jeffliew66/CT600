@@ -85,7 +85,27 @@
     const tradingTurnover = roundPounds(ui.tradingTurnover ?? ui.turnover ?? ui.val_turnover ?? 0);
     const governmentGrants = roundPounds(ui.governmentGrants ?? ui.govtGrants ?? ui.box_325_govt_grants ?? 0);
     const propertyIncome = roundPounds(ui.propertyIncome ?? ui.rentalIncome ?? ui.box_190_rental_income ?? 0);
-    const propertyLossBroughtForward = roundPounds(ui.propertyLossBroughtForward ?? ui.propertyLossBF ?? ui.box_250_prop_losses_bfwd ?? 0);
+    const propertyLossBroughtForward = roundPounds(
+      ui.propertyLossBroughtForward ??
+      ui.propertyLossBF ??
+      ui._property_losses_bfwd ??
+      ui._property_losses_available ??
+      ui._property_losses_cfwd ??
+      ui.box_250_prop_losses_bfwd ??
+      0
+    );
+    const propertyLossUsageRequestedRaw =
+      ui.propertyLossUsageRequested ??
+      ui.propertyLossUseRequested ??
+      ui.box_250_property_business_losses_used;
+    const propertyLossUsageRequested = (propertyLossUsageRequestedRaw === '' || propertyLossUsageRequestedRaw == null)
+      ? null
+      : (() => {
+          const propertyLossUsageRequestedNum = Number(propertyLossUsageRequestedRaw);
+          return Number.isFinite(propertyLossUsageRequestedNum)
+            ? roundPounds(Math.max(0, propertyLossUsageRequestedNum))
+            : null;
+        })();
     const interestIncome = roundPounds(ui.interestIncome ?? ui.box_170_interest_income ?? 0);
     // Backward compatible aliases:
     // - disposalGains (legacy UI label)
@@ -100,7 +120,12 @@
     );
     const chargeableGains = roundPounds(ui.chargeableGains ?? ui.capitalGains ?? ui.box_210_chargeable_gains ?? 0);
     const chargeableGainsComputationFileName = String(ui.chargeableGainsComputationFileName ?? ui.capitalGainsFileName ?? ui.capital_gains_source_file ?? '');
-    const dividendIncome = roundPounds(ui.dividendIncome ?? ui.box_620_dividend_income ?? 0);
+    const dividendIncome = roundPounds(
+      ui.dividendIncome ??
+      ui.box_620_franked_investment_income_exempt_abgh ??
+      ui.box_620_dividend_income ??
+      0
+    );
 
     // Expenses
     const costOfGoodsSold = roundPounds(ui.costOfGoodsSold ?? ui.costOfSales ?? ui.val_cost_of_sales ?? 0);
@@ -127,7 +152,14 @@
     const resolvedAiaNonTrade = annualInvestmentAllowanceNonTradeAdditions;
 
     // Trading losses
-    const tradingLossBroughtForward = roundPounds(ui.tradingLossBroughtForward ?? ui.tradingLossBF ?? ui.box_160_trading_losses_bfwd ?? 0);
+    const tradingLossBroughtForward = roundPounds(
+      ui.tradingLossBroughtForward ??
+      ui.tradingLossBF ??
+      ui._trading_losses_bfwd ??
+      ui._trading_losses_available ??
+      ui.box_160_trading_losses_bfwd ??
+      0
+    );
     const tradingLossUsageRequestedRaw = ui.tradingLossUsageRequested ?? ui.tradingLossUseRequested ?? ui.box_161_trading_losses_use_requested;
     const tradingLossUsageRequested = (tradingLossUsageRequestedRaw === '' || tradingLossUsageRequestedRaw == null)
       ? null
@@ -242,9 +274,11 @@
       losses: {
         tradingLossBroughtForward,
         tradingLossUsageRequested,
+        propertyLossUsageRequested,
         // Legacy aliases retained for backward compatibility.
         tradingLossBF: tradingLossBroughtForward,
-        tradingLossUseRequested: tradingLossUsageRequested
+        tradingLossUseRequested: tradingLossUsageRequested,
+        propertyLossUseRequested: propertyLossUsageRequested
       },
 
       declaration: {
@@ -271,6 +305,8 @@
         rentalIncome: 0,
         propertyLossBF: 0,
         propertyProfitAfterLossOffset: 0,
+        propertyLossUsed: 0,
+        propertyLossAvailable: 0,
         propertyLossCF: 0
       },
 
@@ -280,6 +316,7 @@
         deductions: 0,
         capitalAllowances: 0,
         tradingLossUsed: 0,
+        tradingLossAvailable: 0,
         grossTradingProfit: 0,
         profitsSubtotal: 0,
         subtotalBeforeDeductions: 0,

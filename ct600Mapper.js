@@ -143,6 +143,7 @@
     const accountingPeriodStart = inputs.accountingPeriodStart ?? inputs.apStart;
     const accountingPeriodEnd = inputs.accountingPeriodEnd ?? inputs.apEnd;
     const associatedCompanyCount = inputs.associatedCompanyCount ?? inputs.assocCompanies;
+    const tradingLossBroughtForward = inputs.losses?.tradingLossBroughtForward ?? inputs.losses?.tradingLossBF ?? 0;
     const tradingTurnover = inputs.pnl.tradingTurnover ?? inputs.pnl.turnover;
     const chargeableGains = inputs.pnl.chargeableGains ?? inputs.pnl.capitalGains;
     const propertyLossBroughtForward = inputs.pnl.propertyLossBroughtForward ?? inputs.pnl.propertyLossBF;
@@ -174,37 +175,52 @@
     const incomeTaxDeductedFromGrossIncome = toMoney(ct600.incomeTaxDeductedFromGrossIncome || 0);
     const coronavirusOverpaymentNowDue = toMoney(ct600.coronavirusSupportPaymentOverpaymentNowDue || 0);
     const restitutionTax = toMoney(ct600.restitutionTax || 0);
+    const assocCompanyFyYears = Array.from(new Set(
+      (Array.isArray(result?.byFY) ? result.byFY : [])
+        .flatMap((slice) => (
+          Array.isArray(slice?.fy_years)
+            ? slice.fy_years
+            : [slice?.fy_year]
+        ))
+        .map((y) => Number(y || 0))
+        .filter((y) => y > 0)
+    ))
+      .sort((a, b) => a - b)
+      .slice(0, 3);
+    const hasAssocFy1 = assocCompanyFyYears.length >= 1;
+    const hasAssocFy2 = assocCompanyFyYears.length >= 2;
+    const hasAssocFy3 = assocCompanyFyYears.length >= 3;
 
     boxes.box_30_period_start = accountingPeriodStart;
     boxes.box_35_period_end = accountingPeriodEnd;
-    boxes.box_326_assoc_companies = associatedCompanyCount;
-    boxes.box_327_assoc_companies = associatedCompanyCount;
-    boxes.box_328_assoc_companies = associatedCompanyCount;
+    boxes.box_326_assoc_companies = hasAssocFy1 ? associatedCompanyCount : '';
+    boxes.box_327_assoc_companies = hasAssocFy2 ? associatedCompanyCount : '';
+    boxes.box_328_assoc_companies = hasAssocFy3 ? associatedCompanyCount : '';
 
     // Income headings
     boxes.box_145_trade_turnover = round(tradingTurnover);
-    boxes.box_155_trading_profit = round(tradingProfitBeforeLoss);
+    boxes.box_155_trading_profit = Math.max(0, round(tradingProfitBeforeLoss));
     boxes.box_160_trading_losses_bfwd = round(result.computation.tradingLossUsed);
-    boxes.box_165_net_trading_profits = round(result.computation.taxableTradingProfit);
+    boxes.box_165_net_trading_profits = Math.max(0, round(result.computation.taxableTradingProfit));
     boxes.box_170_non_trading_loan_relationship_profits = round(nonTradingLoanRelationshipProfit);
     boxes.box_190_property_business_income = round(propertyBusinessIncome);
     // Box 205 is residual/miscellaneous profits not reported elsewhere.
     // Do not duplicate total profits here.
-    boxes.box_205_total_trading_and_non_trading_profits = round(
+    boxes.box_205_income_not_elsewhere = round(
       result.computation.miscellaneousIncomeNotElsewhere || 0
     );
     boxes.box_210_chargeable_gains = round(chargeableGains || 0);
-    boxes.box_235_profits_subtotal = round(profitsSubtotal);
-    boxes.box_250_prop_losses_bfwd = round(propertyLossBroughtForward);
-    boxes.box_250_prop_losses_cfwd = round(result.property.propertyLossCF);
-    boxes.box_300_profits_before_deductions = round(
-      result.computation.profitsSubtotal ?? profitsSubtotal
+    boxes.box_235_profits_subtotal = Math.max(0, round(profitsSubtotal));
+    boxes.box_250_property_business_losses_used = round(result.property.propertyLossUsed || 0);
+    boxes.box_300_profits_before_deductions = Math.max(
+      0,
+      round(result.computation.profitsSubtotal ?? profitsSubtotal)
     );
     boxes.box_305_donations = 0;
     boxes.box_310_group_relief = 0;
     boxes.box_312_other_deductions = 0;
     boxes.box_315_taxable_profit = round(result.computation.taxableTotalProfits);
-    boxes.box_620_dividend_income = round(inputs.pnl.dividendIncome);
+    boxes.box_620_franked_investment_income_exempt_abgh = round(inputs.pnl.dividendIncome);
 
     // Box 329 indicator
     // Logic is fully handled in taxEngine.js.
@@ -249,6 +265,13 @@
     // Helpful transparency (not official CT600 boxes)
     boxes._marginal_relief_total = round(result.tax.marginalRelief);
     boxes._trading_balancing_charges = round(tradingBalancingCharges || 0);
+    boxes._trading_losses_bfwd = round(tradingLossBroughtForward || 0);
+    boxes._trading_losses_used = round(result.computation.tradingLossUsed || 0);
+    boxes._trading_losses_available = round(result.computation.tradingLossAvailable || 0);
+    boxes._property_losses_bfwd = round(propertyLossBroughtForward || 0);
+    boxes._property_losses_used = round(result.property.propertyLossUsed || 0);
+    boxes._property_losses_available = round(result.property.propertyLossAvailable || 0);
+    boxes._property_losses_cfwd = round(result.property.propertyLossCF || 0);
     boxes._engine_corporation_tax_charge = round(result.tax.corporationTaxCharge);
 
     return boxes;

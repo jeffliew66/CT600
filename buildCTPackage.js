@@ -67,7 +67,7 @@
       metadata: {
         buildDate: new Date().toISOString(),
         version: '2.0',
-        schemaVersion: 'HMRC CT600 2024'
+        schemaVersion: 'HMRC CT600 v3 (2025)'
       }
     };
   }

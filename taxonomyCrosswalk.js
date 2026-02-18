@@ -10,9 +10,9 @@
 // inputs.accountingPeriodStart                                   | box_30_period_start                                      | -
 // inputs.accountingPeriodEnd                                     | box_35_period_end                                        | -
 // inputs.accountingPeriodDays                                    | -                                                        | capital_allowances_schedule.annual_investment_allowance.parts_by_fy[].ap_days_in_fy
-// inputs.associatedCompanyCount                                  | box_326_assoc_companies                                  | -
-// inputs.associatedCompanyCount                                  | box_327_assoc_companies                                  | -
-// inputs.associatedCompanyCount                                  | box_328_assoc_companies                                  | -
+// inputs.associatedCompanyCount                                  | box_326_assoc_companies (FY1 if applicable)              | -
+// inputs.associatedCompanyCount                                  | box_327_assoc_companies (FY2 if applicable)              | -
+// inputs.associatedCompanyCount                                  | box_328_assoc_companies (FY3 if applicable)              | -
 
 // SECTION: INPUT P&L (INCOME)
 // inputs.pnl.tradingTurnover                                     | box_145_trade_turnover                                   | profit_adjustment_schedule.trading_income_components.turnover
@@ -22,10 +22,10 @@
 // inputs.pnl.tradingBalancingCharges                             | _trading_balancing_charges (custom transparency)         | -
 // inputs.pnl.interestIncome                                      | box_170_non_trading_loan_relationship_profits (profits heading) | profit_adjustment_schedule.other_income.interest_income
 // inputs.pnl.propertyIncome                                      | -                                                        | -
-// inputs.pnl.propertyLossBroughtForward                          | box_250_prop_losses_bfwd                                 | -
+// inputs.pnl.propertyLossBroughtForward                          | _property_losses_bfwd (custom transparency)              | -
 // inputs.pnl.chargeableGains                                     | box_210_chargeable_gains                                 | profit_adjustment_schedule.other_income.capital_gains
 // inputs.pnl.chargeableGainsComputationFileName                  | -                                                        | profit_adjustment_schedule.other_income.capital_gains_source_file
-// inputs.pnl.dividendIncome                                      | box_620_dividend_income                                  | profit_adjustment_schedule.other_income.dividend_income
+// inputs.pnl.dividendIncome                                      | box_620_franked_investment_income_exempt_abgh            | profit_adjustment_schedule.other_income.dividend_income
 
 // SECTION: INPUT P&L (EXPENSES / ADJUSTMENTS)
 // inputs.pnl.costOfGoodsSold                                     | -                                                        | profit_adjustment_schedule.accounting_profit_before_tax (component only; not separately tagged)
@@ -41,6 +41,8 @@
 // inputs.capitalAllowances.annualInvestmentAllowanceTotalAdditions      | -                                                 | capital_allowances_schedule.total_plant_additions
 // inputs.losses.tradingLossBroughtForward                        | -                                                        | trading_loss_schedule.trading_loss_bfwd_available
 // inputs.losses.tradingLossUsageRequested                        | -                                                        | trading_loss_schedule.trading_loss_use_requested
+// inputs.losses.tradingLossBroughtForward                        | _trading_losses_bfwd (custom transparency)               | -
+// inputs.losses.propertyLossUsageRequested                       | box_250_property_business_losses_used (used amount after engine caps; claimed against total profits) | -
 
 // SECTION: CT600 ADDITIONAL INPUTS (OPTIONAL)
 // inputs.ct600.communityInvestmentTaxRelief                      | box_445_community_investment_tax_relief                  | -
@@ -71,8 +73,10 @@
 // result.accounts.profitBeforeTax                                | -                                                        | profit_adjustment_schedule.accounting_profit_before_tax
 // result.property.rentalIncome                                   | -                                                        | -
 // result.property.propertyLossBF                                 | -                                                        | -
-// result.property.propertyProfitAfterLossOffset                  | box_190_property_business_income (after property loss; AIA adjustment applied in mapper) | profit_adjustment_schedule.other_income.rental_income_net
-// result.property.propertyLossCF                                 | box_250_prop_losses_cfwd                                 | -
+// result.property.propertyLossUsed                               | box_250_property_business_losses_used                    | -
+// result.property.propertyLossAvailable                          | _property_losses_available (custom transparency)         | -
+// result.property.propertyProfitAfterLossOffset                  | box_190_property_business_income (property-stream disclosure; AIA adjustment applied in mapper) | profit_adjustment_schedule.other_income.rental_income_net
+// result.property.propertyLossCF                                 | _property_losses_cfwd (custom transparency; not CT600 Box 250) | -
 
 // SECTION: RESULT COMPUTATION
 // result.computation.addBacks                                    | -                                                        | profit_adjustment_schedule.add_backs.total_add_backs
@@ -84,11 +88,12 @@
 // result.computation.grossTradingProfit                          | box_155_trading_profit                                   | profit_adjustment_schedule.net_trading_profit_before_loss
 // result.computation.tradingLossUsed                             | box_160_trading_losses_bfwd                              | profit_adjustment_schedule.trading_loss_bfwd_applied
 // result.computation.tradingLossUsed                             | -                                                        | trading_loss_schedule.trading_loss_bfwd_used_this_period
+// result.computation.tradingLossAvailable                        | _trading_losses_available (custom transparency)          | -
 // result.computation.taxableTradingProfit                        | box_165_net_trading_profits                              | profit_adjustment_schedule.net_trading_profit
 // result.computation.taxableNonTradingProfits                    | box_235_profits_subtotal (component)                     | -
 // result.computation.profitsSubtotal                             | box_235_profits_subtotal                                 | -
 // result.computation.profitsSubtotal                             | box_300_profits_before_deductions                        | -
-// result.computation.miscellaneousIncomeNotElsewhere             | box_205_total_trading_and_non_trading_profits            | -
+// result.computation.miscellaneousIncomeNotElsewhere             | box_205_income_not_elsewhere                             | -
 // result.computation.subtotalBeforeDeductions                    | -                                                        | profit_adjustment_schedule.subtotal_before_deductions
 // result.computation.nonTradingIncomeExcludedFromTradingView     | -                                                        | profit_adjustment_schedule.classification_adjustments.non_trading_income_excluded_from_trading_view
 // result.computation.totalOtherIncome                            | -                                                        | profit_adjustment_schedule.other_income.total_other_income
