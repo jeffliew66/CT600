@@ -55,14 +55,16 @@
       result.computation.grossTradingProfit ??
       (result.computation.taxableTradingProfit + result.computation.tradingLossUsed)
     );
+    // Keep tax-computation rental disclosure aligned with CT600 property-business-income presentation.
+    const rentalIncomeNet = round(
+      result.property.propertyBusinessIncomeForCT600 ??
+      result.property.propertyProfitAfterLossOffset
+    );
     const totalOtherIncome = round(
-      result.computation.totalOtherIncome ??
-      (
-        result.property.propertyProfitAfterLossOffset +
-        inputs.pnl.interestIncome +
-        (chargeableGains || 0) +
-        inputs.pnl.dividendIncome
-      )
+      rentalIncomeNet +
+      inputs.pnl.interestIncome +
+      (chargeableGains || 0) +
+      inputs.pnl.dividendIncome
     );
 
     return {
@@ -111,7 +113,7 @@
 
       // Add: non-trading income items (disposal balancing charges excluded from this bucket)
       other_income: {
-        rental_income_net: round(result.property.propertyProfitAfterLossOffset),
+        rental_income_net: rentalIncomeNet,
         interest_income: round(inputs.pnl.interestIncome),
         capital_gains: round(chargeableGains || 0),
         capital_gains_source_file: String(chargeableGainsComputationFileName || ''),

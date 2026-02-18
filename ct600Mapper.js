@@ -154,10 +154,7 @@
     const chargeableGains = inputs.pnl.chargeableGains;
     const propertyLossBroughtForward = inputs.pnl.propertyLossBroughtForward;
     const tradingBalancingCharges = inputs.pnl.tradingBalancingCharges;
-    const tradingProfitBeforeLoss = Number(
-      result.computation.grossTradingProfit ??
-      ((result.computation.taxableTradingProfit || 0) + (result.computation.tradingLossUsed || 0))
-    );
+    const tradingProfitBeforeLoss = Number(result.computation.grossTradingProfit || 0);
     const profitsSubtotal = Number(
       result.computation.profitsSubtotal ??
       ((result.computation.taxableTradingProfit || 0) + (result.computation.taxableNonTradingProfits || 0))

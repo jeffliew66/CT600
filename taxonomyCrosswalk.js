@@ -75,7 +75,8 @@
 // result.property.propertyLossBF                                 | -                                                        | -
 // result.property.propertyLossUsed                               | box_250_property_business_losses_used                    | -
 // result.property.propertyLossAvailable                          | _property_losses_available (custom transparency)         | -
-// result.property.propertyProfitAfterLossOffset                  | box_190_property_business_income (property-stream disclosure; AIA-adjusted source is result.property.propertyBusinessIncomeForCT600) | profit_adjustment_schedule.other_income.rental_income_net
+// result.property.propertyProfitAfterLossOffset                  | -                                                        | -
+// result.property.propertyBusinessIncomeForCT600                | box_190_property_business_income                         | profit_adjustment_schedule.other_income.rental_income_net
 // result.property.propertyLossCF                                 | _property_losses_cfwd (custom transparency; not CT600 Box 250) | -
 
 // SECTION: RESULT COMPUTATION
