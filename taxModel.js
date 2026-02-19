@@ -236,7 +236,11 @@
         deductions: 0,
         capitalAllowances: 0,
         tradingLossUsed: 0,
+        // Legacy alias: remaining brought-forward trading loss after usage.
         tradingLossAvailable: 0,
+        tradingLossBroughtForwardAvailable: 0,
+        tradingLossBroughtForwardRemaining: 0,
+        tradingLossCurrentPeriodIncurred: 0,
         grossTradingProfit: 0,
         profitsSubtotal: 0,
         subtotalBeforeDeductions: 0,

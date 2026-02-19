@@ -320,7 +320,17 @@
     boxes._trading_balancing_charges = round(tradingBalancingCharges || 0);
     boxes._trading_losses_bfwd = round(tradingLossBroughtForward || 0);
     boxes._trading_losses_used = round(result.computation.tradingLossUsed || 0);
-    boxes._trading_losses_available = round(result.computation.tradingLossAvailable || 0);
+    boxes._trading_losses_bfwd_remaining = round(
+      result.computation.tradingLossBroughtForwardRemaining ??
+      result.computation.tradingLossAvailable ??
+      0
+    );
+    boxes._trading_losses_current_period_incurred = round(
+      result.computation.tradingLossCurrentPeriodIncurred || 0
+    );
+    // Legacy transparency key retained for compatibility; this is b/fwd remaining only.
+    boxes._trading_losses_available = boxes._trading_losses_bfwd_remaining;
+    boxes._trading_losses_cfwd = round(result.computation.tradingLossCarriedForward || 0);
     boxes._property_losses_bfwd = round(propertyLossBroughtForward || 0);
     boxes._property_losses_used = round(result.property.propertyLossUsed || 0);
     boxes._property_losses_available = round(result.property.propertyLossAvailable || 0);

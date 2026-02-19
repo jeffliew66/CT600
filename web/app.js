@@ -94,7 +94,7 @@
       taxComputationMapping: 'trading_loss_schedule.trading_loss_use_requested'
     },
     outTradingLossAvailableRemaining: {
-      variableName: 'result.computation.tradingLossAvailable',
+      variableName: 'result.computation.tradingLossBroughtForwardRemaining (legacy alias: tradingLossAvailable)',
       ct600Mapping: '- (internal display only)',
       taxComputationMapping: '-'
     },
@@ -436,6 +436,18 @@
     const augmentedProfits = result.computation.augmentedProfits;
     const corporationTaxCharge = result.tax.corporationTaxCharge;
     const marginalRelief = result.tax.marginalRelief;
+    const tradingLossBroughtForwardRemaining = Number(
+      result.computation.tradingLossBroughtForwardRemaining ??
+      result.computation.tradingLossAvailable ??
+      0
+    );
+    const tradingLossCurrentPeriodIncurred = Number(
+      result.computation.tradingLossCurrentPeriodIncurred ?? 0
+    );
+    const tradingLossTotalCarriedForward = Number(
+      result.computation.tradingLossCarriedForward ??
+      (tradingLossBroughtForwardRemaining + tradingLossCurrentPeriodIncurred)
+    );
     const profitForPeriod = profitBeforeTax - corporationTaxCharge;
 
     // Helper to set readonly output fields
@@ -613,7 +625,9 @@
     verificationDetail += `  Property losses available b/f: ${pounds(userInputs.propertyLossBF)}\n`;
     verificationDetail += `  Property losses requested to use: ${userInputs.propertyLossUseRequested == null ? 'Auto (up to available)' : pounds(userInputs.propertyLossUseRequested)}\n`;
     verificationDetail += `  Less property losses used: ${pounds(result.property.propertyLossUsed)}\n`;
-    verificationDetail += `  Trading losses still available (internal, not CT600) = ${pounds(result.computation.tradingLossAvailable)}\n`;
+    verificationDetail += `  Trading losses b/f still available (internal, not CT600) = ${pounds(tradingLossBroughtForwardRemaining)}\n`;
+    verificationDetail += `  Current-period trading loss incurred (internal, not CT600) = ${pounds(tradingLossCurrentPeriodIncurred)}\n`;
+    verificationDetail += `  Trading losses carried forward total (internal, not CT600) = ${pounds(tradingLossTotalCarriedForward)}\n`;
     verificationDetail += `  Property losses still available (internal, not CT600) = ${pounds(result.property.propertyLossAvailable)}\n`;
     verificationDetail += `  Taxable trading profit: ${pounds(taxableTradingProfit)}\n`;
     verificationDetail += `  Taxable non-trading income (interest + capital gains + rental/property after rental/property AIA): ${pounds(taxableNonTradeIncome)}\n`;
@@ -693,20 +707,24 @@
       `Opening trading losses brought forward = ${pounds(userInputs.tradingLossBF)}\n` +
       `Requested usage this return = ${userInputs.tradingLossUseRequested == null ? 'Auto (up to available)' : pounds(userInputs.tradingLossUseRequested)}\n` +
       `Used this return = ${pounds(result.computation.tradingLossUsed)}\n` +
-      `Still available = ${pounds(result.computation.tradingLossAvailable)}\n\n` +
+      `B/F still available = ${pounds(tradingLossBroughtForwardRemaining)}\n` +
+      `Current-period trading loss incurred = ${pounds(tradingLossCurrentPeriodIncurred)}\n` +
+      `Total carried forward = ${pounds(tradingLossTotalCarriedForward)}\n\n` +
       `You can adjust this amount via slider if you are reconciling prior-year schedules.`
     );
     setRawMeta('outTradingLossBFAvailable', userInputs.tradingLossBF, roundPounds(userInputs.tradingLossBF));
     setOut(
       'outTradingLossAvailableRemaining',
-      roundPounds(result.computation.tradingLossAvailable),
-      'Trading losses still available after this return (internal display only)',
+      roundPounds(tradingLossBroughtForwardRemaining),
+      'Trading losses brought forward still available after this return (internal display only)',
       `Opening trading losses brought forward = ${pounds(userInputs.tradingLossBF)}\n` +
       `Less trading losses used this return = ${pounds(result.computation.tradingLossUsed)}\n` +
-      `Trading losses still available = ${pounds(result.computation.tradingLossAvailable)}\n\n` +
+      `B/F trading losses still available = ${pounds(tradingLossBroughtForwardRemaining)}\n` +
+      `Current-period trading loss incurred = ${pounds(tradingLossCurrentPeriodIncurred)}\n` +
+      `Total trading losses carried forward = ${pounds(tradingLossTotalCarriedForward)}\n\n` +
       `This value is for internal display only and is not submitted as a CT600 box.`
     );
-    setRawMeta('outTradingLossAvailableRemaining', result.computation.tradingLossAvailable, roundPounds(result.computation.tradingLossAvailable));
+    setRawMeta('outTradingLossAvailableRemaining', tradingLossBroughtForwardRemaining, roundPounds(tradingLossBroughtForwardRemaining));
 
     setOut(
       'outPropertyLossBFAvailable',
@@ -830,7 +848,9 @@
       `Losses available (BF): ${pounds(userInputs.tradingLossBF)}\n` +
       `Losses requested to use: ${userInputs.tradingLossUseRequested == null ? 'Auto (up to available)' : pounds(userInputs.tradingLossUseRequested)}\n` +
       `Losses used this return: ${pounds(result.computation.tradingLossUsed)}\n` +
-      `Losses still available: ${pounds(result.computation.tradingLossAvailable)}`
+      `B/F losses still available: ${pounds(tradingLossBroughtForwardRemaining)}\n` +
+      `Current-period trading loss incurred: ${pounds(tradingLossCurrentPeriodIncurred)}\n` +
+      `Total losses carried forward: ${pounds(tradingLossTotalCarriedForward)}`
     );
     setRawMeta('outTradingLossUsed', result.computation.tradingLossUsed, roundPounds(result.computation.tradingLossUsed));
 

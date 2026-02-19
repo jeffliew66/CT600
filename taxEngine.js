@@ -629,6 +629,10 @@
     // Trading losses b/fwd flow sequentially across APs:
     // opening pool is available to AP1, unused balance carries forward to AP2, etc.
     let remainingLossPool = Math.max(0, Number(tradingLossBroughtForward) || 0);
+    result.computation.tradingLossBroughtForwardAvailable = TaxModel.roundPounds(tradingLossBroughtForward);
+    result.computation.tradingLossBroughtForwardRemaining = TaxModel.roundPounds(remainingLossPool);
+    result.computation.tradingLossCurrentPeriodIncurred = 0;
+    // Legacy alias kept for backward compatibility (means b/fwd remaining, not total carried-forward).
     result.computation.tradingLossAvailable = TaxModel.roundPounds(remainingLossPool);
     const requestedLossTotal =
       tradingLossUsageRequested == null
@@ -954,13 +958,24 @@
     result.computation.tradingLossUsed = TaxModel.roundPounds(
       periodResults.reduce((s, p) => s + Number(p.lossUsedRaw ?? p.lossUsed ?? 0), 0)
     );
-    result.computation.tradingLossAvailable = TaxModel.roundPounds(remainingLossPool);
+    const totalTradingProfitAfterLossRaw = periodResults.reduce(
+      (s, p) => s + Number(p.tradingProfitAfterLossRaw ?? p.tradingProfitAfterLoss ?? 0),
+      0
+    );
+    const tradingLossBroughtForwardRemainingRaw = Math.max(0, remainingLossPool);
+    const currentYearTradingLossIncurredRaw = Math.max(0, -totalTradingProfitAfterLossRaw);
+    const totalTradingLossCarriedForwardRaw =
+      tradingLossBroughtForwardRemainingRaw + currentYearTradingLossIncurredRaw;
+
+    result.computation.tradingLossBroughtForwardAvailable = TaxModel.roundPounds(tradingLossBroughtForward);
+    result.computation.tradingLossBroughtForwardRemaining = TaxModel.roundPounds(tradingLossBroughtForwardRemainingRaw);
+    result.computation.tradingLossCurrentPeriodIncurred = TaxModel.roundPounds(currentYearTradingLossIncurredRaw);
+    // Legacy alias kept for backward compatibility.
+    result.computation.tradingLossAvailable = result.computation.tradingLossBroughtForwardRemaining;
     
     // taxableTradingProfit is the trading income only (after P&L, before adding interest/property)
     // This is for reporting/transparency only
-    result.computation.taxableTradingProfit = TaxModel.roundPounds(
-      periodResults.reduce((s, p) => s + Number(p.tradingProfitAfterLossRaw ?? p.tradingProfitAfterLoss ?? 0), 0)
-    );
+    result.computation.taxableTradingProfit = TaxModel.roundPounds(totalTradingProfitAfterLossRaw);
     
     // Total taxable profit = ALL sources (trading, interest, property after loss)
     // periodResults already includes all of these.
@@ -996,7 +1011,7 @@
       result.property.propertyBusinessIncomeForCT600 + (pnl.interestIncome || 0) + chargeableGains + dividendIncome
     );
     result.computation.tradingLossCarriedForward = TaxModel.roundPounds(
-      Math.max(0, tradingLossBroughtForward - result.computation.tradingLossUsed)
+      totalTradingLossCarriedForwardRaw
     );
     result.computation.miscellaneousIncomeNotElsewhere = 0;
     const allSlices = Array.isArray(result.slices) ? result.slices : [];
@@ -1093,9 +1108,11 @@
       ap_days: accountingPeriodDays,
       ap_split: hasMultiplePeriods,
       period_slice_structure_note: 'Period 1/2 are submission periods (>12 months only). Slice 1/2 are tax-regime slices within each period.',
-      loss_relief_note: 'Trading losses are applied against taxable trading profits only. Property losses are claimable against total profits (subject to availability and claim).',
+      loss_relief_note: 'Trading losses brought forward are applied against taxable trading profits only. Unrelieved current-period trading losses are carried forward. Property losses are claimable against total profits (subject to availability and claim).',
       trading_loss_bf_available: TaxModel.roundPounds(tradingLossBroughtForward),
       trading_loss_bf_available_remaining: TaxModel.roundPounds(remainingLossPool),
+      trading_loss_current_period_incurred: TaxModel.roundPounds(currentYearTradingLossIncurredRaw),
+      trading_loss_cf_total: TaxModel.roundPounds(totalTradingLossCarriedForwardRaw),
       trading_loss_use_requested: TaxModel.roundPounds(requestedLossTotal),
       trading_loss_use_remaining: TaxModel.roundPounds(remainingLossUseRequested),
       property_loss_bf_available: TaxModel.roundPounds(propertyLossBroughtForward),

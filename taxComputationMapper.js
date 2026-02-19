@@ -303,13 +303,24 @@
       tradingLossUsageRequested == null
         ? tradingLossBroughtForward
         : Math.min(tradingLossBroughtForward, tradingLossUsageRequested);
+    const broughtForwardRemaining = Number(
+      result.computation.tradingLossBroughtForwardRemaining ??
+      result.computation.tradingLossAvailable ??
+      Math.max(0, tradingLossBroughtForward - result.computation.tradingLossUsed)
+    );
+    const currentPeriodIncurred = Number(
+      result.computation.tradingLossCurrentPeriodIncurred ??
+      Math.max(0, -Number(result.computation.taxableTradingProfit || 0))
+    );
     return {
       trading_loss_bfwd_available: round(tradingLossBroughtForward),
       trading_loss_use_requested: round(requested),
       trading_loss_bfwd_used_this_period: round(result.computation.tradingLossUsed),
+      trading_loss_bfwd_remaining: round(Math.max(0, broughtForwardRemaining)),
+      trading_loss_current_period_incurred: round(Math.max(0, currentPeriodIncurred)),
       trading_loss_cfwd: round(
         result.computation.tradingLossCarriedForward ??
-        (tradingLossBroughtForward - result.computation.tradingLossUsed)
+        (Math.max(0, broughtForwardRemaining) + Math.max(0, currentPeriodIncurred))
       )
     };
   }

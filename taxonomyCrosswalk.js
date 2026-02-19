@@ -90,7 +90,9 @@
 // result.computation.tradingLossUsed                             | box_160_trading_losses_bfwd_used                         | profit_adjustment_schedule.trading_loss_bfwd_applied
 // result.computation.capitalAllowances                           | box_172_aia_claimed                                      | -
 // result.computation.tradingLossUsed                             | -                                                        | trading_loss_schedule.trading_loss_bfwd_used_this_period
-// result.computation.tradingLossAvailable                        | _trading_losses_available (custom transparency)          | -
+// result.computation.tradingLossBroughtForwardRemaining         | _trading_losses_bfwd_remaining (custom transparency)     | trading_loss_schedule.trading_loss_bfwd_remaining
+// result.computation.tradingLossCurrentPeriodIncurred           | _trading_losses_current_period_incurred (custom transparency) | trading_loss_schedule.trading_loss_current_period_incurred
+// result.computation.tradingLossAvailable                        | _trading_losses_available (legacy alias/custom transparency) | -
 // result.computation.taxableTradingProfit                        | box_165_net_trading_profits                              | profit_adjustment_schedule.net_trading_profit
 // result.computation.taxableNonTradingProfits                    | box_235_profits_subtotal (component)                     | -
 // result.computation.profitsSubtotal                             | box_235_profits_subtotal                                 | -
@@ -102,7 +104,7 @@
 // result.computation.taxableTotalProfits                         | box_315_taxable_profit                                   | profit_adjustment_schedule.taxable_total_profits
 // result.computation.taxableTotalProfits                         | -                                                        | summary.taxable_total_profits
 // result.computation.taxableTotalProfits                         | -                                                        | tax_calculation_table.year_summary.total_taxable_profit
-// result.computation.tradingLossCarriedForward                   | -                                                        | trading_loss_schedule.trading_loss_cfwd
+// result.computation.tradingLossCarriedForward                   | _trading_losses_cfwd (custom transparency)               | trading_loss_schedule.trading_loss_cfwd
 // result.computation.augmentedProfits                            | -                                                        | summary.augmented_profits
 // result.computation.augmentedProfits                            | -                                                        | tax_calculation_table.year_summary.total_augmented_profit
 
