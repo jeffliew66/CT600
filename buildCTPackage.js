@@ -69,8 +69,11 @@
     
     const inputs = runRes.inputs;
     const result = runRes.result;
-    const fyOverlaps = result.byFY ? 
-      result.byFY.map((fy) => ({ fy_year: fy.fy_year, ap_days_in_fy: fy.ap_days_in_fy, fy_total_days: fy.fy_total_days })) 
+    const slices = (Array.isArray(result.slices) && result.slices.length)
+      ? result.slices
+      : (Array.isArray(result.byFY) ? result.byFY : []);
+    const fyOverlaps = slices.length ? 
+      slices.map((fy) => ({ fy_year: fy.fy_year, ap_days_in_fy: fy.ap_days_in_fy, fy_total_days: fy.fy_total_days })) 
       : [];
 
     // 1) CT600 boxes (classic output)

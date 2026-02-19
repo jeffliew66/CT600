@@ -182,6 +182,7 @@
         <div class="layoutCol">
           <section class="card" id="section5Card">
             <h2>Section 5: Tax Variables</h2>
+            <p class="hint">Click any [C] output to open formula view. Period outputs include hidden slice-by-slice formulas in the right panel.</p>
 
             <div class="varsGroup">
               <h3>Core Thresholds And Rates</h3>
@@ -316,11 +317,13 @@
 
     <!-- RHS sliding panel for formula / details -->
     <aside id="formulaPanel" aria-hidden="true">
-      <button id="closePanel" aria-label="Close">×</button>
+      <button id="closePanel" aria-label="Close">x</button>
       <div id="formulaContent">
         <h3 id="formulaTitle">Formula</h3>
+        <pre id="formulaMeta"></pre>
+        <h4>Formula</h4>
         <pre id="formulaText"></pre>
-        <h4>Detailed Calculation</h4>
+        <h4>Detailed Calculation (Formula then Numbers)</h4>
         <pre id="formulaDetails"></pre>
         <hr />
         <div id="sliderControls" style="display:none;">

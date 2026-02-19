@@ -18,6 +18,13 @@
     const [y, m, d] = String(isoStr).split('-').map(Number);
     return new Date(Date.UTC(y, m - 1, d));
   }
+  function formatISODate(dateUTC) {
+    if (!(dateUTC instanceof Date) || Number.isNaN(dateUTC.getTime())) return '';
+    const y = dateUTC.getUTCFullYear();
+    const m = String(dateUTC.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(dateUTC.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
   function addMonthsUTC(dateUTC, months) {
     const year = dateUTC.getUTCFullYear();
     const month = dateUTC.getUTCMonth();
@@ -259,6 +266,8 @@
         fy_year: fy.fy_year,
         fyStart,
         fyEnd,
+        overlap_start_utc: overlapStart,
+        overlap_end_utc: overlapEnd,
         fy_total_days: fyTotalDays,
         ap_days_in_fy: apDaysInFY,
         tiers: fy.tiers
@@ -452,7 +461,12 @@
 
   function collapseSlicesByRegime(rawSlices) {
     const grouped = [];
-    rawSlices.forEach((slice) => {
+    const orderedSlices = [...(rawSlices || [])].sort((a, b) => {
+      const aStart = a?.overlap_start_utc instanceof Date ? a.overlap_start_utc.getTime() : 0;
+      const bStart = b?.overlap_start_utc instanceof Date ? b.overlap_start_utc.getTime() : 0;
+      return aStart - bStart;
+    });
+    orderedSlices.forEach((slice) => {
       const lower = slice.thresholds ? slice.thresholds.small_threshold_for_AP_in_this_FY : 0;
       const upper = slice.thresholds ? slice.thresholds.upper_threshold_for_AP_in_this_FY : 0;
       const signature = getRegimeSignature(slice.tiers);
@@ -461,6 +475,16 @@
         grouped.push({
           signature,
           fy_years: [slice.fy_year],
+          fy_components: [{
+            fy_year: slice.fy_year,
+            ap_days_in_fy: slice.ap_days_in_fy || 0,
+            taxableProfit: slice.taxableProfit || 0,
+            augmentedProfit: slice.augmentedProfit || 0,
+            thresholds: slice.thresholds || null,
+            aia_cap_for_fy: slice.aia_cap_for_fy || 0,
+            overlap_start_utc: slice.overlap_start_utc,
+            overlap_end_utc: slice.overlap_end_utc
+          }],
           ap_days: slice.ap_days_in_fy,
           thresholds: slice.thresholds || null,
           aia_cap_for_fy: slice.aia_cap_for_fy || 0,
@@ -468,6 +492,8 @@
           augmentedProfit: slice.augmentedProfit || 0,
           lower_limit_sum: lower,
           upper_limit_sum: upper,
+          start_utc: slice.overlap_start_utc,
+          end_utc: slice.overlap_end_utc,
           tiers: slice.tiers
         });
         return;
@@ -479,6 +505,17 @@
       last.augmentedProfit += slice.augmentedProfit || 0;
       last.lower_limit_sum += lower;
       last.upper_limit_sum += upper;
+      last.end_utc = slice.overlap_end_utc;
+      last.fy_components.push({
+        fy_year: slice.fy_year,
+        ap_days_in_fy: slice.ap_days_in_fy || 0,
+        taxableProfit: slice.taxableProfit || 0,
+        augmentedProfit: slice.augmentedProfit || 0,
+        thresholds: slice.thresholds || null,
+        aia_cap_for_fy: slice.aia_cap_for_fy || 0,
+        overlap_start_utc: slice.overlap_start_utc,
+        overlap_end_utc: slice.overlap_end_utc
+      });
     });
     return grouped;
   }
@@ -726,6 +763,8 @@
           period_name: period.periodName,
           fy_year: fy.fy_year,
           ap_days_in_fy: fy.ap_days_in_fy,
+          overlap_start_utc: fy.overlap_start_utc,
+          overlap_end_utc: fy.overlap_end_utc,
           thresholds: th || null,
           aia_cap_for_fy: aiaAlloc.parts.find((p) => p.fy_year === fy.fy_year)?.aia_cap_for_fy || 0,
           taxableProfit: tp,
@@ -735,7 +774,7 @@
       });
 
       const groupedPeriodByFY = collapseSlicesByRegime(rawPeriodByFY);
-      const periodByFY = groupedPeriodByFY.map((grp) => {
+      const periodSlices = groupedPeriodByFY.map((grp, sliceIndex) => {
         const lower = grp.lower_limit_sum || 0;
         const upper = grp.upper_limit_sum || 0;
         const smallRate = getTier(grp.tiers, 1).rate;
@@ -754,6 +793,10 @@
         return {
           period_index: periodIndex + 1,
           period_name: period.periodName,
+          slice_index: sliceIndex + 1,
+          slice_name: `Slice ${sliceIndex + 1}`,
+          slice_start: formatISODate(grp.start_utc),
+          slice_end: formatISODate(grp.end_utc),
           fy_year: grp.fy_years[0],
           fy_years: grp.fy_years,
           ap_days_in_fy: grp.ap_days,
@@ -771,12 +814,26 @@
           relief_fraction: getTier(grp.tiers, 2).relief_fraction,
           effective_tax_rate: effectiveTaxRate,
           corporation_tax_at_main_rate: TaxModel.roundPounds(taxableProfitRounded * mainRate),
-          regime_grouped: grp.fy_years.length > 1
+          regime_grouped: grp.fy_years.length > 1,
+          fy_components: (grp.fy_components || []).map((component, compIdx) => ({
+            component_index: compIdx + 1,
+            fy_year: component.fy_year,
+            ap_days_in_fy: component.ap_days_in_fy,
+            taxableProfit: component.taxableProfit,
+            augmentedProfit: component.augmentedProfit,
+            thresholds: component.thresholds || null,
+            aia_cap_for_fy: component.aia_cap_for_fy || 0,
+            slice_start: formatISODate(component.overlap_start_utc),
+            slice_end: formatISODate(component.overlap_end_utc)
+          }))
         };
       });
 
       return {
+        periodIndex: periodIndex + 1,
         periodName: period.periodName,
+        periodStart: formatISODate(period.startUTC),
+        periodEnd: formatISODate(period.endUTC),
         days: period.days,
         isShortPeriod: period.isShortPeriod,
         profitBeforeTax: TaxModel.roundPounds(periodProfitBeforeTax),
@@ -815,9 +872,10 @@
         tradeAIAClaimed: TaxModel.roundPounds(periodTradeAIAClaim),
         nonTradeAIAClaimed: TaxModel.roundPounds(periodNonTradeAIAClaim),
         aiaClaimed: TaxModel.roundPounds(periodAIAClaim),
-        byFY: periodByFY,
-        ctCharge: TaxModel.roundPounds(periodByFY.reduce((s, x) => s + (x.ctCharge || 0), 0)),
-        marginalRelief: TaxModel.roundPounds(periodByFY.reduce((s, x) => s + (x.marginalRelief || 0), 0))
+        slices: periodSlices,
+        byFY: periodSlices,
+        ctCharge: TaxModel.roundPounds(periodSlices.reduce((s, x) => s + (x.ctCharge || 0), 0)),
+        marginalRelief: TaxModel.roundPounds(periodSlices.reduce((s, x) => s + (x.marginalRelief || 0), 0))
       };
     });
 
@@ -829,7 +887,22 @@
     result.property.propertyLossUsed = TaxModel.roundPounds(periodResults.reduce((s, p) => s + (p.propertyLossUsed || 0), 0));
     result.property.propertyLossAvailable = TaxModel.roundPounds(remainingPropertyLossPool);
     result.property.propertyLossCF = TaxModel.roundPounds(remainingPropertyLossPool);
-    result.byFY = periodResults.flatMap((p) => p.byFY);
+    result.periods = periodResults.map((p) => ({
+      period_index: p.periodIndex,
+      period_name: p.periodName,
+      period_start: p.periodStart,
+      period_end: p.periodEnd,
+      days: p.days,
+      is_short_period: !!p.isShortPeriod,
+      taxable_profit: p.taxableProfit,
+      augmented_profit: p.augmentedProfit,
+      ct_charge: p.ctCharge,
+      marginal_relief: p.marginalRelief,
+      slices: p.slices
+    }));
+    result.slices = periodResults.flatMap((p) => p.slices);
+    // Backward compatibility for existing mappers/UI that still read result.byFY.
+    result.byFY = result.slices;
     result.computation.addBacks = TaxModel.roundPounds(periodResults.reduce((s, p) => s + (depreciationExpense + disallowableExpenditure + otherTaxAdjustmentsAddBack) * (p.days / accountingPeriodDays), 0));
     result.computation.capitalAllowances = TaxModel.roundPounds(periodResults.reduce((s, p) => s + p.aiaClaimed, 0));
     result.computation.deductions = result.computation.capitalAllowances;
@@ -878,10 +951,12 @@
       Math.max(0, tradingLossBroughtForward - result.computation.tradingLossUsed)
     );
     result.computation.miscellaneousIncomeNotElsewhere = 0;
-    const aiaSliceRows = (Array.isArray(result.byFY) ? result.byFY : []).map((slice) => ({
+    const allSlices = Array.isArray(result.slices) ? result.slices : [];
+    const aiaSliceRows = allSlices.map((slice) => ({
       fy_year: slice.fy_year,
       fy_years: Array.isArray(slice.fy_years) ? slice.fy_years : [slice.fy_year],
       period_index: slice.period_index || 1,
+      slice_index: slice.slice_index || 1,
       ap_days_in_fy: slice.ap_days_in_fy || 0,
       aia_limit_pro_rated: Number(slice.aia_cap_for_fy || 0)
     }));
@@ -906,6 +981,7 @@
       fyYear: Number(row.fy_year || 0),
       fyYears: Array.isArray(row.fy_years) ? row.fy_years : [Number(row.fy_year || 0)],
       periodIndex: Number(row.period_index || 1),
+      sliceIndex: Number(row.slice_index || 1),
       apDaysInFY: Number(row.ap_days_in_fy || 0),
       aiaLimitProRated: TaxModel.roundPounds(row.aia_limit_pro_rated || 0),
       aiaClaimRequested: TaxModel.roundPounds(row.aia_claim_requested || 0),
@@ -952,7 +1028,7 @@
       restitutionTax
     );
     result.tax.smallProfitsRateOrMarginalReliefEntitlement = (
-      Array.isArray(result.byFY) && result.byFY.some(hasSmallProfitsOrMarginalReliefEntitlement)
+      Array.isArray(result.slices) && result.slices.some(hasSmallProfitsOrMarginalReliefEntitlement)
     ) ? 'X' : '';
     result.tax.taxPayable = result.tax.totalSelfAssessmentTaxPayable;
 
@@ -960,6 +1036,7 @@
     result.metadata = {
       ap_days: accountingPeriodDays,
       ap_split: hasMultiplePeriods,
+      period_slice_structure_note: 'Period 1/2 are submission periods (>12 months only). Slice 1/2 are tax-regime slices within each period.',
       loss_relief_note: 'Trading losses are applied against taxable trading profits only. Property losses are claimable against total profits (subject to availability and claim).',
       trading_loss_bf_available: TaxModel.roundPounds(tradingLossBroughtForward),
       trading_loss_bf_available_remaining: TaxModel.roundPounds(remainingLossPool),
@@ -970,7 +1047,10 @@
       property_loss_use_requested: TaxModel.roundPounds(requestedPropertyLossTotal),
       property_loss_use_remaining: TaxModel.roundPounds(remainingPropertyLossUseRequested),
       periods: periodResults.map((p) => ({
+        period_index: p.periodIndex,
         name: p.periodName,
+        start_date: p.periodStart,
+        end_date: p.periodEnd,
         days: p.days,
         profit_before_tax: p.profitBeforeTax,
         taxable_profit: p.taxableProfit,
@@ -1006,7 +1086,8 @@
         aia_claim: p.aiaClaimed,
         marginal_relief: p.marginalRelief,
         ct_charge: p.ctCharge,
-        by_fy: p.byFY
+        slices: p.slices,
+        by_fy: p.slices
       }))
     };
 

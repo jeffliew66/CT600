@@ -275,7 +275,13 @@
         taxPayable: 0
       },
 
-      // Breakdown by FY overlap (for transparency + mapping)
+      // Submission-level accounting periods (1 unless AP > 12 months).
+      periods: [],
+
+      // Tax-regime slices inside each period (usually FY overlap slices).
+      slices: [],
+
+      // Legacy alias for slices (backward compatibility).
       byFY: []
     };
   }

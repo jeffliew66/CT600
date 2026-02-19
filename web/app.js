@@ -498,7 +498,8 @@
     const divisor = (userInputs.assocCompanies || 0) + 1;
     const annualSmallThreshold = 50000 / divisor;
     const annualUpperThreshold = 250000 / divisor;
-    const fySlices = (result.byFY || []).map((fy, idx) => ({
+    const sliceSource = (Array.isArray(result.slices) && result.slices.length) ? result.slices : (result.byFY || []);
+    const fySlices = sliceSource.map((fy, idx) => ({
       idx: idx + 1,
       fyYear: fy.fy_year,
       fyYears: fy.fy_years || [fy.fy_year],
@@ -887,7 +888,17 @@
     setRawMeta('corpTaxPayable', corporationTaxCharge, Math.round(corporationTaxCharge));
 
     // Section 6 outputs (tax variables and period-level breakdown)
-    const periods = (result.metadata && result.metadata.periods) ? result.metadata.periods : [];
+    const periods = (Array.isArray(result.periods) && result.periods.length)
+      ? result.periods
+      : ((result.metadata && result.metadata.periods) ? result.metadata.periods : []);
+    const slicesList = (Array.isArray(result.slices) && result.slices.length)
+      ? result.slices
+      : (Array.isArray(result.byFY) ? result.byFY : []);
+    const formatFYLabel = (slice) => {
+      const years = Array.isArray(slice?.fy_years) && slice.fy_years.length ? slice.fy_years : [slice?.fy_year];
+      if (!years.length) return 'FY?';
+      return years.length > 1 ? `FY${years[0]}-FY${years[years.length - 1]}` : `FY${years[0]}`;
+    };
     const p1 = periods[0] || {
       days: apDays,
       profit_before_tax: profitBeforeTax,
@@ -904,7 +915,7 @@
       aia_claim: 0,
       marginal_relief: 0
     };
-    const totalAiaCapFromSlices = (result.byFY || []).reduce((s, x) => s + (x.aia_cap_for_fy || 0), 0);
+    const totalAiaCapFromSlices = slicesList.reduce((s, x) => s + (x.aia_cap_for_fy || 0), 0);
     if (typeof p1.aia_cap_total !== 'number') p1.aia_cap_total = totalAiaCapFromSlices;
     if (typeof p2.aia_cap_total !== 'number') p2.aia_cap_total = 0;
     if (typeof p1.aia_additions_share !== 'number') p1.aia_additions_share = userInputs.aiaAdditions || 0;
@@ -925,63 +936,155 @@
     const p1Revenue = totalIncome * ((p1.days || 0) / (apDays || 1));
     const p2Revenue = totalIncome * ((p2.days || 0) / (apDays || 1));
 
-    const fyYear = result.byFY && result.byFY.length ? result.byFY[0].fy_year : null;
+    const fyYear = slicesList.length ? slicesList[0].fy_year : null;
     const fyConfig = (corpTaxYears || []).find((fy) => fy.fy_year === fyYear);
     const lowerRate = fyConfig ? ((fyConfig.tiers.find((t) => t.index === 1) || {}).rate || 0.19) : 0.19;
     const upperRate = fyConfig ? ((fyConfig.tiers.find((t) => t.index === 3) || {}).rate || 0.25) : 0.25;
-    const lowerSliceBreak = (result.byFY || []).map((x) => {
-      const fyLabel = (Array.isArray(x.fy_years) && x.fy_years.length > 1)
-        ? `FY${x.fy_years[0]}-FY${x.fy_years[x.fy_years.length - 1]}`
-        : `FY${x.fy_year}`;
-      return `${fyLabel}: ${pounds(x.thresholds?.small_threshold_for_AP_in_this_FY || 0)}`;
-    }).join(' + ');
-    const upperSliceBreak = (result.byFY || []).map((x) => {
-      const fyLabel = (Array.isArray(x.fy_years) && x.fy_years.length > 1)
-        ? `FY${x.fy_years[0]}-FY${x.fy_years[x.fy_years.length - 1]}`
-        : `FY${x.fy_year}`;
-      return `${fyLabel}: ${pounds(x.thresholds?.upper_threshold_for_AP_in_this_FY || 0)}`;
-    }).join(' + ');
+    const lowerSliceBreak = slicesList.map((x) => `${formatFYLabel(x)}: ${pounds(x.thresholds?.small_threshold_for_AP_in_this_FY || 0)}`).join(' + ');
+    const upperSliceBreak = slicesList.map((x) => `${formatFYLabel(x)}: ${pounds(x.thresholds?.upper_threshold_for_AP_in_this_FY || 0)}`).join(' + ');
 
     setOutNumeric('outApDays', apDays, 'AP days = (End date - Start date) + 1', `${userInputs.apStart} to ${userInputs.apEnd} = ${apDays} days`);
     setOutNumeric('outAssocDivisor', divisor, 'Associates divisor = associated companies + 1', `${userInputs.assocCompanies} + 1 = ${divisor}`);
-    setOutNumeric('outLowerBracket', effectiveLowerThreshold, 'Effective lower bracket = sum of prorated slice lower thresholds', `${lowerSliceBreak || 'No slices'} = ${pounds(effectiveLowerThreshold)}`);
+    setOutNumeric(
+      'outLowerBracket',
+      effectiveLowerThreshold,
+      'Effective lower threshold = sum of time-apportioned slice lower thresholds',
+      `[HMRC tag] tax_calculation_table.computation_by_fy[].thresholds.small_threshold_for_AP_in_this_FY\n` +
+      `${lowerSliceBreak || 'No slices'} = ${pounds(effectiveLowerThreshold)}`
+    );
     setOut('outLowerRate', `${pct(lowerRate)}%`, 'Lower rate from FY tier 1', `FY ${fyYear || 'n/a'} lower rate = ${pct(lowerRate)}%`);
     document.getElementById('outLowerRate').dataset.raw = String(lowerRate * 100);
     document.getElementById('outLowerRate').dataset.orig = String(roundPounds(lowerRate * 100));
-    setOutNumeric('outUpperBracket', effectiveUpperThreshold, 'Effective upper bracket = sum of prorated slice upper thresholds', `${upperSliceBreak || 'No slices'} = ${pounds(effectiveUpperThreshold)}`);
+    setOutNumeric(
+      'outUpperBracket',
+      effectiveUpperThreshold,
+      'Effective upper threshold = sum of time-apportioned slice upper thresholds',
+      `[HMRC tag] tax_calculation_table.computation_by_fy[].thresholds.upper_threshold_for_AP_in_this_FY\n` +
+      `${upperSliceBreak || 'No slices'} = ${pounds(effectiveUpperThreshold)}`
+    );
     setOut('outUpperRate', `${pct(upperRate)}%`, 'Upper rate from FY tier 3', `FY ${fyYear || 'n/a'} upper rate = ${pct(upperRate)}%`);
     document.getElementById('outUpperRate').dataset.raw = String(upperRate * 100);
     document.getElementById('outUpperRate').dataset.orig = String(roundPounds(upperRate * 100));
-    const p1ByFY = (p1.by_fy || ((result.byFY || []).filter((x) => (x.period_index || 1) === 1)));
-    const p2ByFY = (p2.by_fy || ((result.byFY || []).filter((x) => (x.period_index || 0) === 2)));
+    const p1ByFY = (p1.slices || p1.by_fy || slicesList.filter((x) => (x.period_index || 1) === 1));
+    const p2ByFY = (p2.slices || p2.by_fy || slicesList.filter((x) => (x.period_index || 0) === 2));
     const sumPeriodThreshold = (slices, key) => (slices || []).reduce((sum, slice) => {
       return sum + Number(slice && slice.thresholds ? (slice.thresholds[key] || 0) : 0);
     }, 0);
+    const parseISODateUTC = (iso) => {
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || '').trim());
+      if (!m) return null;
+      return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+    };
+    const daysInclusiveUTC = (startUTC, endUTC) => {
+      if (!startUTC || !endUTC) return 0;
+      const msPerDay = 24 * 60 * 60 * 1000;
+      if (endUTC < startUTC) return 0;
+      return Math.round((endUTC - startUTC) / msPerDay) + 1;
+    };
+    const overlapDaysUTC = (startA, endA, startB, endB) => {
+      if (!startA || !endA || !startB || !endB) return 0;
+      const start = startA > startB ? startA : startB;
+      const end = endA < endB ? endA : endB;
+      return daysInclusiveUTC(start, end);
+    };
+    const getFYConfig = (fyYear) => (corpTaxYears || []).find((fy) => Number(fy.fy_year) === Number(fyYear)) || null;
     const buildPeriodThresholdBreakdown = (slices, key, label, periodIndex) => {
       if (!slices || !slices.length) {
         return `No Period ${periodIndex} slices. ${label} = ${pounds(0)}`;
       }
-      const lines = slices.map((slice) => {
-        const fyLabel = (Array.isArray(slice.fy_years) && slice.fy_years.length > 1)
-          ? `FY${slice.fy_years[0]}-FY${slice.fy_years[slice.fy_years.length - 1]}`
-          : `FY${slice.fy_year}`;
-        return `${fyLabel}: ${pounds(slice.thresholds ? (slice.thresholds[key] || 0) : 0)}`;
+      const period = periodIndex === 1 ? p1 : p2;
+      const periodDays = Number(period?.days || 0);
+      const isShortPeriod = !!(period?.is_short_period || /short period/i.test(String(period?.period_name || period?.name || '')));
+      const thresholdTierIndex = key === 'small_threshold_for_AP_in_this_FY' ? 2 : 3;
+      const lines = [];
+      lines.push(`[HMRC tags] Time-apportioned threshold by slice; used in CT calculation table`);
+      slices.forEach((slice, idx) => {
+        const fyYears = Array.isArray(slice.fy_years) && slice.fy_years.length ? slice.fy_years : [slice.fy_year];
+        const sliceLabel = `Slice ${Number(slice.slice_index || idx + 1)} (${slice.slice_start || '?'} to ${slice.slice_end || '?'})`;
+        const engineValue = Number(slice.thresholds ? (slice.thresholds[key] || 0) : 0);
+        lines.push('');
+        lines.push(sliceLabel);
+        if (fyYears.length === 1) {
+          const fyYear = Number(fyYears[0] || 0);
+          const fyCfg = getFYConfig(fyYear);
+          const baseThreshold = Number(fyCfg?.tiers?.find((t) => t.index === thresholdTierIndex)?.threshold || 0);
+          const sliceDays = Number(slice.ap_days_in_fy || 0);
+          if (isShortPeriod) {
+            const fyStart = parseISODateUTC(fyCfg?.start_date);
+            const fyEnd = parseISODateUTC(fyCfg?.end_date);
+            const fyTotalDays = daysInclusiveUTC(fyStart, fyEnd) || 365;
+            const calc = (baseThreshold * (sliceDays / fyTotalDays)) / divisor;
+            lines.push(`  Formula (short period): (${pounds(baseThreshold)} x (${sliceDays}/${fyTotalDays})) / ${divisor} = ${pounds(calc)}`);
+          } else {
+            const calc = (baseThreshold / divisor) * (sliceDays / Math.max(1, periodDays));
+            lines.push(`  Formula (12m/full period): (${pounds(baseThreshold)} / ${divisor}) x (${sliceDays}/${Math.max(1, periodDays)}) = ${pounds(calc)}`);
+          }
+        } else {
+          lines.push(`  Grouped slice across FY years (${fyYears.join(', ')}) -> threshold is the sum of FY components.`);
+          fyYears.forEach((fyYearRaw) => {
+            const fyYear = Number(fyYearRaw || 0);
+            const fyCfg = getFYConfig(fyYear);
+            if (!fyCfg) return;
+            const baseThreshold = Number(fyCfg?.tiers?.find((t) => t.index === thresholdTierIndex)?.threshold || 0);
+            const sliceStart = parseISODateUTC(slice.slice_start);
+            const sliceEnd = parseISODateUTC(slice.slice_end);
+            const fyStart = parseISODateUTC(fyCfg.start_date);
+            const fyEnd = parseISODateUTC(fyCfg.end_date);
+            const sliceDaysInFY = overlapDaysUTC(sliceStart, sliceEnd, fyStart, fyEnd);
+            if (!sliceDaysInFY) return;
+            if (isShortPeriod) {
+              const fyTotalDays = daysInclusiveUTC(fyStart, fyEnd) || 365;
+              const calc = (baseThreshold * (sliceDaysInFY / fyTotalDays)) / divisor;
+              lines.push(`    FY${fyYear}: (${pounds(baseThreshold)} x (${sliceDaysInFY}/${fyTotalDays})) / ${divisor} = ${pounds(calc)}`);
+            } else {
+              const calc = (baseThreshold / divisor) * (sliceDaysInFY / Math.max(1, periodDays));
+              lines.push(`    FY${fyYear}: (${pounds(baseThreshold)} / ${divisor}) x (${sliceDaysInFY}/${Math.max(1, periodDays)}) = ${pounds(calc)}`);
+            }
+          });
+        }
+        lines.push(`  Engine ${label.toLowerCase()} = ${pounds(engineValue)}`);
       });
       const total = sumPeriodThreshold(slices, key);
       return `Period ${periodIndex} ${label} = sum of effective-slice ${label.toLowerCase()} values\n` +
-        `${lines.join(' + ')}\n` +
+        `${lines.join('\n')}\n` +
         `= ${pounds(total)}`;
     };
     const p1LowerBracket = sumPeriodThreshold(p1ByFY, 'small_threshold_for_AP_in_this_FY');
     const p1UpperBracket = sumPeriodThreshold(p1ByFY, 'upper_threshold_for_AP_in_this_FY');
     const p2LowerBracket = sumPeriodThreshold(p2ByFY, 'small_threshold_for_AP_in_this_FY');
     const p2UpperBracket = sumPeriodThreshold(p2ByFY, 'upper_threshold_for_AP_in_this_FY');
+    const buildPeriodSliceBreakdown = (period, periodIndex, slices) => {
+      if (!slices || !slices.length) {
+        return `Slice breakdown (Period ${periodIndex})\nNo slices found.`;
+      }
+      const periodDays = Number(period.days || 0);
+      const periodTaxable = Number(period.taxable_profit || 0);
+      const periodAugmented = Number(period.augmented_profit || 0);
+      const lines = [];
+      lines.push(`Slice breakdown inside Period ${periodIndex} (${period.start_date || period.period_start || '?'} to ${period.end_date || period.period_end || '?'})`);
+      lines.push(`[HMRC tags] taxable profits -> box_315_taxable_profit | augmented profits -> summary.augmented_profits`);
+      slices.forEach((slice, idx) => {
+        const sliceDays = Number(slice.ap_days_in_fy || 0);
+        const ratio = periodDays > 0 ? (sliceDays / periodDays) : 0;
+        const fyLabel = formatFYLabel(slice);
+        const sliceNumber = Number(slice.slice_index || idx + 1);
+        lines.push('');
+        lines.push(`Slice ${sliceNumber} (${slice.slice_start || '?'} to ${slice.slice_end || '?'}) | ${fyLabel}`);
+        lines.push(`  Days ratio = ${sliceDays}/${Math.max(1, periodDays)} = ${ratio.toFixed(6)}`);
+        lines.push(`  Taxable profits formula: ${pounds(periodTaxable)} x (${sliceDays}/${Math.max(1, periodDays)}) = ${pounds(periodTaxable * ratio)} (engine ${pounds(slice.taxableProfit || 0)})`);
+        lines.push(`  Augmented profits formula: ${pounds(periodAugmented)} x (${sliceDays}/${Math.max(1, periodDays)}) = ${pounds(periodAugmented * ratio)} (engine ${pounds(slice.augmentedProfit || 0)})`);
+        lines.push(`  Lower threshold (time-apportioned) = ${pounds(slice.thresholds?.small_threshold_for_AP_in_this_FY || 0)}`);
+        lines.push(`  Upper threshold (time-apportioned) = ${pounds(slice.thresholds?.upper_threshold_for_AP_in_this_FY || 0)}`);
+        lines.push(`  CT charge = ${pounds(slice.ctCharge || 0)} | MR = ${pounds(slice.marginalRelief || 0)}`);
+      });
+      return lines.join('\n');
+    };
 
     function buildPeriodTaxableDetail(period, periodIndex) {
       const days = Number(period.days || 0);
       if (!days) {
         return {
-          formula: `Period ${periodIndex} taxable profit = max(0, taxable before losses - trading loss used - property loss used)`,
+          formula: `Period ${periodIndex} taxable profits = max(0, taxable before losses - trading loss used - property loss used)`,
           details: `No Period ${periodIndex} exists for this accounting period.`
         };
       }
@@ -1004,11 +1107,14 @@
       );
       const periodPropertyLossCF = Number(period.property_loss_cf ?? Math.max(0, periodPropertyLossPool - periodPropertyLossUsed));
       const taxableProfitPeriod = Number(period.taxable_profit || 0);
+      const slices = periodIndex === 1 ? p1ByFY : p2ByFY;
+      const sliceDetail = buildPeriodSliceBreakdown(period, periodIndex, slices);
 
       return {
-        formula: `Period ${periodIndex} taxable profit = max(0, taxable before losses - trading loss used - property loss used)\n` +
+        formula: `Period ${periodIndex} taxable profits = max(0, taxable before losses - trading loss used - property loss used)\n` +
           `taxable before losses = PBT share + add-backs share - AIA claim`,
         details:
+          `[HMRC tag] box_315_taxable_profit\n\n` +
           `STEP 1: PBT share\n` +
           `  ${pounds(profitBeforeTax)} x (${days}/${apDays}) = ${pounds(pbtShare)}\n\n` +
           `STEP 2: Add-backs share\n` +
@@ -1031,7 +1137,8 @@
           `STEP 6: Property loss used in period ${periodIndex} (claimed against total profits)\n` +
           `  min(${pounds(periodPropertyLossPool)}, requested remaining, positive taxable after trading loss) = ${pounds(periodPropertyLossUsed)}\n\n` +
           `STEP 7: Period ${periodIndex} taxable profit\n` +
-          `  max(0, ${pounds(taxableBeforeLoss)} - ${pounds(lossUsed)} - ${pounds(periodPropertyLossUsed)}) = ${pounds(taxableProfitPeriod)}`
+          `  max(0, ${pounds(taxableBeforeLoss)} - ${pounds(lossUsed)} - ${pounds(periodPropertyLossUsed)}) = ${pounds(taxableProfitPeriod)}\n\n` +
+          sliceDetail
       };
     }
 
@@ -1039,18 +1146,20 @@
       const periodMR = Number(period.marginal_relief || 0);
       if (!period.days) {
         return {
-          formula: `Period ${periodIndex} MR = sum of FY-slice MR values`,
+          formula: `Period ${periodIndex} MR = sum of slice-level MR values`,
           details: `No Period ${periodIndex} exists for this accounting period.`
         };
       }
       if (!slices.length) {
         return {
-          formula: `Period ${periodIndex} MR = sum of FY-slice MR values`,
-          details: `No FY slices found inside Period ${periodIndex}.`
+          formula: `Period ${periodIndex} MR = sum of slice-level MR values`,
+          details: `No slices found inside Period ${periodIndex}.`
         };
       }
 
-      let detail = `Period ${periodIndex} marginal relief = sum(MR per FY slice)\n\n`;
+      const sliceDetail = buildPeriodSliceBreakdown(period, periodIndex, slices);
+      let detail = `[HMRC tag] box_435_marginal_relief\n`;
+      detail += `Period ${periodIndex} marginal relief = sum(MR per slice)\n\n`;
       slices.forEach((slice, idx) => {
         const lower = Number(slice.thresholds?.small_threshold_for_AP_in_this_FY || 0);
         const upper = Number(slice.thresholds?.upper_threshold_for_AP_in_this_FY || 0);
@@ -1061,11 +1170,9 @@
         const reliefFractionSlice = Number(slice.relief_fraction ?? (fyCfgSlice ? ((fyCfgSlice.tiers.find((t) => t.index === 2) || {}).relief_fraction || 0.015) : 0.015));
         const ratio = ap > 0 ? (tp / ap) : 0;
         const mrCalc = (ap > lower && ap < upper) ? (reliefFractionSlice * (upper - ap) * ratio) : 0;
-        const fyLabel = (Array.isArray(slice.fy_years) && slice.fy_years.length > 1)
-          ? `FY${slice.fy_years[0]}-FY${slice.fy_years[slice.fy_years.length - 1]}`
-          : `FY${slice.fy_year}`;
+        const fyLabel = formatFYLabel(slice);
 
-        detail += `${fyLabel} slice ${idx + 1} (${slice.ap_days_in_fy || 0} days)\n`;
+        detail += `${fyLabel} slice ${Number(slice.slice_index || idx + 1)} (${slice.ap_days_in_fy || 0} days)\n`;
         if (slice.regime_grouped) {
           detail += `  Regime unchanged across FY boundary -> calculated as one whole slice\n`;
         }
@@ -1083,7 +1190,8 @@
           detail += `     = ${pounds(mrCalc)} (engine: ${pounds(slice.marginalRelief || 0)})\n\n`;
         }
       });
-      detail += `Period ${periodIndex} MR total = ${pounds(periodMR)}`;
+      detail += `Period ${periodIndex} MR total = ${pounds(periodMR)}\n\n`;
+      detail += sliceDetail;
 
       return {
         formula: `For each effective tax-regime slice in Period ${periodIndex}:\n` +
@@ -1098,6 +1206,7 @@
       'outTTPVar',
       taxableTotalProfits,
       'Profits chargeable to corporation tax (TTP) = max(0, taxable trading + taxable non-trading - property losses used)',
+      `[HMRC tag] box_315_taxable_profit\n` +
       `Taxable trading = ${pounds(result.computation.taxableTradingProfit)}\n` +
       `Taxable non-trading (interest + capital gains + rental/property after rental/property AIA) = ${pounds(taxableNonTradeIncome)}\n` +
       `Property losses used = ${pounds(result.property.propertyLossUsed)}\n` +
@@ -1108,23 +1217,21 @@
       'outAugmentedProfitsVar',
       augmentedProfits,
       'Augmented profits = Taxable Total Profits + dividends',
+      `[HMRC tag] summary.augmented_profits\n` +
       `STEP 1: Taxable trading profit = ${pounds(result.computation.taxableTradingProfit)}\n` +
       `STEP 2: Taxable non-trading income (interest + capital gains + rental/property after rental/property AIA) = ${pounds(taxableNonTradeIncome)}\n` +
       `STEP 3: Taxable Total Profits = max(0, ${pounds(result.computation.taxableTradingProfit)} + ${pounds(taxableNonTradeIncome)} - ${pounds(result.property.propertyLossUsed)}) = ${pounds(taxableTotalProfits)}\n` +
-      `STEP 4: Augmented profits = ${pounds(taxableTotalProfits)} + ${pounds(userInputs.dividendIncome)} = ${pounds(augmentedProfits)}`
+      `STEP 4: Augmented profits = ${pounds(taxableTotalProfits)} + ${pounds(userInputs.dividendIncome)} = ${pounds(augmentedProfits)}\n\n` +
+      `Slice-level augmented profits are shown inside Period 1/2 details.`
     );
 
     const totalMRDetails = [
+      `[HMRC tag] box_435_marginal_relief`,
       `Total MR = MR Period 1 + MR Period 2`,
       `${pounds(p1.marginal_relief || 0)} + ${pounds(p2.marginal_relief || 0)} = ${pounds(marginalRelief)}`,
       '',
-      'By effective tax-regime slices:',
-      ...((result.byFY || []).map((x) => {
-        const fyLabel = (Array.isArray(x.fy_years) && x.fy_years.length > 1)
-          ? `FY${x.fy_years[0]}-FY${x.fy_years[x.fy_years.length - 1]}`
-          : `FY${x.fy_year}`;
-        return `  Period ${x.period_index || 1}, ${fyLabel}: MR ${pounds(x.marginalRelief || 0)}`;
-      }))
+      'By slices:',
+      ...(slicesList.map((x) => `  Period ${x.period_index || 1}, Slice ${x.slice_index || 1}, ${formatFYLabel(x)}: MR ${pounds(x.marginalRelief || 0)}`))
     ].join('\n');
     setOutNumeric('outTotalMarginalReliefVar', marginalRelief, 'Total MR = sum of MR across all FY slices and AP periods', totalMRDetails);
     const p1AiaCap = Number(p1.aia_cap_total || 0);
@@ -1160,8 +1267,20 @@
       `Total claim: ${pounds(p1.aia_claim || 0)} + ${pounds(p2.aia_claim || 0)} = ${pounds(result.computation.capitalAllowances)}`
     );
 
-    setOutNumeric('outP1RevenueShare', p1Revenue, 'Period 1 revenue share = total accounting income x (P1 days / AP days)', `${pounds(totalIncome)} x (${p1.days || 0}/${apDays}) = ${pounds(p1Revenue)}`);
-    setOutNumeric('outP1ProfitBeforeTax', p1.profit_before_tax || 0, 'Period 1 PBT = AP PBT apportioned to period 1', `${pounds(profitBeforeTax)} x (${p1.days || 0}/${apDays}) ~= ${pounds(p1.profit_before_tax || 0)}`);
+    setOutNumeric(
+      'outP1RevenueShare',
+      p1Revenue,
+      'Period 1 revenue share = total accounting income x (P1 days / AP days)',
+      `${pounds(totalIncome)} x (${p1.days || 0}/${apDays}) = ${pounds(p1Revenue)}\n\n` +
+      buildPeriodSliceBreakdown(p1, 1, p1ByFY)
+    );
+    setOutNumeric(
+      'outP1ProfitBeforeTax',
+      p1.profit_before_tax || 0,
+      'Period 1 PBT = AP PBT apportioned to period 1',
+      `${pounds(profitBeforeTax)} x (${p1.days || 0}/${apDays}) ~= ${pounds(p1.profit_before_tax || 0)}\n\n` +
+      buildPeriodSliceBreakdown(p1, 1, p1ByFY)
+    );
     setOutNumeric(
       'outP1LowerBracket',
       p1LowerBracket,
@@ -1191,8 +1310,20 @@
     const p1MrDetail = buildPeriodMRDetail(p1, 1, p1ByFY);
     setOutNumeric('outP1MarginalRelief', p1.marginal_relief || 0, p1MrDetail.formula, p1MrDetail.details);
 
-    setOutNumeric('outP2RevenueShare', p2Revenue, 'Period 2 revenue share = total accounting income x (P2 days / AP days)', `${pounds(totalIncome)} x (${p2.days || 0}/${apDays}) = ${pounds(p2Revenue)}`);
-    setOutNumeric('outP2ProfitBeforeTax', p2.profit_before_tax || 0, 'Period 2 PBT = AP PBT apportioned to period 2', `${pounds(profitBeforeTax)} x (${p2.days || 0}/${apDays}) ~= ${pounds(p2.profit_before_tax || 0)}`);
+    setOutNumeric(
+      'outP2RevenueShare',
+      p2Revenue,
+      'Period 2 revenue share = total accounting income x (P2 days / AP days)',
+      `${pounds(totalIncome)} x (${p2.days || 0}/${apDays}) = ${pounds(p2Revenue)}\n\n` +
+      buildPeriodSliceBreakdown(p2, 2, p2ByFY)
+    );
+    setOutNumeric(
+      'outP2ProfitBeforeTax',
+      p2.profit_before_tax || 0,
+      'Period 2 PBT = AP PBT apportioned to period 2',
+      `${pounds(profitBeforeTax)} x (${p2.days || 0}/${apDays}) ~= ${pounds(p2.profit_before_tax || 0)}\n\n` +
+      buildPeriodSliceBreakdown(p2, 2, p2ByFY)
+    );
     setOutNumeric(
       'outP2LowerBracket',
       p2LowerBracket,
@@ -1223,8 +1354,10 @@
     setOutNumeric('outP2MarginalRelief', p2.marginal_relief || 0, p2MrDetail.formula, p2MrDetail.details);
 
     // Log AP split if applicable
+    const periodDays1 = Number((periods[0] && periods[0].days) || p1.days || 0);
+    const periodDays2 = Number((periods[1] && periods[1].days) || p2.days || 0);
     const apDaysMsg = isSplit
-      ? `AP SPLIT ACTIVE: ${apDays} days split into Period 1 (${result.metadata.periods[0].days} days) + Period 2 (${result.metadata.periods[1].days} days). Each period has own thresholds, AIA, and tax calculation.`
+      ? `AP SPLIT ACTIVE: ${apDays} days split into Period 1 (${periodDays1} days) + Period 2 (${periodDays2} days). Each period has own thresholds, AIA, and tax calculation.`
       : `Standard period (12 months or less): ${apDays} days`;
     console.log(apDaysMsg);
     console.log('OK Computed outputs updated (using TaxEngine with HMRC-compliant rules)');
@@ -1317,6 +1450,7 @@
     // Formula panel elements
     const panel = $('formulaPanel');
     const formulaTitle = $('formulaTitle');
+    const formulaMeta = $('formulaMeta');
     const formulaText = $('formulaText');
     const formulaDetails = $('formulaDetails');
     const closePanel = $('closePanel');
@@ -1327,6 +1461,15 @@
     const sliderValue = $('sliderValue');
 
     let activeInput = null;
+    function buildFormulaMeta(input){
+      if (!input) return '';
+      const fieldInfo = getFieldTaxonomyInfo(input.id);
+      return `HMRC TAGGING\n` +
+        `Field ID: ${input.id}\n` +
+        `Variable: ${fieldInfo.variableName}\n` +
+        `CT600: ${fieldInfo.ct600Mapping}\n` +
+        `Tax Computation: ${fieldInfo.taxComputationMapping}`;
+    }
 
     function openFormulaPanel(input, titleOverride){
       if(!input) return;
@@ -1334,6 +1477,7 @@
       const label = input.closest('label');
       const title = titleOverride || (label ? (label.textContent || input.id) : input.id);
       formulaTitle.textContent = title.trim();
+      formulaMeta.textContent = buildFormulaMeta(input);
       formulaText.textContent = input.dataset.formula || '';
       formulaDetails.textContent = input.dataset.details || '';
 
@@ -1364,6 +1508,7 @@
       const title = titleOverride || (label ? (label.textContent || input.id) : input.id);
 
       formulaTitle.textContent = `Field Mapping: ${title.trim()}`;
+      formulaMeta.textContent = buildFormulaMeta(input);
       formulaText.textContent =
         `Variable name:\n${fieldInfo.variableName}\n\n` +
         `CT600 mapping:\n${fieldInfo.ct600Mapping}\n\n` +

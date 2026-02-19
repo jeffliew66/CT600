@@ -17,6 +17,10 @@
   if (!TaxModel) throw new Error('TaxModel not loaded. Load taxModel.js first.');
 
   function round(n) { return TaxModel.roundPounds(n); }
+  function getSlices(result) {
+    if (Array.isArray(result?.slices) && result.slices.length) return result.slices;
+    return Array.isArray(result?.byFY) ? result.byFY : [];
+  }
 
   /**
    * Builds "Profit Adjustment Schedule" (CT600 Page 3 basis)
@@ -133,11 +137,12 @@
    * Builds "Capital Allowances Statement" (CT600 Box 670 basis)
    */
   function buildCapitalAllowancesSchedule(inputs, result) {
-    const slices = Array.isArray(result.byFY) ? result.byFY : [];
+    const slices = getSlices(result);
     const sliceRows = slices.map((slice) => ({
       fy_year: slice.fy_year,
       fy_years: Array.isArray(slice.fy_years) ? slice.fy_years : [slice.fy_year],
       period_index: slice.period_index || 1,
+      slice_index: slice.slice_index || 1,
       ap_days_in_fy: slice.ap_days_in_fy || 0,
       aia_limit_pro_rated: Number(slice.aia_cap_for_fy || 0)
     }));
@@ -173,6 +178,7 @@
         fy_year: Number(row.fyYear || 0),
         fy_years: Array.isArray(row.fyYears) ? row.fyYears : [Number(row.fyYear || 0)],
         period_index: Number(row.periodIndex || 1),
+        slice_index: Number(row.sliceIndex || 1),
         ap_days_in_fy: Number(row.apDaysInFY || 0),
         aia_limit_pro_rated: round(row.aiaLimitProRated),
         aia_claim_requested: round(row.aiaClaimRequested),
@@ -201,6 +207,7 @@
         fy_year: row.fy_year,
         fy_years: row.fy_years,
         period_index: row.period_index,
+        slice_index: row.slice_index || 1,
         ap_days_in_fy: row.ap_days_in_fy,
         aia_limit_pro_rated: round(row.aia_limit_pro_rated),
         aia_claim_requested: round(row.aia_claim_requested),
@@ -235,7 +242,7 @@
    * This note is informational only and follows the implemented engine logic.
    */
   function buildTaxCalculationTable(result) {
-    const byFY = result.byFY;
+    const byFY = getSlices(result);
 
     const taxByFY = byFY.map((fy) => {
       const tp = round(fy.taxableProfit || 0);

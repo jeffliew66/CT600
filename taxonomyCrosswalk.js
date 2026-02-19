@@ -88,6 +88,7 @@
 // result.computation.totalTradingIncome                          | -                                                        | profit_adjustment_schedule.trading_income_components.total_trading_income
 // result.computation.grossTradingProfit                          | box_155_trading_profit                                   | profit_adjustment_schedule.net_trading_profit_before_loss
 // result.computation.tradingLossUsed                             | box_160_trading_losses_bfwd_used                         | profit_adjustment_schedule.trading_loss_bfwd_applied
+// result.computation.capitalAllowances                           | box_172_aia_claimed                                      | -
 // result.computation.tradingLossUsed                             | -                                                        | trading_loss_schedule.trading_loss_bfwd_used_this_period
 // result.computation.tradingLossAvailable                        | _trading_losses_available (custom transparency)          | -
 // result.computation.taxableTradingProfit                        | box_165_net_trading_profits                              | profit_adjustment_schedule.net_trading_profit

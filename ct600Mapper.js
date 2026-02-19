@@ -27,6 +27,49 @@
   function sumNumbers(values) {
     return values.reduce((s, x) => s + (Number(x || 0) || 0), 0);
   }
+  function getSlices(result) {
+    if (Array.isArray(result?.slices) && result.slices.length) return result.slices;
+    return Array.isArray(result?.byFY) ? result.byFY : [];
+  }
+  function expandSlicesForRateTable(slices) {
+    const expanded = [];
+    (Array.isArray(slices) ? slices : []).forEach((slice) => {
+      const components = Array.isArray(slice?.fy_components) ? slice.fy_components : [];
+      if (components.length <= 1) {
+        expanded.push(slice);
+        return;
+      }
+
+      const totalTaxable = Math.max(0, Number(slice?.taxableProfit || 0));
+      const totalCtCharge = Math.max(0, Number(slice?.ctCharge || 0));
+      const totalMarginalRelief = Math.max(0, Number(slice?.marginalRelief || 0));
+      const totalWeight = components.reduce((sum, part) => sum + Math.max(0, Number(part?.taxableProfit || 0)), 0);
+      let remainingCtCharge = totalCtCharge;
+      let remainingMarginalRelief = totalMarginalRelief;
+
+      components.forEach((part, idx) => {
+        const isLast = idx === components.length - 1;
+        const partTaxable = Math.max(0, Number(part?.taxableProfit || 0));
+        const partWeight = totalWeight > 0 ? (partTaxable / totalWeight) : (1 / Math.max(1, components.length));
+        const partCt = isLast ? remainingCtCharge : (totalCtCharge * partWeight);
+        const partMr = isLast ? remainingMarginalRelief : (totalMarginalRelief * partWeight);
+        remainingCtCharge -= partCt;
+        remainingMarginalRelief -= partMr;
+
+        expanded.push({
+          ...slice,
+          fy_year: Number(part?.fy_year || slice?.fy_year || 0),
+          fy_years: [Number(part?.fy_year || slice?.fy_year || 0)],
+          ap_days_in_fy: Number(part?.ap_days_in_fy || 0),
+          taxableProfit: partTaxable,
+          augmentedProfit: Number(part?.augmentedProfit || 0),
+          ctCharge: partCt,
+          marginalRelief: partMr
+        });
+      });
+    });
+    return expanded;
+  }
 
   function computePropertyBusinessIncomeForCT600(result) {
     const direct = Number(result?.property?.propertyBusinessIncomeForCT600);
@@ -120,7 +163,7 @@
   }
 
   function fillRateTableBoxes(boxes, result) {
-    const groupedYears = aggregateRowsByYear(result?.byFY);
+    const groupedYears = aggregateRowsByYear(expandSlicesForRateTable(getSlices(result)));
     const rowSpecs = [
       { yearBox: 330, profitBox: 335, rateBox: 340, taxBox: 345, groupIndex: 0, rowIndex: 0 },
       { yearBox: null, profitBox: 350, rateBox: 355, taxBox: 360, groupIndex: 0, rowIndex: 1 },
@@ -184,7 +227,7 @@
     const coronavirusOverpaymentNowDue = toMoney(ct600.coronavirusSupportPaymentOverpaymentNowDue || 0);
     const restitutionTax = toMoney(ct600.restitutionTax || 0);
     const assocCompanyFyYears = Array.from(new Set(
-      (Array.isArray(result?.byFY) ? result.byFY : [])
+      getSlices(result)
         .flatMap((slice) => (
           Array.isArray(slice?.fy_years)
             ? slice.fy_years
@@ -211,6 +254,7 @@
     // Box 160 is "trading losses brought forward used" (used amount, not opening balance).
     boxes.box_160_trading_losses_bfwd_used = round(result.computation.tradingLossUsed);
     boxes.box_165_net_trading_profits = roundNonNegative(result.computation.taxableTradingProfit);
+    boxes.box_172_aia_claimed = roundNonNegative(result.computation.capitalAllowances || 0);
     // Box 170 is a disclosure heading (gross NTLR profits), not a net taxable-interest box.
     boxes.box_170_non_trading_loan_relationship_profits = roundNonNegative(nonTradingLoanRelationshipProfit);
     boxes.box_190_property_business_income = roundNonNegative(propertyBusinessIncome);
