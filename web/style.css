@@ -347,8 +347,8 @@ footer{
   right:0;
   top:0;
   height:100%;
-  width:min(54vw,920px);
-  min-width:560px;
+  width:min(62vw,1100px);
+  min-width:620px;
   background:var(--panel);
   border-left:1px solid #d8e5db;
   transform:translateX(110%);
@@ -379,8 +379,8 @@ footer{
   margin-top:8px;
   height:calc(100vh - 40px);
   display:grid;
-  grid-template-rows:auto auto auto auto minmax(0,1fr) auto auto;
-  gap:8px;
+  grid-template-rows:auto auto auto minmax(72px,auto) auto minmax(0,1fr) auto;
+  gap:6px;
 }
 
 #formulaTitle{
@@ -402,6 +402,8 @@ footer{
   font-size:13px;
   line-height:1.45;
   color:#244636;
+  max-height:128px;
+  overflow:auto;
 }
 
 #formulaContent h4{
@@ -422,18 +424,21 @@ footer{
   white-space:pre-wrap;
   overflow:auto;
   font-family:"Aptos","Segoe UI Variable","Segoe UI",sans-serif;
-  font-size:15px;
-  line-height:1.55;
+  font-size:14px;
+  line-height:1.48;
   letter-spacing:.01em;
 }
 
 #formulaText{
-  min-height:84px;
-  max-height:180px;
+  min-height:62px;
+  max-height:110px;
 }
 
 #formulaDetails{
-  min-height:220px;
+  min-height:0;
+  height:100%;
+  font-size:14.5px;
+  line-height:1.5;
 }
 
 #formulaSlider{width:100%}

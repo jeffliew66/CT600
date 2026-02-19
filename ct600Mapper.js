@@ -162,8 +162,94 @@
     });
   }
 
+  function allocateRoundedWholePounds(rawValues, targetTotal) {
+    const values = (Array.isArray(rawValues) ? rawValues : []).map((v) => Math.max(0, Number(v || 0)));
+    const target = Math.max(0, round(targetTotal || 0));
+    if (!values.length) return [];
+
+    const floors = values.map((v) => Math.floor(v));
+    const allocated = floors.slice();
+    let delta = target - floors.reduce((s, x) => s + x, 0);
+    const withFraction = values.map((v, idx) => ({
+      idx,
+      frac: v - Math.floor(v),
+      value: v
+    }));
+
+    if (delta > 0) {
+      const order = withFraction
+        .slice()
+        .sort((a, b) => (b.frac - a.frac) || (b.value - a.value) || (a.idx - b.idx));
+      let ptr = 0;
+      while (delta > 0 && order.length > 0) {
+        const pick = order[ptr % order.length];
+        allocated[pick.idx] += 1;
+        delta -= 1;
+        ptr += 1;
+      }
+    } else if (delta < 0) {
+      const order = withFraction
+        .slice()
+        .sort((a, b) => (a.frac - b.frac) || (b.value - a.value) || (a.idx - b.idx));
+      let guard = 0;
+      while (delta < 0 && guard < 1000) {
+        let changed = false;
+        for (const pick of order) {
+          if (delta >= 0) break;
+          if (allocated[pick.idx] > 0) {
+            allocated[pick.idx] -= 1;
+            delta += 1;
+            changed = true;
+          }
+        }
+        if (!changed) break;
+        guard += 1;
+      }
+    }
+
+    return allocated;
+  }
+
+  function applyWholePoundProfitRounding(groupedYears, result) {
+    const groups = (Array.isArray(groupedYears) ? groupedYears : []).map((group) => ({
+      ...group,
+      rows: (Array.isArray(group?.rows) ? group.rows : []).map((row) => ({ ...row }))
+    }));
+    if (!groups.length) return groups;
+
+    const totalTaxableTarget = roundNonNegative(result?.computation?.taxableTotalProfits || 0);
+    const targets = [];
+    if (groups.length === 1) {
+      targets.push(totalTaxableTarget);
+    } else {
+      const yearOneRaw = sumNumbers((groups[0].rows || []).map((row) => row.profit));
+      const yearOneTarget = Math.min(totalTaxableTarget, roundNonNegative(yearOneRaw));
+      targets.push(yearOneTarget);
+      targets.push(Math.max(0, totalTaxableTarget - yearOneTarget));
+      for (let i = 2; i < groups.length; i += 1) {
+        targets.push(roundNonNegative(sumNumbers((groups[i].rows || []).map((row) => row.profit))));
+      }
+    }
+
+    groups.forEach((group, groupIdx) => {
+      const rows = Array.isArray(group.rows) ? group.rows : [];
+      const target = Number.isFinite(targets[groupIdx])
+        ? targets[groupIdx]
+        : roundNonNegative(sumNumbers(rows.map((row) => row.profit)));
+      const rounded = allocateRoundedWholePounds(rows.map((row) => row.profit), target);
+      rows.forEach((row, rowIdx) => {
+        row.profitRounded = Math.max(0, Number(rounded[rowIdx] || 0));
+      });
+    });
+
+    return groups;
+  }
+
   function fillRateTableBoxes(boxes, result) {
-    const groupedYears = aggregateRowsByYear(expandSlicesForRateTable(getSlices(result)));
+    const groupedYears = applyWholePoundProfitRounding(
+      aggregateRowsByYear(expandSlicesForRateTable(getSlices(result))),
+      result
+    );
     const rowSpecs = [
       { yearBox: 330, profitBox: 335, rateBox: 340, taxBox: 345, groupIndex: 0, rowIndex: 0 },
       { yearBox: null, profitBox: 350, rateBox: 355, taxBox: 360, groupIndex: 0, rowIndex: 1 },
@@ -179,7 +265,8 @@
       if (spec.yearBox != null) {
         boxes[`box_${spec.yearBox}_financial_year`] = group ? group.year : '';
       }
-      boxes[`box_${spec.profitBox}_profits_chargeable_at_corresponding_rate`] = toMoney(row ? row.profit : 0);
+      boxes[`box_${spec.profitBox}_profits_chargeable_at_corresponding_rate`] =
+        roundNonNegative(row ? (row.profitRounded ?? row.profit) : 0);
       boxes[`box_${spec.rateBox}_corresponding_rate`] = toMoney(row ? row.ratePct : 0);
       boxes[`box_${spec.taxBox}_tax`] = toMoney(row ? row.taxBeforeRelief : 0);
     });

@@ -463,43 +463,55 @@
     ].join('|');
   }
 
-  function collapseSlicesByRegime(rawSlices) {
-    const grouped = [];
+  function toGroupedSlice(slice) {
+    const lower = slice.thresholds ? slice.thresholds.small_threshold_for_AP_in_this_FY : 0;
+    const upper = slice.thresholds ? slice.thresholds.upper_threshold_for_AP_in_this_FY : 0;
+    return {
+      signature: getRegimeSignature(slice.tiers),
+      fy_years: [slice.fy_year],
+      fy_components: [{
+        fy_year: slice.fy_year,
+        ap_days_in_fy: slice.ap_days_in_fy || 0,
+        taxableProfit: slice.taxableProfit || 0,
+        augmentedProfit: slice.augmentedProfit || 0,
+        thresholds: slice.thresholds || null,
+        aia_cap_for_fy: slice.aia_cap_for_fy || 0,
+        overlap_start_utc: slice.overlap_start_utc,
+        overlap_end_utc: slice.overlap_end_utc
+      }],
+      ap_days: slice.ap_days_in_fy,
+      thresholds: slice.thresholds || null,
+      aia_cap_for_fy: slice.aia_cap_for_fy || 0,
+      taxableProfit: slice.taxableProfit || 0,
+      augmentedProfit: slice.augmentedProfit || 0,
+      lower_limit_sum: lower,
+      upper_limit_sum: upper,
+      start_utc: slice.overlap_start_utc,
+      end_utc: slice.overlap_end_utc,
+      tiers: slice.tiers
+    };
+  }
+
+  function collapseSlicesByRegime(rawSlices, preserveFYBoundaries) {
     const orderedSlices = [...(rawSlices || [])].sort((a, b) => {
       const aStart = a?.overlap_start_utc instanceof Date ? a.overlap_start_utc.getTime() : 0;
       const bStart = b?.overlap_start_utc instanceof Date ? b.overlap_start_utc.getTime() : 0;
       return aStart - bStart;
     });
+    // Keep FY boundaries visible as distinct slices (e.g. Jan-Mar / Apr-Dec),
+    // even where rates are unchanged across consecutive FYs.
+    if (preserveFYBoundaries) {
+      return orderedSlices.map((slice) => toGroupedSlice(slice));
+    }
+
+    const grouped = [];
     orderedSlices.forEach((slice) => {
       const lower = slice.thresholds ? slice.thresholds.small_threshold_for_AP_in_this_FY : 0;
       const upper = slice.thresholds ? slice.thresholds.upper_threshold_for_AP_in_this_FY : 0;
       const signature = getRegimeSignature(slice.tiers);
       const last = grouped[grouped.length - 1];
       if (!last || last.signature !== signature) {
-        grouped.push({
-          signature,
-          fy_years: [slice.fy_year],
-          fy_components: [{
-            fy_year: slice.fy_year,
-            ap_days_in_fy: slice.ap_days_in_fy || 0,
-            taxableProfit: slice.taxableProfit || 0,
-            augmentedProfit: slice.augmentedProfit || 0,
-            thresholds: slice.thresholds || null,
-            aia_cap_for_fy: slice.aia_cap_for_fy || 0,
-            overlap_start_utc: slice.overlap_start_utc,
-            overlap_end_utc: slice.overlap_end_utc
-          }],
-          ap_days: slice.ap_days_in_fy,
-          thresholds: slice.thresholds || null,
-          aia_cap_for_fy: slice.aia_cap_for_fy || 0,
-          taxableProfit: slice.taxableProfit || 0,
-          augmentedProfit: slice.augmentedProfit || 0,
-          lower_limit_sum: lower,
-          upper_limit_sum: upper,
-          start_utc: slice.overlap_start_utc,
-          end_utc: slice.overlap_end_utc,
-          tiers: slice.tiers
-        });
+        grouped.push(toGroupedSlice(slice));
         return;
       }
       last.fy_years.push(slice.fy_year);
@@ -748,8 +760,8 @@
       // Augmented profit includes taxable profit + dividend income (for rate banding)
       const periodAugmentedProfitRaw = periodTaxableTotalRaw + periodDividendIncome;
 
-      // Build raw FY slices first, then collapse contiguous slices when tax regime is unchanged.
-      // This enforces whole-period MR logic when rates/thresholds are unchanged across FY boundaries.
+      // Build raw FY slices and preserve FY boundaries as explicit slices.
+      // This ensures Jan-Mar / Apr-... structure is always visible when a period straddles 1 April.
       const rawPeriodByFY = fyOverlaps.map((fy) => {
         const th = thresholdParts.find((t) => t.fy_year === fy.fy_year);
         const tp = periodTaxableTotalRaw * (fy.ap_days_in_fy / period.days);
@@ -770,7 +782,7 @@
         };
       });
 
-      const groupedPeriodByFY = collapseSlicesByRegime(rawPeriodByFY);
+      const groupedPeriodByFY = collapseSlicesByRegime(rawPeriodByFY, true);
       const periodSlices = groupedPeriodByFY.map((grp, sliceIndex) => {
         const lower = grp.lower_limit_sum || 0;
         const upper = grp.upper_limit_sum || 0;
