@@ -91,7 +91,7 @@
             ? roundPounds(Math.max(0, propertyLossUsageRequestedNum))
             : null;
         })();
-    const interestIncome = roundPounds(ui.interestIncome || 0);
+    const interestIncome = Math.max(0, roundPounds(ui.interestIncome || 0));
     const tradingBalancingCharges = roundPounds(ui.tradingBalancingCharges || 0);
     const chargeableGains = roundPounds(ui.chargeableGains || 0);
     const chargeableGainsComputationFileName = String(ui.chargeableGainsComputationFileName || '');

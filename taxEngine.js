@@ -556,16 +556,6 @@
     const apSplits = buildAccountingPeriodSplits(inputs, corpTaxYears);
     const hasMultiplePeriods = apSplits.length > 1;
 
-    // Allocate profit and income proportionally across periods
-    const allocateToPeriods = (value) => {
-      return apSplits.map((period) => ({
-        periodName: period.periodName,
-        days: period.days,
-        isShortPeriod: period.isShortPeriod,
-        amount: value * (period.days / accountingPeriodDays)
-      }));
-    };
-
     // 1) Accounts P&L -> PBT (allocate to periods)
     // CRITICAL: Do NOT include dividend in totalIncome - dividend affects rate, not taxable profit
     const pnl = inputs.pnl;
@@ -711,6 +701,17 @@
       const periodTradingAfterLossRaw = periodTradingAfterAIARaw - periodLossUsed;
 
       const periodTaxableAfterLossRaw = periodTradingAfterLossRaw + periodNonTradingAfterAIARaw;
+      // Current-period trading losses can be absorbed by same-period non-trading profits
+      // before carry-forward is determined.
+      const periodCurrentTradingLossGeneratedRaw = Math.max(0, -periodTradingAfterLossRaw);
+      const periodTradingLossAbsorbedByNonTradingRaw = Math.min(
+        periodCurrentTradingLossGeneratedRaw,
+        Math.max(0, periodNonTradingAfterAIARaw)
+      );
+      const periodCurrentTradingLossUnrelievedRaw = Math.max(
+        0,
+        periodCurrentTradingLossGeneratedRaw - periodTradingLossAbsorbedByNonTradingRaw
+      );
       // Property losses b/fwd are claimable against total profits (capped at available/requested/positive total profits).
       const periodPropertyLossUsed = Math.min(
         periodPropertyLossPool,
@@ -889,6 +890,14 @@
         propertyAdjustment: TaxModel.roundPounds(periodPropertyAdjustmentDisplayRaw),
         taxableBeforeLossRaw: periodTaxableBeforeLossRaw,
         taxableBeforeLoss: TaxModel.roundPounds(periodTaxableBeforeLossRaw),
+        taxableAfterLossRaw: periodTaxableAfterLossRaw,
+        taxableAfterLoss: TaxModel.roundPounds(periodTaxableAfterLossRaw),
+        currentTradingLossGeneratedRaw: periodCurrentTradingLossGeneratedRaw,
+        currentTradingLossGenerated: TaxModel.roundPounds(periodCurrentTradingLossGeneratedRaw),
+        tradingLossAbsorbedByNonTradingRaw: periodTradingLossAbsorbedByNonTradingRaw,
+        tradingLossAbsorbedByNonTrading: TaxModel.roundPounds(periodTradingLossAbsorbedByNonTradingRaw),
+        currentTradingLossUnrelievedRaw: periodCurrentTradingLossUnrelievedRaw,
+        currentTradingLossUnrelieved: TaxModel.roundPounds(periodCurrentTradingLossUnrelievedRaw),
         addBacksRaw: periodAddBacksRaw,
         addBacks: TaxModel.roundPounds(periodAddBacks),
         tradeAIACapTotalRaw: periodAIACapTotal,
@@ -963,7 +972,10 @@
       0
     );
     const tradingLossBroughtForwardRemainingRaw = Math.max(0, remainingLossPool);
-    const currentYearTradingLossIncurredRaw = Math.max(0, -totalTradingProfitAfterLossRaw);
+    const currentYearTradingLossIncurredRaw = periodResults.reduce(
+      (s, p) => s + Number(p.currentTradingLossUnrelievedRaw ?? 0),
+      0
+    );
     const totalTradingLossCarriedForwardRaw =
       tradingLossBroughtForwardRemainingRaw + currentYearTradingLossIncurredRaw;
 
@@ -1108,7 +1120,7 @@
       ap_days: accountingPeriodDays,
       ap_split: hasMultiplePeriods,
       period_slice_structure_note: 'Period 1/2 are submission periods (>12 months only). Slice 1/2 are tax-regime slices within each period.',
-      loss_relief_note: 'Trading losses brought forward are applied against taxable trading profits only. Unrelieved current-period trading losses are carried forward. Property losses are claimable against total profits (subject to availability and claim).',
+      loss_relief_note: 'Trading losses brought forward are applied against taxable trading profits only. Current-period trading losses are automatically absorbed by same-period non-trading profits before carry-forward. Property losses are claimable against total profits (subject to availability and claim).',
       trading_loss_bf_available: TaxModel.roundPounds(tradingLossBroughtForward),
       trading_loss_bf_available_remaining: TaxModel.roundPounds(remainingLossPool),
       trading_loss_current_period_incurred: TaxModel.roundPounds(currentYearTradingLossIncurredRaw),
@@ -1129,6 +1141,10 @@
         taxable_profit: p.taxableProfit,
         augmented_profit: p.augmentedProfit,
         taxable_before_loss: p.taxableBeforeLoss,
+        taxable_after_loss: p.taxableAfterLoss,
+        current_trading_loss_generated: p.currentTradingLossGenerated,
+        trading_loss_absorbed_by_non_trading: p.tradingLossAbsorbedByNonTrading,
+        current_trading_loss_unrelieved: p.currentTradingLossUnrelieved,
         property_adjustment: p.propertyAdjustment,
         add_backs: p.addBacks,
         loss_used: p.lossUsed,

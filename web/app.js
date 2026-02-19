@@ -352,7 +352,7 @@
       turnover: toNum($("turnover").value),
       govtGrants: toNum($("govtGrants").value),
       rentalIncome: toNum($("rentalIncome").value),
-      interestIncome: toNum($("interestIncome").value),
+      interestIncome: Math.max(0, toNum($("interestIncome").value)),
       disposalGains: $("disposalGains") ? toNum($("disposalGains").value) : 0,
       capitalGains: capitalGainsInput,
       capitalGainsFileName,
